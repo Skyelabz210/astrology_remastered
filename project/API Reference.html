@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CRAM · API Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter+Tight:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+.api{max-width:1200px;margin:0 auto;padding:28px 32px 90px;position:relative;z-index:1}
+.api-hdr{display:flex;align-items:center;justify-content:space-between;gap:18px;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:8px;flex-wrap:wrap}
+.api-hdr-l{display:flex;align-items:center;gap:14px}
+.api-back{background:transparent;border:1px solid var(--line-2);color:var(--ink-2);text-decoration:none;width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:16px}
+.api-back:hover{color:var(--ink);border-color:var(--ink-dim)}
+.api-title{font-family:var(--serif);font-style:italic;font-size:26px}
+.api-sub{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;color:var(--ink-dim);margin-top:2px}
+.api-caps{display:flex;gap:6px;flex-wrap:wrap}
+.cap{padding:4px 10px;border-radius:16px;font-family:var(--mono);font-size:9px;letter-spacing:0.08em;text-transform:uppercase;border:1px solid var(--line-2)}
+.cap.on{color:var(--bg);background:oklch(0.80 0.12 150);border-color:oklch(0.80 0.12 150)}
+.cap.off{color:var(--ink-dim)}
+.api-layout{display:grid;grid-template-columns:200px 1fr;gap:28px;margin-top:24px}
+@media(max-width:860px){.api-layout{grid-template-columns:1fr}.api-nav{display:none}}
+.api-nav{position:sticky;top:20px;align-self:start;display:flex;flex-direction:column;gap:2px}
+.api-nav a{font-family:var(--mono);font-size:11px;color:var(--ink-dim);text-decoration:none;padding:6px 10px;border-radius:5px;border-left:2px solid transparent}
+.api-nav a:hover{color:var(--ink);background:oklch(0.93 0.008 80 / 0.03)}
+.api-nav a.ns{color:var(--ink);margin-top:10px;font-weight:500}
+.grp{margin-bottom:36px}
+.grp-h{font-family:var(--serif);font-style:italic;font-size:24px;color:var(--ink);margin-bottom:4px}
+.grp-ns{font-family:var(--mono);font-size:11px;color:var(--ink-dim);margin-bottom:16px}
+.ep{border:1px solid var(--line);border-radius:10px;margin-bottom:14px;overflow:hidden;background:oklch(0.93 0.008 80 / 0.02)}
+.ep-sig{font-family:var(--mono);font-size:13px;color:var(--ink);padding:13px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ep-sig .fn{color:var(--amber)}
+.ep-sig .ar{color:var(--ink-dim)}
+.ep-sig .rt{color:oklch(0.72 0.10 180);margin-left:auto;font-size:11px}
+.ep-desc{padding:0 16px 12px;font-family:var(--serif);font-style:italic;font-size:14px;color:var(--ink-2);line-height:1.5}
+.ep-try{padding:12px 16px;border-top:1px solid var(--line);background:oklch(0.10 0.006 60)}
+.ep-code{width:100%;background:oklch(0.08 0.005 60);border:1px solid var(--line-2);border-radius:6px;color:var(--ink);font-family:var(--mono);font-size:12px;padding:10px 12px;resize:vertical;min-height:38px;outline:none;line-height:1.5}
+.ep-code:focus{border-color:var(--ink-dim)}
+.ep-run{display:flex;gap:8px;align-items:center;margin-top:8px}
+.ep-btn{background:var(--ink);color:var(--bg);border:none;padding:7px 14px;border-radius:5px;font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer}
+.ep-btn:hover{background:oklch(0.85 0.012 80)}
+.ep-out{font-family:var(--mono);font-size:12px;color:oklch(0.80 0.12 150);flex:1;word-break:break-all;white-space:pre-wrap}
+.ep-out.err{color:oklch(0.72 0.14 25)}
+.intro{font-family:var(--serif);font-size:16px;line-height:1.6;color:var(--ink-2);max-width:680px;margin:18px 0 4px}
+.intro code{font-family:var(--mono);font-size:13px;color:var(--amber);background:oklch(0.10 0.006 60);padding:1px 5px;border-radius:3px}
+.load-row{font-family:var(--mono);font-size:11px;color:var(--ink-dim);background:oklch(0.10 0.006 60);border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin-top:14px;line-height:1.7}
+.load-row b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="api">
+  <header class="api-hdr">
+    <div class="api-hdr-l">
+      <a class="api-back" href="HCRM Console.html" title="Back to HCRM Console">←</a>
+      <div>
+        <div class="api-title">CRAM · API Reference</div>
+        <div class="api-sub">window.CRAM · v<span id="ver">—</span> · residue-native number core + HCRM + astro</div>
+      </div>
+    </div>
+    <div class="api-caps" id="caps"></div>
+  </header>
+
+  <p class="intro">Every computational surface in the system is reachable through one namespace, <code>window.CRAM</code>. Each endpoint below is <b>live</b> — edit the call and press Run. Results are JSON-able so they cross workers, postMessage, and fetch boundaries unchanged. BigInts render as strings.</p>
+
+  <div class="load-row">
+    <b>Load order</b> for the full surface:<br>
+    &lt;script src="cram-int.js"&gt;&lt;/script&gt; — residue-native number core (standalone)<br>
+    &lt;script src="cram-api.js"&gt;&lt;/script&gt; — the <b>CRAM</b> namespace<br>
+    <span style="color:var(--ink-dim)">+ astro.jsx / hcrm.jsx (Babel) for the chart &amp; register-map endpoints</span>
+  </div>
+
+  <div class="api-layout">
+    <nav class="api-nav" id="nav"></nav>
+    <div id="groups"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" data-presets="react" src="astro.jsx"></script>
+<script type="text/babel" data-presets="react" src="hcrm.jsx"></script>
+<script src="cram-int.js"></script>
+<script src="cram-api.js"></script>
+<script src="api-ref.js"></script>
+</body>
+</html>

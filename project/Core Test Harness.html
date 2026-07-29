@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HCRM Core · Exact Test Harness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,400&family=Inter+Tight:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+.th{max-width:1000px;margin:0 auto;padding:28px 32px 80px;position:relative;z-index:1}
+.th-hdr{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:22px;flex-wrap:wrap}
+.th-hdr-l{display:flex;align-items:center;gap:14px}
+.th-back{background:transparent;border:1px solid var(--line-2);color:var(--ink-2);text-decoration:none;width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:16px}
+.th-title{font-family:var(--serif);font-style:italic;font-size:26px}
+.th-sub{font-family:var(--mono);font-size:10px;letter-spacing:0.10em;color:var(--ink-dim);margin-top:2px}
+.gate{display:flex;align-items:center;gap:14px;padding:18px 22px;border-radius:12px;border:1px solid var(--line);margin-bottom:22px;background:oklch(0.93 0.008 80 / 0.02)}
+.gate-badge{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:0.08em;padding:8px 16px;border-radius:8px}
+.gate.pass .gate-badge{background:oklch(0.80 0.12 150);color:var(--bg)}
+.gate.fail .gate-badge{background:oklch(0.72 0.14 25);color:var(--bg)}
+.gate.run .gate-badge{background:oklch(0.84 0.11 75);color:var(--bg)}
+.gate-txt{font-family:var(--serif);font-style:italic;font-size:16px;color:var(--ink-2)}
+.ctrls{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+.btn{background:var(--ink);color:var(--bg);border:none;padding:11px 18px;border-radius:6px;font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer}
+.btn.sec{background:transparent;color:var(--ink-2);border:1px solid var(--line-2)}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+.sec-h{font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-dim);margin:24px 0 10px;display:flex;align-items:center;gap:10px}
+.sec-h .pill{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid var(--line-2)}
+.prog{height:5px;border-radius:3px;background:var(--bg-3,oklch(0.20 0.01 60));overflow:hidden;margin:8px 0 14px}
+.prog-fill{height:100%;background:linear-gradient(90deg,oklch(0.6 0.04 60),oklch(0.80 0.12 150));width:0%;transition:width .2s}
+.row{display:flex;align-items:center;gap:12px;padding:7px 12px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px}
+.row:last-child{border-bottom:none}
+.tick{width:18px;text-align:center;flex-shrink:0}
+.tick.ok{color:oklch(0.80 0.12 150)}
+.tick.no{color:oklch(0.72 0.14 25)}
+.row-n{flex:1;color:var(--ink)}
+.row-d{color:var(--ink-dim);font-size:11px;text-align:right}
+.sweepbox{padding:16px 20px;border:1px solid var(--line);border-radius:12px;background:oklch(0.10 0.006 60);margin-top:8px}
+.sweep-stat{display:flex;gap:28px;flex-wrap:wrap;font-family:var(--mono);font-size:13px;margin-top:8px}
+.sweep-stat b{color:var(--ink);font-size:20px;font-family:var(--serif);font-style:italic;display:block}
+.sweep-stat span{color:var(--ink-dim);font-size:9px;text-transform:uppercase;letter-spacing:0.1em}
+.formula{font-family:var(--mono);font-size:12px;color:oklch(0.72 0.10 180);background:oklch(0.08 0.005 60);padding:10px 14px;border-radius:6px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="th">
+  <header class="th-hdr">
+    <div class="th-hdr-l">
+      <a class="th-back" href="HCRM Console.html" title="Back to HCRM Console">←</a>
+      <div>
+        <div class="th-title">HCRM Core · Exact Test Harness</div>
+        <div class="th-sub">P4 hard gate · BigInt-only · full ecliptic sweep + no-float audit</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="gate run" id="gate">
+    <span class="gate-badge" id="gateBadge">READY</span>
+    <span class="gate-txt" id="gateTxt">Run the suite to certify the integer core over the whole arcsecond ring.</span>
+  </div>
+
+  <div class="ctrls">
+    <button class="btn" id="runAll" onclick="runAll()">▶ run full gate</button>
+    <button class="btn sec" id="runUnit" onclick="runUnitOnly()">unit only</button>
+    <button class="btn sec" id="runSweep" onclick="runSweepOnly()">sweep only</button>
+  </div>
+
+  <div class="sec-h">Full ecliptic K-Elim sweep <span class="pill">PROVEN target</span></div>
+  <div class="formula">∀ x ∈ [0, 1,296,000): &nbsp; ⌊x/M₆⌋ ≡ (x mod 323 − x mod 30030)·287 (mod 323)</div>
+  <div class="prog"><div class="prog-fill" id="prog"></div></div>
+  <div class="sweepbox">
+    <div class="sweep-stat">
+      <div><b id="swChecked">—</b><span>arcseconds checked</span></div>
+      <div><b id="swMis">—</b><span>mismatches</span></div>
+      <div><b id="swMaxK">—</b><span>max winding K</span></div>
+      <div><b id="swStatus">idle</b><span>status</span></div>
+    </div>
+  </div>
+
+  <div class="sec-h">No-float core audit <span class="pill">src/core BigInt-only</span></div>
+  <div id="audit"></div>
+
+  <div class="sec-h">Exact unit tests <span class="pill" id="unitCount">—</span></div>
+  <div id="unit"></div>
+</div>
+
+<script type="module">
+import { run as runUnit } from "./test/core.test.js";
+import { runSweep } from "./test/full-sweep.test.js";
+import { runNoFloatAudit } from "./test/no-float-core.test.js";
+
+const $ = (id) => document.getElementById(id);
+let unitPass = null, auditPass = null, sweepPass = null;
+
+function rowHTML(r) {
+  return `<div class="row"><span class="tick ${r.ok?"ok":"no"}">${r.ok?"✓":"✗"}</span><span class="row-n">${r.name}</span><span class="row-d">${r.detail||""}</span></div>`;
+}
+function setGate() {
+  const g = $("gate"), b = $("gateBadge"), t = $("gateTxt");
+  const done = [unitPass, auditPass, sweepPass].filter(v => v !== null);
+  if (done.length === 0) return;
+  const allKnown = unitPass !== null && auditPass !== null && sweepPass !== null;
+  const anyFail = done.some(v => v === false);
+  g.className = "gate " + (anyFail ? "fail" : allKnown ? "pass" : "run");
+  if (anyFail) { b.textContent = "FAIL"; t.textContent = "Core is not evidence-grade — a check failed."; }
+  else if (allKnown) { b.textContent = "PROVEN"; t.textContent = "Integer core certified over the full ecliptic ring with zero mismatches, no floating point."; }
+  else { b.textContent = "PARTIAL"; t.textContent = "Some checks passed; run the full gate to certify."; }
+}
+
+window.runUnitOnly = async function() {
+  const res = runUnit();
+  $("unit").innerHTML = res.map(rowHTML).join("");
+  const pass = res.filter(r => r.ok).length;
+  $("unitCount").textContent = `${pass}/${res.length}`;
+  unitPass = res.every(r => r.ok); setGate();
+};
+async function runAudit() {
+  const res = await runNoFloatAudit();
+  $("audit").innerHTML = res.map(rowHTML).join("");
+  auditPass = res.every(r => r.ok); setGate();
+}
+window.runSweepOnly = async function() {
+  $("swStatus").textContent = "running"; $("runSweep").disabled = true; $("runAll").disabled = true;
+  const out = await runSweep(async (pct, checked, mis) => {
+    $("prog").style.width = pct + "%"; $("swChecked").textContent = Number(checked).toLocaleString(); $("swMis").textContent = mis;
+    await new Promise(r => setTimeout(r, 0));
+  });
+  $("prog").style.width = "100%";
+  $("swChecked").textContent = Number(out.checked).toLocaleString();
+  $("swMis").textContent = out.mismatches; $("swMaxK").textContent = out.maxK;
+  $("swStatus").textContent = out.ok ? "PROVEN" : "FAIL";
+  sweepPass = out.ok; $("runSweep").disabled = false; $("runAll").disabled = false; setGate();
+};
+window.runAll = async function() {
+  await window.runUnitOnly();
+  await runAudit();
+  await window.runSweepOnly();
+};
+// auto-run unit + audit on load (fast); sweep is explicit
+window.runUnitOnly();
+runAudit();
+</script>
+</body>
+</html>

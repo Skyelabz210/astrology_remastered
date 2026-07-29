@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HCRM Exact Ephemeris Ledger Entry",
+  "type": "object",
+  "required": ["ledger_version", "event_id", "body", "longitude_arcsec", "source", "certificate"],
+  "properties": {
+    "ledger_version": { "const": "hcrm-ephemeris-ledger-v1" },
+    "event_id": { "type": "string" },
+    "body": { "type": "string" },
+    "longitude_arcsec": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "source": {
+      "type": "object",
+      "required": ["kind", "name", "checksum"],
+      "properties": {
+        "kind": { "type": "string" },
+        "name": { "type": "string" },
+        "checksum": { "type": "string" }
+      }
+    },
+    "certificate": {
+      "type": "object",
+      "required": ["status", "notes"],
+      "properties": {
+        "status": { "enum": ["SYNTHETIC_DEMO", "IMPORTED_INTEGER_LEDGER", "CERTIFIED_EXACT_LEDGER"] },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}
