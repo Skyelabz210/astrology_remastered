@@ -164,6 +164,18 @@ excluded from the shell product so it can carry the winding.
   by construction. This is what Sh = {11⁶, 13, 17, 19} has always meant.
 - **Refusal** — PROVEN: `parkedRecover` throws when the parked prime is still in
   the shell, because no inverse exists there.
+- **CORRECTED (P22) — parking moves a lane out of the shell; it cannot conjure
+  one.** `parkingReport` gated admissibility on coprimality alone, so an
+  off-basis prime passed: `parkingReport(B8, [23])` returned
+  `admissible: true` — gcd(M₈, 23) = 1 — while 23 ∤ M₈, so the tray has no
+  mod-23 lane to read. That is precisely the EXTERNAL anchor this module rejects
+  three sections down; the report contradicted `trayDeterminesAnchor`. Nothing
+  was in fact parked either: filtering the shell by a prime the basis lacks
+  removes nothing, so the report also showed all eight lanes still in the shell.
+  Admissibility now requires the parked lane to be **in the basis** —
+  `parked_in_basis`, with any offenders named in `external_lanes`. Widening an
+  existing lane to p^k stays admissible (it is read off the tray at more
+  precision); importing a new prime does not.
 
 ### Anchor admissibility (`src/core/anchor.js`) — P17, REVERSES P14
 
@@ -290,6 +302,23 @@ transduce, which implied the tower certifies the bridge. It does not.
   integer-coefficient Φ acts lane-wise, but Φ⁻¹ requires its divisor to be a
   unit in every lane the bridge touches, including M+1. Over {2,5,7,11},
   M+1 = 771 = 3·257 breaks a divide-by-3 even though no basis lane contains 3.
+- **CORRECTED (P22) — the corridor was certified against the wrong magnitude.**
+  Φ acting lane-wise pins the target RESIDUES, but the winding K_B = ⌊Φ(x)/M_B⌋
+  is a magnitude fact and lane-wise action says nothing about it. The test used
+  `M_A(K_A+1)/M_B`, a bound on **x**, to certify a corridor holding **Φ(x)**.
+  Counter-computation: source {2,3,5,7}, target {3,5,7,11}, x = 1000,
+  Φ(v) = 10000·v. The old bound reads 210·5/1155 = **0 < 1156**, so the lineage
+  said `corridor_certified: true` — while the adjacency K-Elim had recovered
+  K_B only mod 1156 and `value()` returned **653,740** instead of 10,000,000.
+  A wrong value, marked certified. The true bound is 10000·1050/1155 = **9090**,
+  which refuses.
+  A caller supplying a non-trivial `phiLane` must now declare how Φ moves
+  magnitude — `phiBound(N)` (an upper bound on Φ(X) for X < N) for
+  `omega:"recompute"`, `phiMagnitude(X)` for the `omega:"lift"` boundary touch —
+  and is **refused** rather than certified when it does not. With no `phiLane`
+  both default to the identity and the prior behaviour is unchanged. Under
+  `preserve`/`project` the winding is not recomputed at all, so it is flagged
+  `winding_asserted` — the caller's claim, never presented as a result.
 
 ### Safe Basis tiers and S_R (P16 — correction of record)
 

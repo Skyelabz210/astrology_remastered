@@ -174,7 +174,8 @@ export function run() {
     // Φ acts LANE-WISE: any polynomial with integer coefficients satisfies
     // Φ(x) mod b = Φ(x mod b) mod b, so an active transduction stays native.
     const A = [2n, 3n, 5n, 7n], Bt = [3n, 5n, 7n, 11n];
-    const sB = transduce(encode(83n, A), Bt, { phiLane: (v) => 2n * v + 1n });
+    const sB = transduce(encode(83n, A), Bt,
+      { phiLane: (v) => 2n * v + 1n, phiBound: (N) => 2n * N + 1n });
     t("active transduction (Φ ≠ id) applies lane-wise and stays residue-native",
       value(sB) === 167n && 2n * 83n + 1n === 167n,
       "Φ(x) mod b = Φ(x mod b) mod b for integer-coefficient Φ");
@@ -184,8 +185,10 @@ export function run() {
     // — and the bridge touches the ANCHOR lane M+1 as well as the basis lanes.
     const A = [2n, 5n, 7n, 13n], Bt = [17n, 19n, 23n];   // M+1 = 911 and 7430, both coprime to 3
     const x = 29n;
-    const sB = transduce(encode(x, A), Bt, { phiLane: (v) => 3n * v - 4n });
-    const back = transduce(sB, A, { phiLane: (v, m) => mod((v + 4n) * inverse(3n, m), m) });
+    const sB = transduce(encode(x, A), Bt,
+      { phiLane: (v) => 3n * v - 4n, phiBound: (N) => 3n * N });
+    const back = transduce(sB, A,
+      { phiLane: (v, m) => mod((v + 4n) * inverse(3n, m), m), phiBound: (N) => N });
     t("reversible round trip: Φ then Φ⁻¹, both lane-wise",
       value(sB) === 83n && value(back) === x && wellFormed(back),
       "29 → 3·29−4 = 83 → (83+4)·3⁻¹ = 29");
@@ -223,6 +226,63 @@ export function run() {
     t("omega:'lift' accepts an explicit, flagged boundary touch",
       value(lifted) === value(huge) && lifted.lineage[0].boundary_touch === true,
       "declared in the lineage, never silent");
+  }
+  {
+    // ── P22. The corridor test is a MAGNITUDE test, and Φ moves magnitude ──
+    // Φ acting lane-wise pins the target residues but says nothing about
+    // ⌊Φ(x)/M_B⌋. Certifying the corridor from a bound on x rather than on Φ(x)
+    // accepted a K that agreed only mod M_B+1 — a wrong value, marked certified.
+    const A = [2n, 3n, 5n, 7n], Bt = [3n, 5n, 7n, 11n];   // M_B = 1155
+    const amp = { phiLane: (v) => 10000n * v, phiBound: (N) => 10000n * N };
+    t("REGRESSION — a magnifying Φ is refused, not certified against the source bound",
+      (() => { try { transduce(encode(1000n, A), Bt, amp); return false; }
+        catch (e) { return e.message.includes("anchor corridor"); } })(),
+      "Φ(1000) = 10,000,000 needs K_B ≈ 8658; the corridor is 1156");
+    t("CORRECTED — the old bound M_A(K_A+1)/M_B ignored Φ and read 0 < 1156",
+      210n * (encode(1000n, A).K + 1n) / 1155n === 0n
+      && (10000n * 210n * (encode(1000n, A).K + 1n)) / 1155n === 9090n,
+      "same state, same target: 0 says certified, 9090 says refuse");
+    t("a non-trivial phiLane without phiBound is refused outright",
+      (() => { try { transduce(encode(1000n, A), Bt, { phiLane: amp.phiLane }); return false; }
+        catch (e) { return e.message.includes("phiBound"); } })(),
+      "magnitude is not a lane-wise fact — the caller must declare it");
+    {
+      // widen the target until it genuinely holds Φ(x), and the same call certifies
+      const wide = [11n, 13n, 17n, 19n, 23n, 29n, 31n];
+      const s = transduce(encode(1000n, A), wide, amp);
+      t("with a target wide enough for Φ(x), the certified path returns the right value",
+        value(s) === 10000000n && s.lineage.at(-1).corridor_certified === true
+        && s.lineage.at(-1).phi_active === true,
+        "10,000,000 exactly, and the lineage records that Φ was active");
+    }
+    {
+      // Φ = id must be untouched by the new gate
+      const s = transduce(encode(1000n, A), Bt);
+      t("no phiLane — bounds default to the identity and the old behaviour stands",
+        value(s) === 1000n && s.lineage.at(-1).corridor_certified === true
+        && s.lineage.at(-1).phi_active === false);
+    }
+    {
+      // preserve/project do not recompute, so they assert rather than certify
+      const s = transduce(encode(1000n, A), Bt, { omega: "preserve", phiLane: amp.phiLane });
+      t("under preserve/project a Φ-moved winding is flagged as ASSERTED, not certified",
+        s.lineage.at(-1).winding_asserted === true
+        && s.lineage.at(-1).corridor_certified === null,
+        "the caller owns the winding there; nothing claims to have proven it");
+    }
+    t("omega:'lift' with a phiLane needs phiMagnitude — the lift forms a value",
+      (() => { try { transduce(encode(1000n, A), Bt, { omega: "lift", phiLane: amp.phiLane }); return false; }
+        catch (e) { return e.message.includes("phiMagnitude"); } })(),
+      "reconstructing x tells you nothing about Φ(x)");
+    {
+      const s = transduce(encode(1000n, A), Bt,
+        { omega: "lift", phiLane: amp.phiLane, phiBound: amp.phiBound,
+          phiMagnitude: (X) => 10000n * X });
+      t("lift with phiMagnitude takes the boundary touch and lands on Φ(x)",
+        s.K === 8658n && s.lineage.at(-1).boundary_touch === true
+        && 10000n * 1000n / 1155n === 8658n,
+        "declared, flagged, and correct");
+    }
   }
   {
     const A = [2n, 3n, 5n, 7n, 11n], Bt = [2n, 3n, 5n, 7n];

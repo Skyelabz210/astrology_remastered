@@ -153,8 +153,10 @@ export function run() {
   {
     // an active transduction that holds the lock, and one that breaks it
     const A = [2n, 3n, 5n, 7n, 11n], Bt = [3n, 7n, 11n, 13n];
-    const held = transduce(encode(83n, A), Bt, { phiLane: lockedShift(11n, 2n) });
-    const broken = transduce(encode(83n, A), Bt, { phiLane: (v) => 2n * v + 1n });
+    const held = transduce(encode(83n, A), Bt,
+      { phiLane: lockedShift(11n, 2n), phiBound: (N) => N + 22n });
+    const broken = transduce(encode(83n, A), Bt,
+      { phiLane: (v) => 2n * v + 1n, phiBound: (N) => 2n * N + 1n });
     t("a locked transduction lands on the same lane-11 phase; an unlocked one does not",
       mod(value(held), 11n) === mod(83n, 11n) && mod(value(broken), 11n) !== mod(83n, 11n),
       `83 → ${value(held)} holds phase ${mod(83n, 11n)}; 83 → ${value(broken)} does not`);

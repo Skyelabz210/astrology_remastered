@@ -129,3 +129,20 @@ leaving the existing browser apps working against the demo layer.
   `hcrm-core.js` emits HCRM_REGISTER_V2 carrying the identity pair (r, K) plus
   the retained legacy block. The full sweep certifies both splits over the whole
   ring. Core unit suite 32 → 48 assertions, anchor suite 43 → 46.
+- P22: two review findings, both confirmed by counter-computation and both
+  cases of a certificate that was checking the wrong thing.
+  (1) `transduce` certified the target winding corridor with a bound on the
+  SOURCE magnitude while the tray held the TRANSFORMED one. Φ acting lane-wise
+  fixes residues; it says nothing about ⌊Φ(x)/M_B⌋. With x = 1000, {2,3,5,7} →
+  {3,5,7,11}, Φ(v) = 10000·v, the old bound read 0 < 1156 and the lineage said
+  `corridor_certified: true` while `value()` returned 653,740 instead of
+  10,000,000 — K_B had been recovered only mod 1156. A non-trivial `phiLane`
+  now requires `phiBound` under `omega:"recompute"` and `phiMagnitude` under
+  `omega:"lift"`, and is refused without them; `preserve`/`project` flag the
+  winding `winding_asserted`. Φ = id defaults to the identity, unchanged.
+  (2) `parkingReport` gated admissibility on coprimality alone, so an off-basis
+  prime passed: `parkingReport(B8, [23])` said admissible although 23 ∤ M₈ and
+  no mod-23 lane exists — the external anchor the module rejects elsewhere.
+  Admissibility now also requires `parked_in_basis`. Lane widening to p^k is
+  still admissible; importing a new prime is not.
+  CRAM suite 39 → 47, anchor suite 46 → 51. Total 378 → 391.

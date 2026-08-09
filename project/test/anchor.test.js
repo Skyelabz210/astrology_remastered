@@ -174,6 +174,29 @@ export function run() {
       && rep.shell === "881790" && rep.anchor === "11");
     t("corridor with the bare parked lane is the full Colony",
       rep.corridor === "9699690", "881,790 · 11 = 9,699,690");
+    t("the parked lane is one the tray already carries",
+      rep.parked_in_basis && rep.external_lanes.length === 0);
+  }
+  {
+    // ── P22. Parking moves a lane out of the shell; it cannot conjure one ────
+    // A prime outside the basis is an EXTERNAL anchor. Coprimality is not the
+    // test — trayDeterminesAnchor is, and 23 ∤ M₈. The report used to call this
+    // admissible, certifying an anchor the fixture cannot read.
+    const rep = parkingReport(B8, [23n]);
+    t("REGRESSION — an off-basis prime is refused however clean its arithmetic",
+      !rep.admissible && !rep.parked_in_basis && rep.external_lanes[0] === "23"
+      && rep.coprime && !trayDeterminesAnchor(B8, 23n),
+      "coprime to the shell and still inadmissible — the tray has no mod-23 lane");
+    t("CORRECTED — coprimality alone was the admissibility test, and it is not",
+      gcd(shellModulus(B8), 23n) === 1n && mod(M8, 23n) !== 0n,
+      "gcd said yes; divisibility — the actual i.i.d. condition — says no");
+    t("nothing was parked either: the shell still holds all eight lanes",
+      rep.shell === M8.toString() && rep.shell_lanes.length === 8,
+      "filtering by a prime the basis lacks removes nothing");
+    t("the rule is internality, and both real splits satisfy it",
+      parkingReport(B8, [11n]).admissible && parkingReport(B8, [11n], 6n).admissible
+      && !parkingReport(B8, [23n], 6n).admissible,
+      "widening an existing lane stays admissible; importing a new one does not");
   }
   {
     // over the ecliptic ring the parked lane alone suffices

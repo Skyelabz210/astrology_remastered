@@ -252,6 +252,15 @@ export function parkingReport(basis, parked, power = 1n) {
   const A = parked.reduce((a, p) => {
     let q = 1n; for (let i = 0n; i < power; i++) q = q * p; return a * q;
   }, 1n);
+  // A lane can only be PARKED if the tray already carries it. Parking moves a
+  // lane out of the shell and onto the anchor; it does not conjure one. A prime
+  // outside the basis is an EXTERNAL anchor — coprime or not, the tray cannot
+  // read it (trayDeterminesAnchor), so i.i.d. is gone and the split is
+  // inadmissible however clean the arithmetic looks. (P22)
+  const inBasis = parked.every((p) => basis.some((q) => q === p));
+  const external = parked.filter((p) => !basis.some((q) => q === p));
+  // Widening an existing lane to p^k is a lane widening, not a basis extension:
+  // the lane is still read off the tray, just carried at more precision.
   return {
     kind: "LANE_OCCUPANCY_V1",
     basis: basis.map(String),
@@ -262,11 +271,11 @@ export function parkingReport(basis, parked, power = 1n) {
     anchor: A.toString(),
     disjoint: shellLanes.every((p) => !parked.some((q) => q === p)),
     coprime: gcd(M, A) === 1n,
-    // a widened lane is tray-determined by construction once it is carried at
-    // that power; at power 1 it is already a lane of the basis
+    parked_in_basis: inBasis,
+    external_lanes: external.map(String),
     lane_widened: power > 1n,
     corridor: (M * A).toString(),
-    admissible: gcd(M, A) === 1n && shellLanes.length > 0,
+    admissible: inBasis && gcd(M, A) === 1n && shellLanes.length > 0,
   };
 }
 

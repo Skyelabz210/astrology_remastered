@@ -395,6 +395,26 @@ export function certifyTransduction(A, B) {
  * the value. `phiLane` applies a lane-wise value map (any polynomial with
  * integer coefficients acts lane-wise, since Φ(x) mod b = Φ(x mod b) mod b).
  * Ω selects the winding policy: recompute · preserve · project.
+ *
+ * MAGNITUDE IS NOT A LANE-WISE QUANTITY. (P22)
+ * ────────────────────────────────────────────
+ * Φ acting lane-wise fixes the target RESIDUES, but it says nothing about the
+ * magnitude of Φ(x) — and the winding K_B = ⌊Φ(x)/M_B⌋ is a magnitude fact.
+ * The adjacency K-Elim below recovers K_B only modulo M_B+1, so it is the exact
+ * winding only inside the corridor, and the corridor test needs a bound on the
+ * TRANSFORMED value. A bound on x certifies nothing about Φ(x).
+ *
+ * So a caller supplying a non-trivial `phiLane` must also declare how Φ moves
+ * magnitude. These are declarations about Φ, not reconstructions of x:
+ *
+ *   phiBound(N)     ⟹  Φ(X) < phiBound(N) for every 0 ≤ X < N.  Required by
+ *                      omega:"recompute". Used only for the corridor test.
+ *   phiMagnitude(X) ⟹  Φ(X) exactly, on integers. Required by omega:"lift",
+ *                      which is a declared boundary touch and needs the value.
+ *
+ * With no phiLane both default to the identity and the old behaviour stands.
+ * Absent when required, the transduction is REFUSED rather than certified on a
+ * bound that does not apply to what the tray now holds.
  */
 export function transduce(state, targetBasis, opts = {}) {
   const cert = certifyTransduction(state.basis, targetBasis);
@@ -404,6 +424,8 @@ export function transduce(state, targetBasis, opts = {}) {
   const Pi = opts.pi || ((t) => t.slice(0, targetBasis.length));
   const omega = opts.omega || "recompute";
   const phiLane = opts.phiLane || null;
+  const phiBound = opts.phiBound || (phiLane ? null : (N) => N);
+  const phiMagnitude = opts.phiMagnitude || (phiLane ? null : (X) => X);
 
   const A = state.basis, MA = shellModulus(A);
   const e = idempotents(A);
@@ -434,20 +456,40 @@ export function transduce(state, targetBasis, opts = {}) {
     const sB = phiLane ? mod(phiLane(bridge(anchor), anchor), anchor) : bridge(anchor);
     K = mod(gB - sB, anchor);
     corridor = anchor;
-    // Certify from the carried winding and the two basis constants alone:
-    //   K_B ≤ (γ_A + K_A·M_A)/M_B  <  M_A·(K_A+1)/M_B
-    const bound = MA * (state.K + 1n) / MB;
-    certified = bound < anchor;
-    if (!certified) {
-      if (omega === "recompute") {
+
+    // The source magnitude corridor: x = γ_A + K_A·M_A < M_A·(K_A+1).
+    const srcBound = MA * (state.K + 1n);
+
+    if (omega === "recompute") {
+      if (phiBound === null) {
+        throw new Error(
+          "transduction refused: phiLane given without phiBound. Φ acts lane-wise on "
+          + "residues but its effect on MAGNITUDE is not a lane-wise fact, and the winding "
+          + "corridor is a magnitude test. Declare phiBound(N) — an upper bound on Φ(X) for "
+          + "X < N — or pass omega:'lift' with phiMagnitude to take an explicit boundary touch.");
+      }
+      // Certify against the TRANSFORMED magnitude, not the source:
+      //   K_B ≤ ⌊Φ(x)/M_B⌋  and  Φ(x) < phiBound(M_A·(K_A+1))
+      const bound = phiBound(srcBound) / MB;
+      certified = bound < anchor;
+      if (!certified) {
         throw new Error(
           "transduction refused: target winding leaves the anchor corridor. "
           + `K_B may reach ${bound}, corridor is ${anchor}. `
           + "Extend the target fixture (a wider basis widens the anchor), or pass omega:'lift' "
           + "to accept an explicit boundary touch.");
       }
-      // omega === "lift": explicit, declared boundary touch
-      K = (gammaOf(state.r, A) + state.K * MA) / MB;
+    } else {
+      // omega === "lift": explicit, declared boundary touch. It needs the value,
+      // so under a non-trivial Φ it needs Φ on magnitudes too.
+      if (phiMagnitude === null) {
+        throw new Error(
+          "transduction refused: omega:'lift' with a phiLane needs phiMagnitude. The lift "
+          + "reconstructs a magnitude, and Φ's magnitude is not recoverable from the tray.");
+      }
+      const bound = phiBound === null ? null : phiBound(srcBound) / MB;
+      certified = bound !== null && bound < anchor;
+      if (!certified) K = phiMagnitude(gammaOf(state.r, A) + state.K * MA) / MB;
     }
   } else if (omega === "preserve") K = state.K;
   else if (omega === "project") K = 0n;
@@ -467,6 +509,11 @@ export function transduce(state, targetBasis, opts = {}) {
       corridor: corridor === null ? null : corridor.toString(),
       corridor_certified: certified,
       boundary_touch: omega === "lift" && certified === false,
+      // Φ ≠ id moves magnitude. Under recompute/lift that is certified or the
+      // transduction is refused; under preserve/project the winding is the
+      // caller's assertion, not a result, and is flagged as such.
+      phi_active: phiLane !== null,
+      winding_asserted: (omega === "preserve" || omega === "project") && phiLane !== null,
     }],
     support: targetBasis.map((_, i) => i),
   };
