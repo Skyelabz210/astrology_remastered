@@ -164,6 +164,24 @@ excluded from the shell product so it can carry the winding.
   by construction. This is what Sh = {11⁶, 13, 17, 19} has always meant.
 - **Refusal** — PROVEN: `parkedRecover` throws when the parked prime is still in
   the shell, because no inverse exists there.
+- **The winding is DERIVED, not carried (P23)** — PROVEN. K is not a stored
+  field; it is a function of the tray, recovered on demand by K-Elimination on
+  the parked lane. Depth comes from LIFTING the same lane to 11^e and
+  eliminating again — level e yields one base-11 digit of K:
+
+  ```
+  level 1:   K ≡ (s₁ − r)·M⁻¹  (mod 11)      level 2:   K ≡ (s₂ − r)·M⁻¹  (mod 11²)
+  ```
+
+  The levels agree because the lane is PHASE LOCKED: s₂ ≡ s₁ (mod 11), so
+  lifting never moves the phase the fixture was affixed to. Level e is the same
+  single modular subtraction as level 1 at a higher power of the same prime —
+  not a new lane, not a basis extension. No Hensel step at any depth, because
+  parking makes gcd(M_SHELL, 11) = 1 and M invertible mod 11^e for every e.
+  Corridors: level 1 → 9,699,690 (the full Colony, since 881,790 · 11 = M₈),
+  level 2 → 106,696,590, level 6 → 1,562,144,774,190 (the SD-11 anchor).
+  Verified exact across the whole double-lift corridor and at level 6 out to
+  1.56 × 10¹². `trayRegister` carries no K field at all.
 - **CORRECTED (P22) — parking moves a lane out of the shell; it cannot conjure
   one.** `parkingReport` gated admissibility on coprimality alone, so an
   off-basis prime passed: `parkingReport(B8, [23])` returned

@@ -17,6 +17,7 @@ import { parseArcsecString } from "./validators.js";
 import {
   parkedShellResidue, parkResidue, recoverShellWindingFrom, verifyShellWinding,
   shellResidue, recoverShellWindingFromGear, verifyLegacyShellWinding,
+  windingFromTray,
 } from "./shell-kelim.js";
 import { gearClass } from "./gear-class.js";
 
@@ -28,6 +29,12 @@ export function computeHcrmRegister(entry) {
 
   const legacyCheck = verifyLegacyShellWinding(x);
   if (!legacyCheck.ok) throw new Error("HCRM legacy winding recovery failed");
+
+  // The winding is derived, not stored: a double K-Elimination lift on the
+  // phase-locked parked lane. Level 1 already covers the ring; the second level
+  // is carried so the register shows how depth is obtained rather than asserted.
+  const lift = windingFromTray(x, 2n);
+  if (lift.K !== x / M_SHELL) throw new Error("HCRM winding lift failed");
 
   return {
     kind: "HCRM_REGISTER_V2",
@@ -50,7 +57,20 @@ export function computeHcrmRegister(entry) {
       split: "parked",
       r: parkedShellResidue(x).toString(),
       s: parkResidue(x).toString(),
+      // K is DERIVED, never carried — a K-Elimination lift on the parked lane.
+      // The ring needs only level 1 (K ≤ 1); the double lift is reported
+      // alongside to show the mechanism that supplies depth beyond it.
       K: recoverShellWindingFrom(x).toString(),
+      winding_derived: true,
+      winding_carried: false,
+      lift: {
+        levels: lift.levels.toString(),
+        depth: lift.depth.toString(),
+        digits: lift.digits.map(String),
+        corridor: lift.corridor.toString(),
+        phase: lift.phases[0].toString(),
+        phase_locked: lift.phases.every((p) => p % PARK === lift.phases[0]),
+      },
       anchor: PARK.toString(),
       anchor_internal: true,
       inverse: M_SHELL_INV_MOD_PARK.toString(),

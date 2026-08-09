@@ -26,7 +26,7 @@
 
 import {
   M6, GEAR_PRODUCT, M6_INV_MOD_GEAR,
-  PARK, M_SHELL, M_SHELL_INV_MOD_PARK,
+  PARK, SHELL_LANES, M_SHELL, M_SHELL_INV_MOD_PARK,
 } from "./basis.js";
 import { mod } from "./residues.js";
 
@@ -61,6 +61,110 @@ export function shellIdentity(x) {
 }
 
 export function actualShellWinding(x) { return x / M_SHELL; }
+
+// ── the winding is DERIVED, not carried ────────────────────────────
+//
+// K is not a stored field. It is a FUNCTION OF THE TRAY, recovered on demand by
+// K-Elimination on the parked lane. A single elimination at 11 reaches K < 11;
+// depth comes from LIFTING the same lane to 11^e and eliminating again. Two
+// levels — the double lift — reach K < 121:
+//
+//     level 1:   K ≡ (s₁ − r)·M⁻¹  (mod 11)      s₁ = x mod 11
+//     level 2:   K ≡ (s₂ − r)·M⁻¹  (mod 11²)     s₂ = x mod 11²
+//
+// Each level yields one base-11 digit of K, and the levels agree because the
+// lane is PHASE LOCKED: s₂ ≡ s₁ (mod 11), so lifting never moves the phase it
+// was affixed to. Level e is the same single modular subtraction as level 1,
+// taken at a higher power of the same prime — not a new lane, not a new basis.
+//
+// M_SHELL is coprime to 11 (that is what parking the lane buys), so M⁻¹ exists
+// mod 11^e for every e and the lift is plain K-Elimination throughout — no
+// Hensel division, no divide-by-11 anywhere.
+
+/** 11^e — the parked lane carried at depth e. */
+export function parkPower(levels) {
+  let q = 1n;
+  for (let i = 0n; i < levels; i++) q = q * PARK;
+  return q;
+}
+
+/**
+ * Derive the winding by an e-fold K-Elimination lift on the parked lane.
+ * `levels = 2n` is the double lift. Nothing is carried: r and s are read off
+ * the tray, and K falls out of them.
+ *
+ *   r  = x mod M_SHELL   — from the shell lanes
+ *   s  = x mod 11^levels — from the parked lane, carried at that depth
+ *
+ * Exact while K < 11^levels. Returns the base-11 digits alongside K so the
+ * lift is auditable level by level.
+ */
+export function liftWinding(r, s, levels = 2n) {
+  if (levels < 1n) throw new Error("the lift needs at least one level");
+  const digits = [];
+  const phases = [];
+  let K = 0n, pow = 1n;
+  for (let i = 0n; i < levels; i++) {
+    const prev = pow;
+    pow = pow * PARK;                                  // 11^(i+1)
+    const sI = mod(s, pow);                            // phase lock: s reduces cleanly
+    const inv = inverseModPrimePower(mod(M_SHELL, pow), pow);
+    const Ki = mod((sI - r) * inv, pow);
+    digits.push((Ki - K) / prev);                      // the new base-11 digit
+    phases.push(sI);
+    K = Ki;
+  }
+  return {
+    K, digits, phases,
+    levels, depth: pow,
+    shell: M_SHELL, anchor: pow,
+    corridor: M_SHELL * pow,
+  };
+}
+
+/** The double lift, named — two eliminations, K < 121. */
+export function doubleLiftWinding(r, s) { return liftWinding(r, s, 2n); }
+
+/**
+ * Derive the winding straight from the tray at the given depth. The parked lane
+ * is read at 11^levels; every other lane is untouched.
+ */
+export function windingFromTray(x, levels = 2n) {
+  return liftWinding(parkedShellResidue(x), mod(x, parkPower(levels)), levels);
+}
+
+/** Inverse mod a prime power, by extended Euclid. Defined because gcd(M,11)=1. */
+function inverseModPrimePower(a, m) {
+  let [old_r, r] = [mod(a, m), m];
+  let [old_s, s] = [1n, 0n];
+  while (r !== 0n) {
+    const q = old_r / r;
+    [old_r, r] = [r, old_r - q * r];
+    [old_s, s] = [s, old_s - q * s];
+  }
+  if (old_r !== 1n) throw new Error("parked lane is not coprime to the shell");
+  return mod(old_s, m);
+}
+
+/**
+ * The register carried by the tray alone. There is no K field — `winding` is a
+ * getter-shaped derivation, recomputed from r and s every time it is asked for.
+ */
+export function trayRegister(x, levels = 2n) {
+  const r = parkedShellResidue(x);
+  const s = mod(x, parkPower(levels));
+  return {
+    kind: "PARKED_TRAY_V1",
+    shell_lanes: SHELL_LANES.map(String),
+    r: r.toString(),
+    parked_lane: PARK.toString(),
+    parked_depth: levels.toString(),
+    s: s.toString(),
+    // K is absent by construction. Derive it:
+    derive: () => liftWinding(r, s, levels),
+    carries_winding: false,
+  };
+}
 
 export function verifyShellWinding(x) {
   const recovered = recoverShellWindingFrom(x);

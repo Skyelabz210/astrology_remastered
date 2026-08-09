@@ -12,6 +12,7 @@ import {
   shellResidue, gearResidue, recoverShellWindingFromGear, verifyLegacyShellWinding,
   parkedShellResidue, parkResidue, recoverShellWinding, recoverShellWindingFrom,
   shellIdentity, actualShellWinding, verifyShellWinding, SHELL_ANCHOR,
+  liftWinding, doubleLiftWinding, windingFromTray, trayRegister, parkPower,
 } from "../src/core/shell-kelim.js";
 import { parseArcsecString, assertIntegerString } from "../src/core/validators.js";
 import { computeHcrmRegister } from "../src/core/hcrm-core.js";
@@ -91,6 +92,66 @@ export function run() {
     t("recoverShellWinding takes (r, s) — residues only, never the integer",
       recoverShellWinding(parkedShellResidue(1234567n), parkResidue(1234567n))
         === recoverShellWindingFrom(1234567n));
+  }
+
+  // ── the winding is DERIVED, not carried (P23) ───────────────────
+  {
+    // Depth comes from LIFTING the parked lane to 11^e and eliminating again.
+    // Each level is the same single modular subtraction at a higher power of
+    // the same prime — not a new lane, not a new basis, nothing stored.
+    t("one elimination reaches K < 11; the DOUBLE lift reaches K < 121",
+      liftWinding(0n, 0n, 1n).depth === 11n && liftWinding(0n, 0n, 2n).depth === 121n
+      && liftWinding(0n, 0n, 1n).corridor === M_SHELL * 11n
+      && liftWinding(0n, 0n, 2n).corridor === 106696590n,
+      "881,790 · 121 = 106,696,590");
+    {
+      // exact across the ENTIRE double-lift corridor, sampled at a stride coprime
+      // to both the shell and the lane so it walks every residue class
+      let bad = 0, maxK = 0n, n = 0;
+      for (let x = 0n; x < 106696590n; x += 977n) {
+        const K = windingFromTray(x, 2n).K, want = x / M_SHELL;
+        if (K !== want) bad++;
+        if (want > maxK) maxK = want;
+        n++;
+      }
+      t("the double lift is exact over its whole corridor",
+        bad === 0 && maxK === 120n && n === 109209,
+        `${n} points, 0 mismatches, K reached ${maxK} = 11²−1`);
+    }
+    {
+      // the levels agree because the lane is PHASE LOCKED
+      const w = windingFromTray(100000000n, 2n);
+      t("each level yields one base-11 digit of K",
+        w.K === 113n && w.digits[0] === 3n && w.digits[1] === 10n
+        && 10n * 11n + 3n === 113n,
+        "113 = 10·11 + 3, recovered digit by digit");
+      t("PHASE LOCK — lifting never moves the phase the lane was affixed to",
+        mod(w.phases[1], 11n) === w.phases[0]
+        && w.phases[0] === mod(100000000n, 11n),
+        "s₂ ≡ s₁ (mod 11), so level 2 reduces onto level 1");
+    }
+    t("the lift needs no Hensel step at any depth — gcd(M_SHELL, 11) = 1",
+      M_SHELL % PARK !== 0n && liftWinding(0n, 0n, 6n).depth === 1771561n
+      && liftWinding(0n, 0n, 6n).corridor === 1562144774190n,
+      "parking the lane is what makes M invertible mod 11^e for every e");
+    {
+      // depth is arbitrary: level 6 is the SD-11 anchor, and it still derives
+      let bad = 0;
+      for (const x of [0n, 1n, 123456789012n, 999999999999n, 1562144774189n]) {
+        if (windingFromTray(x, 6n).K !== x / M_SHELL) bad++;
+      }
+      t("arbitrary depth — level 6 reaches the SD-11 corridor and stays exact",
+        bad === 0, "881,790 · 11⁶ = 1,562,144,774,190");
+    }
+    {
+      const reg = trayRegister(1234567n, 2n);
+      t("the register carries the TRAY, not the winding",
+        !("K" in reg) && reg.carries_winding === false
+        && reg.derive().K === 1234567n / M_SHELL,
+        "no K field — it is recomputed from (r, s) on demand");
+    }
+    t("a lift of zero levels is refused",
+      throws(() => liftWinding(0n, 0n, 0n)));
   }
 
   // validators

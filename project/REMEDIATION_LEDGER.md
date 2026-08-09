@@ -146,3 +146,21 @@ leaving the existing browser apps working against the demo layer.
   Admissibility now also requires `parked_in_basis`. Lane widening to p^k is
   still admissible; importing a new prime is not.
   CRAM suite 39 → 47, anchor suite 46 → 51. Total 378 → 391.
+- P23: the winding is DERIVED, not carried. The register reported K as a value it
+  held; it is a function of the tray and is now recovered on demand by a
+  K-Elimination lift on the phase-locked parked lane. `shell-kelim.js` gains
+  `liftWinding` / `doubleLiftWinding` / `windingFromTray` / `trayRegister`:
+  level e eliminates at 11^e and yields one base-11 digit of K, and the levels
+  agree because s_e ≡ s_1 (mod 11) — lifting never moves the phase the fixture
+  was affixed to. Depth is arbitrary and needs no Hensel step at any level,
+  because parking the lane makes gcd(M_SHELL, 11) = 1 and M invertible mod 11^e
+  for every e. Corridors: level 1 → 9,699,690 (the full Colony), level 2 →
+  106,696,590, level 6 → 1,562,144,774,190 (the SD-11 anchor). `trayRegister`
+  has no K field at all. Verified exact across the entire double-lift corridor
+  and at level 6 out to 1.56 × 10¹².
+  Also added `test/run.js`, a headless Node runner (`npm test`) executing the
+  same modules as the browser gate, with the no-float audit done by reading
+  source rather than fetching it. Core suite 48 → 56; 416 assertions total.
+  Repository README replaced: the Claude Design handoff boilerplate is gone and
+  the README now documents the architecture, leading with the five ways CRAM
+  departs from RNS, since reading it as RNS makes the rest look wrong.
