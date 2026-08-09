@@ -457,9 +457,18 @@ export function transduce(state, targetBasis, opts = {}) {
     return mod(acc + W * mod(MA, m), m);
   };
 
+  // Reduction emits a residue AND a quotient. The quotient is the hidden carry
+  // (the lane shadow) and was previously dropped on the floor here. Under a
+  // uniform ensemble an additive lane's residues are exactly i.i.d. — the digit
+  // channel is featureless by construction — so the shadow is where any signal
+  // actually lives. It is captured, not discarded. (P25)
+  const laneCarry = [];
   const r = targetBasis.map((b) => {
     const v = bridge(b);
-    return phiLane ? mod(phiLane(v, b), b) : v;
+    if (!phiLane) { laneCarry.push(0n); return v; }
+    const full = phiLane(v, b);
+    laneCarry.push((full - mod(full, b)) / b);
+    return mod(full, b);
   });
 
   const MB = shellModulus(targetBasis);
@@ -555,6 +564,9 @@ export function transduce(state, targetBasis, opts = {}) {
       corridor_certified: certified,
       // how the magnitude was derived: K-Elimination against a lifted anchor
       lift,
+      // the hidden carry each lane emitted and would otherwise have discarded
+      lane_carry: laneCarry.map(String),
+      carry_energy: laneCarry.reduce((a, w) => a + w * w, 0n).toString(),
       boundary_touch: omega === "lift" && certified === false,
       // Φ ≠ id moves magnitude. Under recompute/lift that is certified or the
       // transduction is refused; under preserve/project the winding is the

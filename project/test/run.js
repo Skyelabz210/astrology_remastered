@@ -22,6 +22,7 @@ const SUITES = [
   ["CRAM layer", "cram.test.js"],
   ["star · tower · fixture", "fixture.test.js"],
   ["anchor", "anchor.test.js"],
+  ["hidden carry", "carry.test.js"],
 ];
 
 // The no-float audit reads source; in the browser it fetches, here it reads the

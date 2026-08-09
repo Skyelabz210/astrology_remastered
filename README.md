@@ -10,7 +10,7 @@ of 1,296,000; every lane is a BigInt residue; every claim is either exhaustively
 swept or explicitly marked open.
 
 ```
-418/418 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 16/16 core modules float-free
+441/441 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 16/16 core modules float-free
 ```
 
 ---
@@ -166,6 +166,39 @@ The formal development is at
 — 27 Lean 4 theorems and 10 Coq lemmas, zero `sorry`, zero axioms, cross-verified
 in both systems.
 
+### The hidden carry
+
+Every reduction emits **two** things: a residue and a quotient. Keeping only the
+residue is what makes the carry "hidden", and three consequences follow.
+
+**The carry is signed.** Under least-nonnegative residues the winding is always
+`≥ 0` and the sign is gone. The centred residue `r ∈ (−p/2, p/2]` with
+`w = (x − r)/p` keeps it — `w` counts to the *nearest* shell, so it goes negative
+below one. It is the K-Elimination winding, not the p-adic valuation:
+`w₇(49) = 7` where `v₇(49) = 2`.
+
+**The anchor reads it negated.** For any anchor with `M ≡ −1 (mod A)`:
+
+```
+v_A = (r − K) mod A
+```
+
+At a closed shell (`r = 0`) that is `(−K) mod A` — **the anchor counts down as
+the carry counts up**. This matters because in the residue lane the closed shells
+`0, M, 2M, …` are *indistinguishable*; each reads `r = 0`, and only the
+descending anchor separates them. On the Dresden pair `M = 36, A = 37` the
+descent reads `36, 35, 34, 33` at `N = 36, 72, 108, 144`. The ecliptic ring holds
+exactly two closed shells of `M_SHELL`, and only the parked lane tells them apart.
+
+**The shadow is the readable channel.** Under a uniform ensemble an additive
+lane's residues are exactly i.i.d. uniform, so the digit channel is featureless
+*by construction* — absence of structure there proves nothing. Squaring is not an
+additive shift, so that argument does not apply: `r ↦ r² mod p` is 2-to-1 on
+nonzero residues, its image covers only `(p+1)/2` of `p` values (7 of 13, 19 of
+37), and the discarded quotient `⌊r²/p⌋` inherits that structure. The shadow is
+where signal actually lives — which is why discarding it costs you the one
+channel worth reading.
+
 ---
 
 ## What this does with astrology
@@ -274,6 +307,7 @@ project/
   src/core/            the exact core — BigInt only, no UI, no prose
     basis.js             S8, both splits, the parked constants
     shell-kelim.js       K-Elimination, the lift, the tray register
+    carry.js             the hidden carry — signed winding, shadow, C = Σw²
     hcrm-core.js         HCRM_REGISTER_V2
     cram.js              adjacency, gradient, state tuple, transduction χ
     anchor.js            anchor admissibility, i.i.d., the parked lane

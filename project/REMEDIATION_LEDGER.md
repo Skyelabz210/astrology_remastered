@@ -189,3 +189,28 @@ leaving the existing browser apps working against the demo layer.
   depth d proves depth d−1 was too narrow, not depth d, so the certifying
   elimination must sit one level ABOVE the working one.
   CRAM suite 47 → 49. 418 assertions total.
+- P25: the hidden carry was not accounted for. Every reduction emits a residue
+  AND a quotient; the residue was kept and the quotient dropped. Three separate
+  omissions, all now closed in `src/core/carry.js`:
+  (1) THE CARRY IS SIGNED. Everything ran on least-nonnegative residues, where
+  the winding is always ≥ 0 and the sign is gone. The centred residue
+  r ∈ (−p/2, p/2] with w = (x − r)/p keeps it — w counts to the NEAREST shell,
+  so it goes negative below one. It is the K-Elimination winding, not the p-adic
+  valuation: w_7(49) = 7 where v_7(49) = 2.
+  (2) THE ANCHOR READS THE CARRY NEGATED. Lemma 1: v_A = (r − K) mod A whenever
+  M ≡ −1 (mod A). At a closed shell r = 0 this is (−K) mod A, so the anchor
+  counts DOWN as the carry counts up. That descent is the readout separating the
+  closed shells 0, M, 2M, … which are identical in the residue lane. Recomputed
+  over [0,5000) at M=36/A=37, zero mismatches; the descent reads 36,35,34,33 at
+  N = 36,72,108,144, and k_elim(36,37,73) = 1,1,2. The ecliptic ring holds
+  exactly two closed shells of M_SHELL and only the parked lane separates them.
+  (3) THE SHADOW WAS DISCARDED IN TRANSDUCTION. `transduce` computed
+  `mod(phiLane(v,b), b)` and threw ⌊Φ(v)/b⌋ away. Under a uniform ensemble an
+  additive lane's residues are exactly i.i.d., so the digit channel is
+  featureless BY CONSTRUCTION and the shadow is where signal actually lives —
+  squaring is 2-to-1, its image covers only (p+1)/2 of p values (7/13, 19/37,
+  recomputed), and the discarded quotient inherits that structure. The lineage
+  now carries `lane_carry` and `carry_energy`; values are unchanged, the
+  quotient is simply no longer lost. Also added the carry functional C = Σ w²,
+  zero exactly when no value wound past its shell.
+  New suite: 22 assertions. 441 total; no-float audit 16 → 17 modules.

@@ -195,6 +195,39 @@ excluded from the shell product so it can carry the winding.
   existing lane to p^k stays admissible (it is read off the tray at more
   precision); importing a new prime does not.
 
+### The hidden carry (`src/core/carry.js`) — P25
+
+Every reduction emits a residue **and** a quotient. The residue was kept and the
+quotient discarded; the quotient is the carry.
+
+- **The carry is SIGNED** — PROVEN. Under least-nonnegative residues the winding
+  is always ≥ 0 and the sign is gone. The centred residue `r ∈ (−p/2, p/2]` with
+  `w = (x − r)/p` keeps it: `w` counts to the *nearest* shell, so it goes
+  negative below one. `x = r + p·w` exact over 401 consecutive values at p = 7.
+- **It is the K-Elimination winding, not the p-adic valuation** — PROVEN:
+  `w_7(49) = 7` where `v_7(49) = 2`. Different objects.
+- **The anchor reads the carry NEGATED** — PROVEN (Lemma 1). For any anchor with
+  `M ≡ −1 (mod A)`, `v_A = (r − K) mod A`. Verified over `[0, 5000)` at
+  M = 36, A = 37, zero mismatches.
+- **The closed-shell descent** — PROVEN. At `r = 0` the anchor reads `(−K) mod A`,
+  so successive closed shells walk it *downward*: `v₃₇ = 36, 35, 34, 33` at
+  `N = 36, 72, 108, 144`. In the residue lane those shells are indistinguishable
+  — each reads `r = 0` — and the descending anchor is what separates them. The
+  ecliptic ring holds exactly two closed shells of `M_SHELL`, and only the parked
+  lane tells them apart.
+- **The shadow is the readable channel** — PROVEN. Under a uniform ensemble an
+  additive lane's residues are exactly i.i.d., so the digit channel is featureless
+  *by construction* and absence of structure there proves nothing. Squaring is not
+  an additive shift: `r ↦ r² mod p` is 2-to-1 on nonzero residues and its image
+  covers only `(p+1)/2` of `p` values (7 of 13, 19 of 37 — recomputed), and the
+  discarded quotient `⌊r²/p⌋` inherits that structure.
+- **CORRECTED — `transduce` discarded the lane shadow.** It computed
+  `mod(phiLane(v,b), b)` and dropped `⌊Φ(v)/b⌋` on the floor, which is precisely
+  the one channel that is not blind. The lineage now carries `lane_carry` and
+  `carry_energy`. No value changes; the quotient is simply no longer lost.
+- **The carry functional** — PROVEN: `C = Σ w²` is non-negative, integer-valued,
+  and zero exactly when every value is a pure centred residue.
+
 ### Anchor admissibility (`src/core/anchor.js`) — P17, REVERSES P14
 
 **Correction of record.** P14 called the adjacent anchor A = M+1 canonical and
