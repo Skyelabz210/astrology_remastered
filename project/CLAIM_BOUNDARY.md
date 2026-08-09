@@ -330,13 +330,41 @@ transduce, which implied the tower certifies the bridge. It does not.
   K_B only mod 1156 and `value()` returned **653,740** instead of 10,000,000.
   A wrong value, marked certified. The true bound is 10000·1050/1155 = **9090**,
   which refuses.
-  A caller supplying a non-trivial `phiLane` must now declare how Φ moves
-  magnitude — `phiBound(N)` (an upper bound on Φ(X) for X < N) for
-  `omega:"recompute"`, `phiMagnitude(X)` for the `omega:"lift"` boundary touch —
-  and is **refused** rather than certified when it does not. With no `phiLane`
-  both default to the identity and the prior behaviour is unchanged. Under
-  `preserve`/`project` the winding is not recomputed at all, so it is flagged
-  `winding_asserted` — the caller's claim, never presented as a result.
+  **The P22 remedy was itself wrong and is WITHDRAWN (P24).** P22 required the
+  caller to declare `phiBound`, an analytic bound on Φ's growth. That inverts
+  K-Elimination's own theorem: in `X = r + k·M`, k is not lost information
+  awaiting an estimate — it is already implicit in the complete residue
+  representation, and an anchor coprime to the shell gives an **independent
+  exact view** of the same value. That is precisely what retires k-tracking.
+  Φ(x)'s magnitude is no different, and is recovered the same way:
+
+  ```
+  K_B ≡ (s − γ_B)·M_B⁻¹  (mod A),     s = Φ(x) mod A
+  ```
+
+  and `Φ(x) mod A` is reachable for **any** A from the source tray alone, since
+  the bridge gives `x mod A` exactly and `Φ(x) mod A = Φ(x mod A) mod A`.
+
+  What the theorem does require is the **range hypothesis** — `hRange : X < M*A`
+  in `kElimination_core`. So the caller declares **depth**, a property of the
+  target fixture, and the anchor lifts to `(M_B+1)^depth`. Nothing about Φ need
+  be known. — PROVEN: the P22 counterexample now derives `Φ(1000) = 10,000,000`
+  exactly at the default depth 2, with no declaration of any kind.
+
+  The derivation is **double**: one elimination at `depth` yields the winding, a
+  second at `depth+1` certifies it. `K mod A^d = K mod A^(d+1)` means the leading
+  digit is zero — the winding stopped growing rather than wrapping. A difference
+  **proves** the corridor was too narrow and refuses; depth 1 on that example
+  gives 566 against 8658, a leading digit of 7, which is exactly the wrap that
+  produced 653,740. A zero leading digit is necessary for containment and is
+  reported as `leading_digit_zero`, not asserted as a proof of it.
+
+  `phiBound` survives as an **optional** strengthening: supplied, it proves
+  containment outright and the lineage records `bound_supplied`. `phiMagnitude`
+  is required only by `omega:"lift"` past the certified corridor, where the
+  boundary touch genuinely forms a magnitude. Under `preserve`/`project` the
+  winding is not recomputed at all and is flagged `winding_asserted` — the
+  caller's claim, never presented as a result.
 
 ### Safe Basis tiers and S_R (P16 — correction of record)
 

@@ -164,3 +164,28 @@ leaving the existing browser apps working against the demo layer.
   Repository README replaced: the Claude Design handoff boilerplate is gone and
   the README now documents the architecture, leading with the five ways CRAM
   departs from RNS, since reading it as RNS makes the rest look wrong.
+- P24: the P22 remedy is WITHDRAWN. P22 fixed a real defect — the corridor was
+  certified against the source magnitude — but fixed it the wrong way, by
+  requiring the caller to declare `phiBound`, an analytic bound on Φ's growth.
+  That inverts K-Elimination's own theorem (Skyelabz210/k-elimination-lean4,
+  §2.2 and §4.1): k is not lost information awaiting an estimate, it is already
+  implicit in the complete residue representation, and an anchor coprime to the
+  shell gives an independent exact view. Magnitude is derived, not declared.
+  `transduce` now recovers K_B by K-Elimination against an anchor lifted to
+  (M_B+1)^depth, using Φ(x) mod A — reachable for any A from the source tray,
+  since the bridge gives x mod A exactly and Φ(x) mod A = Φ(x mod A) mod A. The
+  caller declares DEPTH, a property of the fixture, which is the range
+  hypothesis `hRange : X < M*A` the Lean theorem actually carries. The
+  derivation is double: one elimination at `depth` yields the winding, a second
+  at `depth+1` certifies it — equal values mean the leading digit is zero and
+  the winding stopped growing rather than wrapping; a difference proves the
+  corridor was too narrow and refuses. The P22 counterexample now derives
+  Φ(1000) = 10,000,000 exactly at the default depth 2 with no declaration at
+  all, and depth 1 refuses with the wrap made explicit (566 vs 8658, leading
+  digit 7 — the wrap that produced 653,740). `phiBound` survives as an optional
+  strengthening and was removed from every test to demonstrate it is not needed;
+  `phiMagnitude` is required only by omega:'lift' past the certified corridor.
+  An off-by-one was caught during implementation: a non-zero leading digit at
+  depth d proves depth d−1 was too narrow, not depth d, so the certifying
+  elimination must sit one level ABOVE the working one.
+  CRAM suite 47 → 49. 418 assertions total.

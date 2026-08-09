@@ -396,25 +396,39 @@ export function certifyTransduction(A, B) {
  * integer coefficients acts lane-wise, since Φ(x) mod b = Φ(x mod b) mod b).
  * Ω selects the winding policy: recompute · preserve · project.
  *
- * MAGNITUDE IS NOT A LANE-WISE QUANTITY. (P22)
- * ────────────────────────────────────────────
- * Φ acting lane-wise fixes the target RESIDUES, but it says nothing about the
- * magnitude of Φ(x) — and the winding K_B = ⌊Φ(x)/M_B⌋ is a magnitude fact.
- * The adjacency K-Elim below recovers K_B only modulo M_B+1, so it is the exact
- * winding only inside the corridor, and the corridor test needs a bound on the
- * TRANSFORMED value. A bound on x certifies nothing about Φ(x).
+ * MAGNITUDE IS DERIVED BY K-ELIMINATION, NOT DECLARED. (P24, corrects P22)
+ * ───────────────────────────────────────────────────────────────────────
+ * P22 required the caller to declare `phiBound` — an analytic bound on Φ's
+ * growth — before the target winding could be certified. That was the wrong
+ * framing, and it is withdrawn.
  *
- * So a caller supplying a non-trivial `phiLane` must also declare how Φ moves
- * magnitude. These are declarations about Φ, not reconstructions of x:
+ * K-Elimination's own theorem says why. In `X = r + k·M`, k is not lost
+ * information waiting to be estimated: it is already implicit in the complete
+ * residue representation, and an anchor coprime to the shell provides an
+ * INDEPENDENT EXACT VIEW of the same value. That is what retires k-tracking.
+ * The magnitude of Φ(x) is no different from any other magnitude — it is
+ * recovered the same way, by eliminating against an anchor:
  *
- *   phiBound(N)     ⟹  Φ(X) < phiBound(N) for every 0 ≤ X < N.  Required by
- *                      omega:"recompute". Used only for the corridor test.
- *   phiMagnitude(X) ⟹  Φ(X) exactly, on integers. Required by omega:"lift",
- *                      which is a declared boundary touch and needs the value.
+ *     K_B ≡ (s − γ_B) · M_B⁻¹   (mod A),      s = Φ(x) mod A
  *
- * With no phiLane both default to the identity and the old behaviour stands.
- * Absent when required, the transduction is REFUSED rather than certified on a
- * bound that does not apply to what the tray now holds.
+ * and Φ(x) mod A is available for ANY A from the source tray alone, because the
+ * bridge gives x mod A exactly and Φ(x) mod A = Φ(x mod A) mod A.
+ *
+ * What the theorem does require is the RANGE HYPOTHESIS — `X < M·A` in
+ * `kElimination_core`. K-Elimination is exact inside a corridor, and the
+ * corridor has to be wide enough. So the caller declares DEPTH, a property of
+ * the target fixture, and the anchor is lifted to A = (M_B+1)^depth. Depth is
+ * the same lever the parked lane uses; nothing about Φ needs to be known.
+ *
+ * The lift is self-checking. The leading base-A digit of the recovered winding
+ * is zero exactly when the previous depth already sufficed, so a NON-ZERO
+ * leading digit proves the corridor was too narrow and the transduction is
+ * refused. A zero leading digit is necessary for being inside the corridor, and
+ * is reported as such — `leading_digit_zero`, not a proof of containment.
+ *
+ * `phiBound` survives as an OPTIONAL strengthening: supplied, it proves
+ * containment outright and the lineage says so. It is no longer required, and
+ * its absence no longer refuses anything.
  */
 export function transduce(state, targetBasis, opts = {}) {
   const cert = certifyTransduction(state.basis, targetBasis);
@@ -424,8 +438,9 @@ export function transduce(state, targetBasis, opts = {}) {
   const Pi = opts.pi || ((t) => t.slice(0, targetBasis.length));
   const omega = opts.omega || "recompute";
   const phiLane = opts.phiLane || null;
-  const phiBound = opts.phiBound || (phiLane ? null : (N) => N);
-  const phiMagnitude = opts.phiMagnitude || (phiLane ? null : (X) => X);
+  const phiBound = opts.phiBound || null;          // optional strengthening only
+  const depth = opts.depth === undefined ? 2n : opts.depth;
+  if (depth < 1n) throw new Error("the anchor lift needs at least one level");
 
   const A = state.basis, MA = shellModulus(A);
   const e = idempotents(A);
@@ -448,48 +463,78 @@ export function transduce(state, targetBasis, opts = {}) {
   });
 
   const MB = shellModulus(targetBasis);
-  const anchor = MB + 1n;
-  let K, corridor = null, certified = null;
+  const base = MB + 1n;
+  let K, corridor = null, certified = null, lift = null;
   if (omega === "recompute" || omega === "lift") {
-    // Native adjacency K-Elim in the TARGET frame: bridge to M_B+1, subtract.
     const gB = gammaOf(r, targetBasis);
-    const sB = phiLane ? mod(phiLane(bridge(anchor), anchor), anchor) : bridge(anchor);
-    K = mod(gB - sB, anchor);
-    corridor = anchor;
 
-    // The source magnitude corridor: x = γ_A + K_A·M_A < M_A·(K_A+1).
-    const srcBound = MA * (state.K + 1n);
+    /** Φ(x) mod m, from the source tray alone, for ANY m. */
+    const phiMod = (m) => {
+      const v = bridge(m);
+      return phiLane ? mod(phiLane(v, m), m) : v;
+    };
 
-    if (omega === "recompute") {
-      if (phiBound === null) {
-        throw new Error(
-          "transduction refused: phiLane given without phiBound. Φ acts lane-wise on "
-          + "residues but its effect on MAGNITUDE is not a lane-wise fact, and the winding "
-          + "corridor is a magnitude test. Declare phiBound(N) — an upper bound on Φ(X) for "
-          + "X < N — or pass omega:'lift' with phiMagnitude to take an explicit boundary touch.");
-      }
-      // Certify against the TRANSFORMED magnitude, not the source:
-      //   K_B ≤ ⌊Φ(x)/M_B⌋  and  Φ(x) < phiBound(M_A·(K_A+1))
-      const bound = phiBound(srcBound) / MB;
-      certified = bound < anchor;
-      if (!certified) {
-        throw new Error(
-          "transduction refused: target winding leaves the anchor corridor. "
-          + `K_B may reach ${bound}, corridor is ${anchor}. `
-          + "Extend the target fixture (a wider basis widens the anchor), or pass omega:'lift' "
-          + "to accept an explicit boundary touch.");
-      }
+    /** K-Elimination against the anchor lifted to base^level. */
+    const elim = (level) => {
+      let A_ = 1n;
+      for (let i = 0n; i < level; i++) A_ = A_ * base;
+      const inv = inverse(mod(MB, A_), A_);
+      if (inv === null) throw new Error("target shell is not coprime to its anchor");
+      return { A: A_, K: mod((phiMod(A_) - gB) * inv, A_) };
+    };
+
+    // DOUBLE elimination: one derives the winding at `depth`, a second at the
+    // level ABOVE certifies it. K_d = K mod A^d and K_{d+1} = K mod A^{d+1}, so
+    // K_{d+1} = K_d says the leading digit is zero — the winding stopped growing
+    // and did not merely wrap. A DIFFERENCE proves depth was too narrow.
+    const top = elim(depth);
+    const above = elim(depth + 1n);
+    const leadingDigit = (above.K - top.K) / top.A;
+
+    K = top.K;
+    corridor = MB * top.A;
+    lift = {
+      depth: depth.toString(),
+      anchor: top.A.toString(),
+      corridor: corridor.toString(),
+      certifying_anchor: above.A.toString(),
+      leading_digit: leadingDigit.toString(),
+      leading_digit_zero: leadingDigit === 0n,
+    };
+
+    if (omega === "recompute" && leadingDigit !== 0n) {
+      throw new Error(
+        "transduction refused: the target winding overflows the lifted anchor. "
+        + `At depth ${depth} K-Elim gives ${top.K}, at depth ${depth + 1n} it gives ${above.K} — `
+        + `a leading base-${base} digit of ${leadingDigit}, so the winding wrapped the corridor `
+        + `M_B·A = ${corridor}. Raise depth, widen the target basis, or pass omega:'lift' `
+        + "to take the boundary touch explicitly.");
+    }
+
+    // Optional strengthening: an analytic bound on Φ proves containment outright.
+    if (phiBound !== null) {
+      const bound = phiBound(MA * (state.K + 1n));
+      certified = bound <= corridor;
+      lift.bound_supplied = true;
+      lift.bound = bound.toString();
     } else {
-      // omega === "lift": explicit, declared boundary touch. It needs the value,
-      // so under a non-trivial Φ it needs Φ on magnitudes too.
-      if (phiMagnitude === null) {
+      certified = lift.leading_digit_zero;
+      lift.bound_supplied = false;
+    }
+
+    // omega:"lift" — an explicit, flagged boundary touch. Where the corridor is
+    // not certified it reconstructs rather than returning a wrapped winding.
+    // Reconstruction forms a magnitude, so under a non-trivial Φ it needs Φ on
+    // magnitudes; `phiMagnitude` is required HERE and nowhere else.
+    if (omega === "lift" && !certified) {
+      if (phiLane && !opts.phiMagnitude) {
         throw new Error(
-          "transduction refused: omega:'lift' with a phiLane needs phiMagnitude. The lift "
-          + "reconstructs a magnitude, and Φ's magnitude is not recoverable from the tray.");
+          "transduction refused: omega:'lift' past the certified corridor needs phiMagnitude. "
+          + "The boundary touch forms a magnitude, and reconstructing x alone does not give Φ(x). "
+          + "Raise depth instead and the winding derives with no declaration at all.");
       }
-      const bound = phiBound === null ? null : phiBound(srcBound) / MB;
-      certified = bound !== null && bound < anchor;
-      if (!certified) K = phiMagnitude(gammaOf(state.r, A) + state.K * MA) / MB;
+      const srcValue = gammaOf(state.r, A) + state.K * MA;
+      K = (opts.phiMagnitude ? opts.phiMagnitude(srcValue) : srcValue) / MB;
     }
   } else if (omega === "preserve") K = state.K;
   else if (omega === "project") K = 0n;
@@ -508,6 +553,8 @@ export function transduce(state, targetBasis, opts = {}) {
       certified_by: cert.certified_by, shared_lanes: cert.shared_lanes,
       corridor: corridor === null ? null : corridor.toString(),
       corridor_certified: certified,
+      // how the magnitude was derived: K-Elimination against a lifted anchor
+      lift,
       boundary_touch: omega === "lift" && certified === false,
       // Φ ≠ id moves magnitude. Under recompute/lift that is certified or the
       // transduction is refused; under preserve/project the winding is the

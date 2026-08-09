@@ -19,6 +19,7 @@ import {
 export function run() {
   const R = [];
   const t = (name, ok, detail) => R.push({ name, ok: !!ok, detail: detail || "" });
+  const throws = (f) => { try { f(); return false; } catch { return true; } };
 
   // ── the anchor ───────────────────────────────────────────────────
   t("the adjacent modulus is coprime for free: gcd(M, M+1) = 1 always",
@@ -174,8 +175,7 @@ export function run() {
     // Φ acts LANE-WISE: any polynomial with integer coefficients satisfies
     // Φ(x) mod b = Φ(x mod b) mod b, so an active transduction stays native.
     const A = [2n, 3n, 5n, 7n], Bt = [3n, 5n, 7n, 11n];
-    const sB = transduce(encode(83n, A), Bt,
-      { phiLane: (v) => 2n * v + 1n, phiBound: (N) => 2n * N + 1n });
+    const sB = transduce(encode(83n, A), Bt, { phiLane: (v) => 2n * v + 1n });
     t("active transduction (Φ ≠ id) applies lane-wise and stays residue-native",
       value(sB) === 167n && 2n * 83n + 1n === 167n,
       "Φ(x) mod b = Φ(x mod b) mod b for integer-coefficient Φ");
@@ -185,10 +185,8 @@ export function run() {
     // — and the bridge touches the ANCHOR lane M+1 as well as the basis lanes.
     const A = [2n, 5n, 7n, 13n], Bt = [17n, 19n, 23n];   // M+1 = 911 and 7430, both coprime to 3
     const x = 29n;
-    const sB = transduce(encode(x, A), Bt,
-      { phiLane: (v) => 3n * v - 4n, phiBound: (N) => 3n * N });
-    const back = transduce(sB, A,
-      { phiLane: (v, m) => mod((v + 4n) * inverse(3n, m), m), phiBound: (N) => N });
+    const sB = transduce(encode(x, A), Bt, { phiLane: (v) => 3n * v - 4n });
+    const back = transduce(sB, A, { phiLane: (v, m) => mod((v + 4n) * inverse(3n, m), m) });
     t("reversible round trip: Φ then Φ⁻¹, both lane-wise",
       value(sB) === 83n && value(back) === x && wellFormed(back),
       "29 → 3·29−4 = 83 → (83+4)·3⁻¹ = 29");
@@ -220,7 +218,7 @@ export function run() {
     const huge = encode(123n + (10n ** 40n) * MA, A);
     t("the bridge refuses when the TARGET winding leaves its anchor corridor",
       (() => { try { transduce(huge, [11n, 13n, 17n]); return false; } catch (e) {
-        return e.message.includes("anchor corridor"); } })(),
+        return e.message.includes("overflows the lifted anchor"); } })(),
       "it names the corridor and the remedy rather than returning a wrong K");
     const lifted = transduce(huge, [11n, 13n, 17n], { omega: "lift" });
     t("omega:'lift' accepts an explicit, flagged boundary touch",
@@ -228,61 +226,76 @@ export function run() {
       "declared in the lineage, never silent");
   }
   {
-    // ── P22. The corridor test is a MAGNITUDE test, and Φ moves magnitude ──
-    // Φ acting lane-wise pins the target residues but says nothing about
-    // ⌊Φ(x)/M_B⌋. Certifying the corridor from a bound on x rather than on Φ(x)
-    // accepted a K that agreed only mod M_B+1 — a wrong value, marked certified.
+    // ── P24. MAGNITUDE IS DERIVED BY K-ELIMINATION (corrects P22) ────────
+    // P22 demanded the caller declare `phiBound` — an analytic bound on Φ's
+    // growth — before the target winding could be certified. Withdrawn. k is
+    // not lost information; an anchor coprime to the shell gives an independent
+    // exact view, and Φ(x) mod A is reachable for ANY A from the source tray.
+    // What the theorem needs is the RANGE HYPOTHESIS, so the caller declares
+    // DEPTH — a property of the fixture — and the anchor lifts to (M_B+1)^depth.
     const A = [2n, 3n, 5n, 7n], Bt = [3n, 5n, 7n, 11n];   // M_B = 1155
-    const amp = { phiLane: (v) => 10000n * v, phiBound: (N) => 10000n * N };
-    t("REGRESSION — a magnifying Φ is refused, not certified against the source bound",
-      (() => { try { transduce(encode(1000n, A), Bt, amp); return false; }
-        catch (e) { return e.message.includes("anchor corridor"); } })(),
-      "Φ(1000) = 10,000,000 needs K_B ≈ 8658; the corridor is 1156");
-    t("CORRECTED — the old bound M_A(K_A+1)/M_B ignored Φ and read 0 < 1156",
-      210n * (encode(1000n, A).K + 1n) / 1155n === 0n
-      && (10000n * 210n * (encode(1000n, A).K + 1n)) / 1155n === 9090n,
-      "same state, same target: 0 says certified, 9090 says refuse");
-    t("a non-trivial phiLane without phiBound is refused outright",
-      (() => { try { transduce(encode(1000n, A), Bt, { phiLane: amp.phiLane }); return false; }
-        catch (e) { return e.message.includes("phiBound"); } })(),
-      "magnitude is not a lane-wise fact — the caller must declare it");
+    const amp = (v) => 10000n * v;
     {
-      // widen the target until it genuinely holds Φ(x), and the same call certifies
-      const wide = [11n, 13n, 17n, 19n, 23n, 29n, 31n];
-      const s = transduce(encode(1000n, A), wide, amp);
-      t("with a target wide enough for Φ(x), the certified path returns the right value",
-        value(s) === 10000000n && s.lineage.at(-1).corridor_certified === true
-        && s.lineage.at(-1).phi_active === true,
-        "10,000,000 exactly, and the lineage records that Φ was active");
+      const s = transduce(encode(1000n, A), Bt, { phiLane: amp });
+      t("CORRECTED — a magnifying Φ derives its own magnitude, no declaration",
+        value(s) === 10000000n && s.K === 8658n
+        && s.lineage.at(-1).corridor_certified === true
+        && s.lineage.at(-1).lift.bound_supplied === false,
+        "Φ(1000) = 10,000,000 recovered exactly at the default depth 2");
+      t("WITHDRAWN — 'a non-trivial phiLane without phiBound is refused'",
+        s.lineage.at(-1).lift.depth === "2" && s.lineage.at(-1).lift.anchor === "1336336",
+        "the anchor lifted instead; nothing about Φ had to be known");
     }
     {
-      // Φ = id must be untouched by the new gate
+      // DOUBLE elimination: one derives, a second at the level above certifies.
+      const s = transduce(encode(1000n, A), Bt, { phiLane: amp });
+      const L = s.lineage.at(-1).lift;
+      t("the second elimination certifies the first — leading digit zero",
+        L.leading_digit === "0" && L.leading_digit_zero === true
+        && L.certifying_anchor === "1544804416",
+        "K mod A² = K mod A³ ⟹ the winding stopped growing, it did not wrap");
+      t("a wrapped winding is caught, not certified",
+        (() => { try { transduce(encode(1000n, A), Bt, { phiLane: amp, depth: 1n }); return false; }
+          catch (e) { return e.message.includes("overflows the lifted anchor"); } })(),
+        "depth 1 gives 566, depth 2 gives 8658 — a leading digit of 7 proves the wrap");
+      t("REGRESSION — depth 1 is exactly what P22 certified and returned wrong",
+        mod((10000000n - 1155n * 566n), 1155n) === 10n
+        && 10n + 566n * 1155n === 653740n,
+        "653,740 was the wrapped answer; it is now refused rather than certified");
+    }
+    {
+      // Φ = id must be untouched
       const s = transduce(encode(1000n, A), Bt);
-      t("no phiLane — bounds default to the identity and the old behaviour stands",
+      t("no phiLane — the same derivation, unchanged behaviour",
         value(s) === 1000n && s.lineage.at(-1).corridor_certified === true
         && s.lineage.at(-1).phi_active === false);
     }
     {
+      // depth is the lever; raising it widens the corridor
+      const deep = transduce(encode(1000n, A), Bt, { phiLane: amp, depth: 3n });
+      t("raising depth widens the corridor and lands on the same winding",
+        deep.K === 8658n && value(deep) === 10000000n
+        && BigInt(deep.lineage.at(-1).lift.corridor) > 1543468080n,
+        "the answer does not move once the corridor contains it");
+    }
+    {
+      // phiBound survives as an OPTIONAL strengthening
+      const s = transduce(encode(1000n, A), Bt, { phiLane: amp, phiBound: (N) => 10000n * N });
+      t("phiBound is now optional — supplied, it proves containment outright",
+        s.lineage.at(-1).lift.bound_supplied === true
+        && s.lineage.at(-1).lift.bound === "10500000"
+        && value(s) === 10000000n);
+    }
+    {
       // preserve/project do not recompute, so they assert rather than certify
-      const s = transduce(encode(1000n, A), Bt, { omega: "preserve", phiLane: amp.phiLane });
-      t("under preserve/project a Φ-moved winding is flagged as ASSERTED, not certified",
+      const s = transduce(encode(1000n, A), Bt, { omega: "preserve", phiLane: amp });
+      t("under preserve/project a Φ-moved winding is flagged as ASSERTED",
         s.lineage.at(-1).winding_asserted === true
         && s.lineage.at(-1).corridor_certified === null,
         "the caller owns the winding there; nothing claims to have proven it");
     }
-    t("omega:'lift' with a phiLane needs phiMagnitude — the lift forms a value",
-      (() => { try { transduce(encode(1000n, A), Bt, { omega: "lift", phiLane: amp.phiLane }); return false; }
-        catch (e) { return e.message.includes("phiMagnitude"); } })(),
-      "reconstructing x tells you nothing about Φ(x)");
-    {
-      const s = transduce(encode(1000n, A), Bt,
-        { omega: "lift", phiLane: amp.phiLane, phiBound: amp.phiBound,
-          phiMagnitude: (X) => 10000n * X });
-      t("lift with phiMagnitude takes the boundary touch and lands on Φ(x)",
-        s.K === 8658n && s.lineage.at(-1).boundary_touch === true
-        && 10000n * 1000n / 1155n === 8658n,
-        "declared, flagged, and correct");
-    }
+    t("a depth below one is refused",
+      throws(() => transduce(encode(1000n, A), Bt, { depth: 0n })));
   }
   {
     const A = [2n, 3n, 5n, 7n, 11n], Bt = [2n, 3n, 5n, 7n];

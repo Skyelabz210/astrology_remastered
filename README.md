@@ -10,7 +10,7 @@ of 1,296,000; every lane is a BigInt residue; every claim is either exhaustively
 swept or explicitly marked open.
 
 ```
-416/416 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 16/16 core modules float-free
+418/418 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 16/16 core modules float-free
 ```
 
 ---
@@ -20,10 +20,13 @@ swept or explicitly marked open.
 CRAM looks like RNS and is not RNS. Five differences decide how everything else
 reads, and skipping them will make the rest of this repo look wrong.
 
-**1. The winding is derived, never carried.** A value's position is a tray of
+**1. Magnitude is derived, never carried.** A value's position is a tray of
 residues. The lap count `K` is *not a stored field* — it is a function of the
-tray, recovered on demand by K-Elimination on the parked lane. Storing it would
-be a denormalisation that can go out of sync with the lanes that determine it.
+tray, recovered on demand by K-Elimination on the parked lane. This is not a
+storage preference: `k` was never separate information in the first place, and
+an anchor coprime to the shell gives an independent exact view of the same
+value. That is what retires k-tracking, and with it the sixty-year "impossibility"
+of exact RNS division.
 
 **2. What matters is the split, not the basis.** The safe basis
 `S8 = {2,3,5,7,11,13,17,19}` is fixed. The design question is which lanes carry
@@ -119,6 +122,49 @@ digits (base 11) = [3, 10]     10·11 + 3 = 113
 
 Verified exact across the entire double-lift corridor and, at level 6, out to
 1.56 × 10¹².
+
+### Deriving magnitude — you never declare it
+
+This generalises past the winding. **k was never separate information.** In
+`X = r + k·M` the classical reading treats `k` as erased by the reduction and
+sets out to estimate it; that reading is what made RNS division "impossible" for
+sixty years (Szabó & Tanaka, 1967). It is wrong for integer-only arithmetic. An
+anchor coprime to the shell supplies an *independent exact view* of the same
+value, and the pair of views pins it. Nothing is estimated and nothing is
+approximated.
+
+So any magnitude question — division, comparison, overflow, sign, or the
+magnitude of a transformed value `Φ(x)` — is answered by eliminating against an
+anchor, not by tracking a bound:
+
+```
+K ≡ (s − γ) · M⁻¹   (mod A)          s = Φ(x) mod A
+```
+
+`Φ(x) mod A` is reachable for **any** `A` from the source tray alone, because
+the bridge gives `x mod A` exactly and `Φ(x) mod A = Φ(x mod A) mod A` for any
+integer-coefficient Φ. So the transform's growth never has to be known
+analytically.
+
+What *is* required is the range hypothesis the theorem actually carries —
+`X < M·A`. The caller therefore declares **depth**, a property of the fixture,
+and the anchor lifts to `(M_B+1)^depth`. The derivation is **double**: one
+elimination at `depth` yields the winding, a second at `depth+1` certifies it.
+Equal results mean the leading digit is zero — the winding stopped growing
+rather than wrapping. A difference *proves* the corridor was too narrow, and the
+transduction is refused rather than certified.
+
+```js
+// no declaration about Φ of any kind
+transduce(encode(1000n, [2n,3n,5n,7n]), [3n,5n,7n,11n], { phiLane: v => 10000n*v })
+// → value 10,000,000, K = 8658, leading_digit 0, corridor_certified: true
+// depth 1 refuses: K-Elim gives 566 vs 8658 — a leading digit of 7 is the wrap
+```
+
+The formal development is at
+[`Skyelabz210/k-elimination-lean4`](https://github.com/Skyelabz210/k-elimination-lean4)
+— 27 Lean 4 theorems and 10 Coq lemmas, zero `sorry`, zero axioms, cross-verified
+in both systems.
 
 ---
 
@@ -216,7 +262,7 @@ claim here depends on it.
 - **Native sqrt and in-lane Frobenius** — REJECTED. sqrt is undefined on 98.13% of the torus and 128-valued where defined; `x^p = x` on a prime field makes Frobenius the identity.
 - **"Ramanujan primes {2,11,17}"** — REJECTED. `S_R` is the partition-congruence set `{5,7,11}`: `p(5n+4) ≡ 0 (mod 5)`, `p(7n+5) ≡ 0 (mod 7)`, `p(11n+6) ≡ 0 (mod 11)`. 13 has no congruence at any offset.
 - **"Sidereal frames don't move whole-sign houses"** — FALSE, mine. Counterexample: asc 0, body 107,999″, ayanāṁśa 100,000″ → house 1 becomes house 2. Degree-based houses are invariant; whole-sign shifts by `δ_asc − δ_body`, bounded to ±1 house.
-- **The transduction corridor was certified against the wrong magnitude** — Φ acting lane-wise pins target *residues* but says nothing about `⌊Φ(x)/M_B⌋`. A magnifying Φ was reported `corridor_certified: true` while returning 653,740 instead of 10,000,000. A non-trivial `phiLane` now must declare `phiBound` or `phiMagnitude`, or it is refused.
+- **The transduction corridor was certified against the wrong magnitude** — a magnifying Φ was reported `corridor_certified: true` while returning 653,740 instead of 10,000,000. Real defect; but the **first remedy was also wrong** and is withdrawn. It required the caller to declare Φ's growth, which inverts the theorem — magnitude is *derived*, by K-Elimination against a lifted anchor. See [Deriving magnitude](#deriving-magnitude-you-never-declare-it).
 - **`parkingReport` admitted an off-basis prime** — it gated admissibility on coprimality alone, so lane 23 passed although `23 ∤ M₈` and no such lane exists in the tray.
 
 ---
