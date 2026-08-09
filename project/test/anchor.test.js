@@ -21,7 +21,7 @@ import {
   PARKED_LANE, SHELL_LANES_PARKED, SHELL_PARKED, shadowAnchor,
   parkingReport, parkedRecover, parkedRecoverFrom,
 } from "../src/core/anchor.js";
-import { SHELL_ANCHOR, ADJACENT_MODULUS } from "../src/core/shell-kelim.js";
+import { SHELL_ANCHOR, LEGACY_ANCHOR, LEGACY_SHELL } from "../src/core/shell-kelim.js";
 
 export function run() {
   const R = [];
@@ -73,9 +73,13 @@ export function run() {
     t("it is NOT adjacent, so the precomputed inverse is the correct price",
       !rep.adjacent && M6_INV_MOD_GEAR === 287n,
       "internality costs one multiply; it is not optional");
-    t("shell-kelim's canonical anchor is the internal gear pair again",
-      SHELL_ANCHOR === GEAR_PRODUCT && ADJACENT_MODULUS === M6 + 1n,
-      "P14's designation reversed");
+    t("the gear split remains admissible and is retained as LEGACY",
+      SHELL_ANCHOR !== LEGACY_ANCHOR && LEGACY_ANCHOR === GEAR_PRODUCT
+      && LEGACY_SHELL === M6,
+      "exact, still certified, no longer the register's split");
+    t("shell-kelim's CANONICAL anchor is now the parked lane 11",
+      SHELL_ANCHOR === PARKED_LANE && SHELL_ANCHOR === 11n,
+      "P21 re-base: the register runs on the parked shell");
   }
   {
     // the canonical path still certifies the whole ring
@@ -151,6 +155,18 @@ export function run() {
   t("parked shell M = 2·3·5·7·13·17·19 = 881,790 = M₈ / 11",
     SHELL_PARKED === 881790n && SHELL_PARKED === M8 / 11n
     && shellModulus(SHELL_LANES_PARKED) === SHELL_PARKED);
+  {
+    // the core is now built on this split — check it end to end
+    const rep = anchorReport(B8, SHELL_LANES_PARKED, [11n]);
+    t("the RE-BASED core split is admissible: internal, disjoint, tray-determined",
+      rep.admissible && rep.internal && rep.disjoint && rep.tray_determines_anchor
+      && rep.iid_preserved && rep.shell === "881790" && rep.anchor === "11",
+      "shell 881,790 · anchor lane 11 · " + rep.recovery);
+    t("the parked anchor reads exactly one lane, and it is not a shell lane",
+      laneDependency(B8, 11n).map(String).join() === "11"
+      && !SHELL_LANES_PARKED.some((p) => p === 11n),
+      "i.i.d. intact — every shell lane is still x mod p and nothing else");
+  }
   {
     const rep = parkingReport(B8, [11n], 1n);
     t("shell and parked lane are disjoint and coprime",

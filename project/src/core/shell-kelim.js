@@ -1,65 +1,84 @@
-// src/core/shell-kelim.js — shell winding recovery. (P3, canonical path P14)
+// src/core/shell-kelim.js — shell winding recovery. (P3, re-based P21)
 //
-// TWO PATHS, and the canonical one is the adjacent anchor.
+// CANONICAL — the parked split.
+// ─────────────────────────────
+// Shell {2,3,5,7,13,17,19} = 881,790, anchor the parked lane 11. Both are
+// sub-products of the fixed basis and their lane sets are disjoint, so the
+// anchor is INTERNAL and tray-determined and i.i.d. survives: every lane is
+// still x mod p, referencing no other lane.
 //
-//   CANONICAL (CRAM).  A = 17·19 = 323 — the gear pair, INTERNAL to the fixed
-//   safe basis. Lanes 17 and 19 are already in the tray, produced by their own
-//   reductions, disjoint from the six shell lanes. K ≡ (s − r)·287 (mod 323).
-//   The precomputed inverse is the price of internality, and internality is not
-//   optional: see below.
+//     K ≡ (s − r) · M_SHELL⁻¹   (mod 11),      M_SHELL⁻¹ ≡ 7 (mod 11)
 //
-//   NOT ADMISSIBLE HERE.  A = M6 + 1 = 30,031 = 59 · 509 is EXTERNAL to SafeS8.
-//   x and x + M8 share the entire tray yet differ modulo 30,031 (they differ by
-//   M8 mod 30,031 = 29,708), so the adjacent residue is not a function of the
-//   tray at all. Obtaining it means reconstructing the integer — leaving residue
-//   space — or adjoining lanes 59 and 509, which violates A3. The adjacency
-//   identity below is arithmetically true and is retained for bases where the
-//   anchor IS internal (the star-lift bases; see src/core/anchor.js), but over
-//   SafeS8 it is not a residue-space operation and must not be treated as one.
+// Exact while K < 11. Over the ecliptic ring K ≤ 1, so the bare lane covers it
+// with an order of magnitude to spare.
 //
-//   This reverses an earlier pass that had these two the other way round.
+// The yield is the PAIR (r, K). It is not fused: r lives in the shell lanes,
+// K in the parked lane. Forming r + K·M_SHELL is a radix boundary projection
+// and lives in cram.js as `projectToInteger`, not here.
 //
-// Both are certified over the whole ecliptic ring in test/full-sweep.test.js.
+// LEGACY — the gear split.
+// ────────────────────────
+// Shell {2,3,5,7,11,13} = 30,030, anchor 17·19 = 323 with the precomputed
+// inverse 287. Exact, still PROVEN, still exported. It needs the wider 323
+// anchor only because 11 was loaded into the shell, pushing K to 43.
+//
 // BigInt only.
 
-import { M6, GEAR_PRODUCT, M6_INV_MOD_GEAR } from "./basis.js";
+import {
+  M6, GEAR_PRODUCT, M6_INV_MOD_GEAR,
+  PARK, M_SHELL, M_SHELL_INV_MOD_PARK,
+} from "./basis.js";
 import { mod } from "./residues.js";
 
-/** The canonical INTERNAL anchor for the six-lane shell: the gear pair. */
-export const SHELL_ANCHOR = GEAR_PRODUCT;       // 323 = 17 · 19, both lanes of B8
+// ── canonical: parked shell, lane-11 anchor ────────────────────────
 
-/** The adjacent modulus. EXTERNAL to SafeS8 — not tray-determined. */
-export const ADJACENT_MODULUS = M6 + 1n;        // 30,031 = 59 · 509
+/** The canonical internal anchor: the parked lane. */
+export const SHELL_ANCHOR = PARK;               // 11
 
-/**
- * The adjacent residue. Takes the INTEGER, not the tray — over SafeS8 the tray
- * cannot supply it. Provided so the identity can be exercised and its
- * inadmissibility demonstrated, not for use in the hot path.
- */
-export function adjacentResidue(x) { return mod(x, ADJACENT_MODULUS); }
+/** r — the shell residue, over {2,3,5,7,13,17,19}. */
+export function parkedShellResidue(x) { return mod(x, M_SHELL); }
+
+/** s — the anchor residue, read straight off the parked lane. */
+export function parkResidue(x) { return mod(x, PARK); }
 
 /**
- * The adjacency identity K ≡ r − s (mod M+1). Arithmetically exact, but over
- * SafeS8 it is NOT a residue-space operation — see the header. Use
- * `internalAdjacencyRecover` from anchor.js on a basis where the anchor is
- * internal (a star-lift basis).
+ * K-Elimination on the parked split. Returns K only; the number is the pair
+ * (r, K) and nothing here fuses them.
  */
-export function recoverShellWindingAdjacent(x) {
-  return mod(shellResidue(x) - adjacentResidue(x), ADJACENT_MODULUS);
+export function recoverShellWinding(r, s) {
+  return mod((s - r) * M_SHELL_INV_MOD_PARK, PARK);
 }
 
-export function verifyShellWindingAdjacent(x) {
-  const recovered = recoverShellWindingAdjacent(x);
-  const actual = x / M6;
+/** The same, driven from the integer — for encoding and for tests. */
+export function recoverShellWindingFrom(x) {
+  return recoverShellWinding(parkedShellResidue(x), parkResidue(x));
+}
+
+/** The yield: the identity pair, uncoupled. */
+export function shellIdentity(x) {
+  const r = parkedShellResidue(x);
+  return { r, K: recoverShellWinding(r, parkResidue(x)), shell: M_SHELL, anchor: PARK };
+}
+
+export function actualShellWinding(x) { return x / M_SHELL; }
+
+export function verifyShellWinding(x) {
+  const recovered = recoverShellWindingFrom(x);
+  const actual = actualShellWinding(x);
   return {
-    path: "adjacency (identity only — anchor external to SafeS8)",
-    anchor: ADJACENT_MODULUS.toString(),
-    tray_determined: false,
+    split: "parked",
+    shell: M_SHELL.toString(),
+    anchor: PARK.toString(),
     recovered: recovered.toString(),
     actual: actual.toString(),
     ok: recovered === actual,
   };
 }
+
+// ── legacy: gear split, retained and still exact ───────────────────
+
+export const LEGACY_SHELL = M6;
+export const LEGACY_ANCHOR = GEAR_PRODUCT;
 
 export function shellResidue(x) { return mod(x, M6); }
 export function gearResidue(x) { return mod(x, GEAR_PRODUCT); }
@@ -70,10 +89,17 @@ export function recoverShellWindingFromGear(x) {
   return mod((vA - vM) * M6_INV_MOD_GEAR, GEAR_PRODUCT);
 }
 
-export function actualShellWinding(x) { return x / M6; }
+export function actualLegacyWinding(x) { return x / M6; }
 
-export function verifyShellWinding(x) {
+export function verifyLegacyShellWinding(x) {
   const recovered = recoverShellWindingFromGear(x);
-  const actual = actualShellWinding(x);
-  return { recovered: recovered.toString(), actual: actual.toString(), ok: recovered === actual };
+  const actual = actualLegacyWinding(x);
+  return {
+    split: "gear (legacy)",
+    shell: M6.toString(),
+    anchor: GEAR_PRODUCT.toString(),
+    recovered: recovered.toString(),
+    actual: actual.toString(),
+    ok: recovered === actual,
+  };
 }

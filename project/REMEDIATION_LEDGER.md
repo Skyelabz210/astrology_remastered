@@ -27,14 +27,15 @@ leaving the existing browser apps working against the demo layer.
 | P18 | Lane 11 parked — anchor lane carries no value; shadow lift loses its Hensel step | DONE — 358/358 |
 | P19 | A3 withdrawn as a premise; O(1) yield; P17 overclaim amended | DONE — 367/367 |
 | P20 | Yield uncoupled — `r + K·M` named as a radix boundary projection, not the yield | DONE — 368/368 |
+| P21 | Core RE-BASED on the parked shell — 881,790 / lane 11 | DONE — 386/386 |
 
 ## Acceptance evidence
 
 - `src/core` no-float audit: clean across all sixteen modules (see
   `test/no-float-core.test.js` token list).
-- Full-sweep K-Elim, every x in [0, 1,296,000), zero mismatches: canonical
-  INTERNAL anchor `K ≡ (s − r)·287 (mod 323)`, plus the adjacency identity
-  `K ≡ r − s (mod 30031)` which is exact arithmetic but not tray-determined.
+- Full-sweep, every x in [0, 1,296,000), zero mismatches on BOTH splits:
+  canonical parked `K ≡ (s − r)·7 (mod 11)` with K_max = 1, and legacy gear
+  `K ≡ (s − r)·287 (mod 323)` with K_max = 43.
 - Variant coverage: 78 assertions over 13 traditions, 36 divisions, 7 frames,
   13 house systems, 7 aspect families.
 - Safe Basis / ρ / arrow: 62 assertions.
@@ -122,3 +123,9 @@ leaving the existing browser apps working against the demo layer.
   flag. Verified that the pair alone is injective over the span and that
   equality and ordering read straight off (K, r) — the composite is never
   needed.
+- P21: the P4 register is re-based on the parked shell. `basis.js` gains PARK,
+  SHELL_LANES, M_SHELL = 881,790 and M_SHELL_INV_MOD_PARK = 7; `shell-kelim.js`
+  makes the parked split canonical and keeps the gear split as LEGACY;
+  `hcrm-core.js` emits HCRM_REGISTER_V2 carrying the identity pair (r, K) plus
+  the retained legacy block. The full sweep certifies both splits over the whole
+  ring. Core unit suite 32 → 48 assertions, anchor suite 43 → 46.

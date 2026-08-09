@@ -53,16 +53,24 @@ straight off it — lexicographic (K, r) reproduces integer order exactly.
 
 ## Current classification
 
-- **HCRM register core** (`src/core`) — PROVEN over the full ecliptic arcsecond
-  ring [0, 1,296,000): SafeS8 residues + M6 shell-winding recovered with zero
-  failures and no floating point through the **internal** gear anchor
-  A = 17·19 = 323 with the precomputed inverse 287. The adjacency identity
-  `K ≡ r − s (mod 30,031)` is also exact arithmetic over the ring, but 30,031 is
-  external to SafeS8 and not tray-determined — see the anchor-admissibility
-  section.
-- **SafeS8 injectivity over the ring** — PROVEN (CRT; ARC < M8).
-- **Shell winding bound 0 ≤ K ≤ 43** — PROVEN (⌊(ARC−1)/M6⌋ = 43).
-- **Gear anchor sufficiency (A = 323 > K)** — PROVEN.
+- **HCRM register core** (`src/core`) — **RE-BASED (P21)** onto the parked
+  split and PROVEN over the full ecliptic arcsecond ring [0, 1,296,000) with
+  zero failures and no floating point. Canonical: shell {2,3,5,7,13,17,19} =
+  **881,790** with the internal anchor on the **parked lane 11**,
+  `K ≡ (s − r)·7 (mod 11)`. The register (`HCRM_REGISTER_V2`) reports the
+  identity **pair** (r, K) — the two are never fused.
+- **Parked winding bound 0 ≤ K ≤ 1** — PROVEN (⌊(ARC−1)/881,790⌋ = 1). The ring
+  spans two laps of the parked shell, so the bare lane-11 anchor covers it with
+  an order of magnitude to spare.
+- **Parked anchor admissibility** — PROVEN: 11 is a lane of SafeS8 (internal,
+  tray-determined) and is disjoint from the shell lanes, so i.i.d. survives —
+  `laneDependency(B8, 11)` is exactly {11}.
+- **SafeS8 injectivity over the ring** — PROVEN (CRT; ARC < M8). Unchanged: the
+  basis did not move, only the shell/anchor split.
+- **Legacy gear split** — RETAINED and still PROVEN: shell M6 = 30,030, anchor
+  17·19 = 323, inverse 287, K ≤ 43. Both splits are swept together over the
+  whole ring, so the re-base loses nothing. The wider 323 anchor was needed only
+  because 11 sat in the shell.
 
 ### Astrology Remastered (`ring.js`, `variants.js`, `safe-basis.js`, `rho.js`, `shadow-spine.js`, `arrow.js`)
 

@@ -215,8 +215,8 @@
   <div class="vgrid" id="matrix"></div>
 
   <!-- ══ sweeps ═════════════════════════════════════════════════ -->
-  <div class="sec-h">Full ecliptic K-Elim sweep <span class="pill proven">exhaustive</span></div>
-  <div class="formula">∀ x ∈ [0, 1,296,000): &nbsp; ⌊x/M₆⌋ ≡ (x mod 323 − x mod 30030)·287 (mod 323)</div>
+  <div class="sec-h">Full ecliptic K-Elim sweep <span class="pill proven">exhaustive</span> <span class="pill">parked shell (canonical) + gear shell (legacy)</span></div>
+  <div class="formula">∀ x ∈ [0, 1,296,000): &nbsp; ⌊x/881,790⌋ ≡ (x mod 11 − x mod 881,790)·7 (mod 11) &nbsp;·&nbsp; parked lane 11, K ≤ 1</div>
   <div class="prog"><div class="prog-fill" id="prog"></div></div>
   <div class="sweepbox">
     <div class="sweep-stat">

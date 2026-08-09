@@ -20,7 +20,22 @@ ARCSEC_CIRCLE = 1 296 000          M6⁻¹ mod 323 = 287    (since M6 mod 323 = 
 ### Residue map (`src/core/residues.js`) — DEFINED
 `mod(x, m)` is the non-negative representative; `residues(x, B)` the tray.
 
-### Canonical winding recovery — INTERNAL anchor — PROVEN
+### Canonical winding recovery — PARKED shell, lane-11 anchor — PROVEN (P21)
+The register runs on shell `{2,3,5,7,13,17,19}` = **881 790** = M8/11 with the
+internal anchor on the **parked lane 11**:
+
+```
+K ≡ (s − r) · 7   (mod 11)      r = x mod 881 790,  s = x mod 11
+```
+
+Lane 11 is in the basis (so the anchor is internal and tray-determined) and out
+of the shell product (so it can carry the winding). Over the ecliptic ring
+K ≤ 1. The yield is the pair (r, K); fusing them is a boundary projection.
+
+The gear split below is retained, exact, and still certified — it is the
+configuration that arises when 11 is left in the shell.
+
+### Legacy winding recovery — INTERNAL gear anchor — PROVEN
 The anchor must be a sub-product of the fixed basis. The tray determines
 `x mod A` iff `A | M`; for SafeS8, `M8 mod 30 031 = 29 708`, so the adjacent
 modulus is not tray-determined and cannot be used without leaving residue space
