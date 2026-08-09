@@ -17,9 +17,108 @@ leaving the existing browser apps working against the demo layer.
 | P8 | 180-fold overclaim correction | DONE (docs/hcrm-open-claims.md) |
 | P9 | Commit sequence | N/A (no git) |
 | P10 | Final classification | DONE (STATUS.md) |
+| P11 | Astrology Remastered — variant coverage + closure certification | DONE |
+| P12 | Safe-Basis correction — roles, Gaussian class, ρ, arrow; shadow/closure split | DONE — 221/221 |
+| P13 | Operator-atlas assessment — enumeration replaces assertion | DONE — 247/247 |
+| P14 | CRAM-not-RNS correction — adjacency anchor, coprimality, gradient, shadow lift, state tuple, χ | DONE — 279/279 |
+| P15 | Star lift, winding tower, phase-locked fixture, recommissioned unit lane | DONE — 311/311 |
+| P16 | Residue-native transduction; certification by unbroken safe basis; S_R and tier corrections | DONE — 325/325 |
+| P17 | Anchor must be INTERNAL — reverses P14's canonical designation | DONE — 346/346 |
+| P18 | Lane 11 parked — anchor lane carries no value; shadow lift loses its Hensel step | DONE — 358/358 |
+| P19 | A3 withdrawn as a premise; O(1) yield; P17 overclaim amended | DONE — 367/367 |
+| P20 | Yield uncoupled — `r + K·M` named as a radix boundary projection, not the yield | DONE — 368/368 |
 
 ## Acceptance evidence
 
-- `src/core` no-float audit: clean (see `test/no-float-core.test.js` token list).
-- Full-sweep K-Elim: every x in [0, 1,296,000) recovers K = ⌊x/M6⌋ via
-  K ≡ (x mod 323 − x mod 30030)·287 (mod 323). Zero mismatches.
+- `src/core` no-float audit: clean across all sixteen modules (see
+  `test/no-float-core.test.js` token list).
+- Full-sweep K-Elim, every x in [0, 1,296,000), zero mismatches: canonical
+  INTERNAL anchor `K ≡ (s − r)·287 (mod 323)`, plus the adjacency identity
+  `K ≡ r − s (mod 30031)` which is exact arithmetic but not tray-determined.
+- Variant coverage: 78 assertions over 13 traditions, 36 divisions, 7 frames,
+  13 house systems, 7 aspect families.
+- Safe Basis / ρ / arrow: 62 assertions.
+- Lanes: 40 static assertions + 5 exhaustive-sweep certificates
+  (classifier agreement over the 323,323 period, census vs closed form,
+  orthogonality, independence) + 4 frame-additivity certificates.
+- P11 timings on the reference machine: lane sweep 0.5 s, frame sweep 1.9 s,
+  K-Elim sweep 0.1 s.
+- P12 correction: the earlier "shadow spine = {7,11,13,17,19}" is REJECTED and
+  replaced. Shadow is the Gaussian/mod-4 class {3,7,11,19} anchored at 11;
+  {7,11,13,17,19} is the off-ring closure axis. Both are carried, separately,
+  and the 2×2 cross is verified fully occupied.
+- P12 additions: `src/core/safe-basis.js` (roles, Gaussian class, families,
+  saturation), `src/core/rho.js` (ω, q, δ, ρ, bands), `src/core/arrow.js`
+  ((r,K), lap saturation, shadow entropy). 62 new assertions; no-float audit
+  clean across all 12 core modules.
+- P13: `src/core/operators.js` + 26 assertions. The circulated figure of
+  14,174,742 operators is REJECTED (= 2·3·2,362,457); the derived count of
+  exact lane operators over S8 is 5,096,079,360, enumerated as function tables
+  and matched against ∏(p−1)φ(p−1) in every lane. Native sqrt and in-lane
+  Frobenius are REJECTED on structural grounds with the counter-computations
+  attached.
+- P14: `src/core/cram.js` + 32 assertions. The basis was being used as an RNS —
+  prime lanes, anchor from inside the basis, precomputed inverse. Canonical
+  path is now the adjacent anchor A = M+1 (K ≡ r − s, one subtraction, no
+  inverse, 92× corridor), certified alongside the gear path over the full ring.
+  Adds coprimality-not-primality (verified on an all-composite basis), the
+  resolution gradient (Maya Calendar Round exhaustive over 18,980), the 11⁶
+  shadow lift (K mod 161,051), the eight-field state tuple with first-class
+  per-lane topology, and the fifth operator χ with Φ/Θ/Π/Ω.
+- P15: `src/core/fixture.js` + 32 assertions. Star numbers S_n = 6n(n−1)+1 are
+  an adjacency family, and every anchor already in use is one of them (1, 13,
+  37, 73, 121 = 11², 181). The 36/37 lift iterated to zero is the winding tower
+  — arbitrary depth, terminating, level-independent, explicitly NOT a radix
+  (contrasted against Garner's threaded accumulator). Depth and precision are
+  separated: `towerReport` names the level at which a single anchor stops
+  certifying and transduction must take over. The recommissioned unit lane is
+  the frame-independent origin (0 bits, indexed lane 0 so 11 stays on lane 5);
+  the phase lock rides on the shared shadow lane and constrains Φ to
+  Φ(x) ≡ x (mod 11).
+- P16: two corrections. (a) `transduce` was reconstructing — it called
+  `value(state)` and re-reduced, materialising K·M. Rewritten residue-native via
+  idempotents plus the effective winding W; the largest integer formed is now a
+  basis constant (43-digit value → 4-digit intermediate). (b) Certification was
+  attributed to the winding tower; it belongs to the UNBROKEN SAFE BASIS.
+  `certifyTransduction` + boot gates B001–B004 are the certificate; the tower
+  certifies depth inside one fixture only. Also REJECTED: the circulated
+  transduction sheet's α formula (does not reproduce x mod b) and its worked
+  example (internally inconsistent), and "Ramanujan primes {2,11,17}" — the
+  architecture means the partition congruences, S_R = {5,7,11}, with 13 having
+  no congruence at any offset. Adds the three-tier structure and Fibonacci
+  entry paths.
+- P17: `src/core/anchor.js` + 21 assertions, REVERSING P14's canonical call.
+  The anchor must be an internal sub-product of the fixed basis, because the
+  tray determines x mod A iff A | M — and M₈ mod 30,031 = 29,708, so the
+  adjacent modulus is not a function of the tray at all (witness: x and x + M₈
+  share all eight lanes, read 3,332 vs 3,009). Internal 323 is pinned by lanes
+  {17,19} alone, disjoint from the shell, so i.i.d. survives; the external
+  anchor couples all eight and is still undetermined. Adjacency is recovered by
+  designing the basis for it — star-lift bases {4,3,13}, {4,9,37}, {8,9,73},
+  {4,9,5,181} are adjacent AND internal, verified exhaustively. 16/16 core
+  modules BigInt-clean.
+- P18: a lane cannot be both anchor and shell. Lane 11 is PARKED — in the basis
+  but out of the shell product — so it can anchor. Shell becomes
+  2·3·5·7·13·17·19 = 881,790 = M₈/11; over the ecliptic ring K ≤ 1 and the bare
+  lane-11 anchor suffices, so the K ≤ 43 corridor and the gear pair were
+  artefacts of loading 11 into the shell. The shadow lift at 11⁶ becomes plain
+  coprime K-Elimination — gcd(11⁶, 881,790) = 1 — retiring the divide-by-11
+  Hensel step and withdrawing the "intentional non-coprimality" claim. Same
+  corridor, 1,562,144,774,190.
+- P19: A3 ("fixed immutable basis") was imported from an external framework doc
+  and made load-bearing in P17. It was never adopted here — withdrawn as a
+  premise, and the P17 argument restated on i.i.d. alone. Also corrects the
+  overclaim that an external anchor "cannot be evaluated in residue space at
+  all": it is reachable, because reconstruction is O(1). A2 retires Garner, not
+  reconstruction. `reconstructAdjacent` / `reconstructGeneral` added with op
+  counts — 4 and 5 ops, independent of lane count, against Garner's 48 over the
+  same eight lanes.
+- P20: the P19 yield was written as "K-Elim plus one multiply-add, X = r + K·M".
+  That multiply-add is a radix composition — r the low digit, K the high, M the
+  radix — so the positional emission A2 retires had been put back inside the
+  function meant to avoid it. The yield now returns the identity PAIR and stops:
+  2 ops adjacent, 3 general, neither coupling. `projectToInteger` and
+  `towerRebuild` are relabelled BOUNDARY PROJECTIONS and carry a `couples: true`
+  flag. Verified that the pair alone is injective over the span and that
+  equality and ordering read straight off (K, r) — the composite is never
+  needed.

@@ -12,11 +12,12 @@
 // and can report progress. BigInt only — no floats anywhere in the hot loop.
 
 import { M6, GEAR_PRODUCT, M6_INV_MOD_GEAR, ARCSEC_CIRCLE } from "../src/core/basis.js";
+import { ADJACENT_MODULUS } from "../src/core/shell-kelim.js";
 
 export async function runSweep(onProgress) {
   const M6n = M6, A = GEAR_PRODUCT, inv = M6_INV_MOD_GEAR, RING = ARCSEC_CIRCLE;
   const CHUNK = 32400n;                 // 40 chunks over the ring
-  let x = 0n, mismatches = 0, checked = 0n;
+  let x = 0n, mismatches = 0, adjMismatches = 0, checked = 0n;
   let maxK = 0n, firstFail = null;
 
   while (x < RING) {
@@ -25,8 +26,12 @@ export async function runSweep(onProgress) {
       const vM = x % M6n;                          // shell residue
       const vA = x % A;                            // gear residue
       let k = ((vA - vM) * inv) % A; if (k < 0n) k += A;
+      // adjacency IDENTITY (arithmetic only — this anchor is external to SafeS8,
+      // so it reads the integer, not the tray; see src/core/anchor.js)
+      let kAdj = (vM - (x % ADJACENT_MODULUS)) % ADJACENT_MODULUS; if (kAdj < 0n) kAdj += ADJACENT_MODULUS;
       const actual = x / M6n;                       // ⌊x/M6⌋ exact (BigInt division)
       if (k !== actual) { mismatches++; if (firstFail === null) firstFail = x.toString(); }
+      if (kAdj !== actual) { adjMismatches++; if (firstFail === null) firstFail = x.toString(); }
       if (actual > maxK) maxK = actual;
       checked++;
     }
@@ -34,11 +39,14 @@ export async function runSweep(onProgress) {
   }
 
   return {
-    name: "Full ecliptic K-Elim sweep [0, 1,296,000)",
+    name: "Full ecliptic K-Elim sweep [0, 1,296,000) — canonical internal anchor + adjacency identity",
     checked: checked.toString(),
     mismatches,
+    adjMismatches,
+    anchor_canonical_internal: A.toString(),
+    adjacent_modulus_external: ADJACENT_MODULUS.toString(),
     maxK: maxK.toString(),
     firstFail,
-    ok: mismatches === 0 && checked === RING && maxK === 43n,
+    ok: mismatches === 0 && adjMismatches === 0 && checked === RING && maxK === 43n,
   };
 }
