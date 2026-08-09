@@ -116,7 +116,8 @@ export function run() {
   // ── the carry is captured, not discarded ─────────────────────────
   {
     const A = [2n, 3n, 5n, 7n], Bt = [3n, 5n, 7n, 11n];
-    const s = transduce(encode(1000n, A), Bt, { phiLane: (v) => 10000n * v });
+    const s = transduce(encode(1000n, A), Bt,
+      { phiLane: (v) => 10000n * v, anchors: [1156n, 13n] });
     const line = s.lineage.at(-1);
     t("every lane's emitted carry is recorded, not dropped on the floor",
       line.lane_carry.length === 4 && line.lane_carry.some((c) => c !== "0"),

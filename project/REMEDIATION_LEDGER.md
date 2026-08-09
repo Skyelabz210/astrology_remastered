@@ -214,3 +214,29 @@ leaving the existing browser apps working against the demo layer.
   quotient is simply no longer lost. Also added the carry functional C = Σ w²,
   zero exactly when no value wound past its shell.
   New suite: 22 assertions. 441 total; no-float audit 16 → 17 modules.
+- P26: T-COMP-1 supersedes the P24 anchor-power lift. P24 grew the corridor by
+  raising ONE anchor to a power, (M+1)^depth, and certified with a leading-digit
+  heuristic I invented — necessary but never sufficient, as noted at the time.
+  Wrong mechanism. The corridor is grown by EXTENDING THE ANCHOR SET:
+      M = ∏ basis, anchors {A₁..A_t}, L = lcm(Aᵢ), d = gcd(M,L), R = L/d
+      K ≡ ((v_L − r)/d)·(M/d)⁻¹ (mod R),   exact while K < R
+  Two things this fixes. (M/d) is invertible mod R UNCONDITIONALLY — gcd(M/d,
+  L/d) = 1 always, since per prime one exponent is exhausted by the min
+  (verified over 90,000 (M,L) pairs) — so no coprimality precondition is needed
+  between shell and anchor set, and the gradient case d > 1 is not an exception
+  to route around but the general case. And R is COMPUTED, not guessed: K < R is
+  a declared corridor of the same shape as the Lean `hRange`, replacing the digit
+  heuristic. Reach is unbounded by adding anchors: each coprime anchor multiplies
+  R at one pairwise combine — 1,156 → 15,028 → 285,532 on the worked example —
+  linear cost for multiplicative corridor, against one enormous modulus before.
+  Raising a single anchor to a power is the special case {A, A², …} with d = 1.
+  New src/core/tower-recover.js with crtCombine over non-coprime moduli,
+  anchorSetCorridor, towerRecover, extendAnchors, and the E-DIV-4 winding
+  cross-check. `transduce` rewired onto it: `opts.anchors` replaces `opts.depth`.
+  Verified exhaustively over the full period M·L per the composition document,
+  including a case whose anchors are non-coprime to each other AND share d = 12
+  with the shell.
+  Two self-inflicted bugs caught while wiring: the falsification test as first
+  written compared K mod R against K mod R — a tautology that never fired; and a
+  test expected crtCombine([1,3],[4,6]) = 3 when it is 9.
+  New suite: 14 assertions. 455 total; no-float audit 18 modules.

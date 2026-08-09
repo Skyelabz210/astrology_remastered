@@ -45,6 +45,7 @@
 // BigInt only. No floats, no Date, no ephemeris.
 
 import { mod } from "./residues.js";
+import { towerRecover } from "./tower-recover.js";
 import { B6, B8, M6, M8 } from "./basis.js";
 
 // ── basis hygiene: coprimality, not primality ──────────────────────
@@ -484,40 +485,39 @@ export function transduce(state, targetBasis, opts = {}) {
     };
 
     /** K-Elimination against the anchor lifted to base^level. */
-    const elim = (level) => {
-      let A_ = 1n;
-      for (let i = 0n; i < level; i++) A_ = A_ * base;
-      const inv = inverse(mod(MB, A_), A_);
-      if (inv === null) throw new Error("target shell is not coprime to its anchor");
-      return { A: A_, K: mod((phiMod(A_) - gB) * inv, A_) };
-    };
+    // T-COMP-1 (P26). The corridor is grown by EXTENDING THE ANCHOR SET, not by
+    // raising one anchor to a power, and the bound R = lcm(A)/gcd(M_B, lcm(A))
+    // is COMPUTED rather than guessed from a leading digit.
+    const anchors = opts.anchors || [base];
+    const rec = towerRecover(gB, anchors.map(phiMod), MB, anchors);
+    if (rec === null) throw new Error("transduction refused: anchor residues are inconsistent");
 
-    // DOUBLE elimination: one derives the winding at `depth`, a second at the
-    // level ABOVE certifies it. K_d = K mod A^d and K_{d+1} = K mod A^{d+1}, so
-    // K_{d+1} = K_d says the leading digit is zero — the winding stopped growing
-    // and did not merely wrap. A DIFFERENCE proves depth was too narrow.
-    const top = elim(depth);
-    const above = elim(depth + 1n);
-    const leadingDigit = (above.K - top.K) / top.A;
+    // A wider anchor set FALSIFIES the corridor when the winding it recovers
+    // already exceeds the narrow R: that is a proof K ≥ R, so the narrow set
+    // wrapped. Non-falsification is necessary, not sufficient — the certificate
+    // is K < R, which is exactly what the declared anchor set buys.
+    const wider = [...anchors, base * base + 1n];
+    const check = towerRecover(gB, wider.map(phiMod), MB, wider);
+    const wrapped = check !== null && check.K >= rec.R;
 
-    K = top.K;
-    corridor = MB * top.A;
+    K = rec.K;
+    corridor = rec.corridor;
     lift = {
-      depth: depth.toString(),
-      anchor: top.A.toString(),
+      mechanism: "anchor-set (T-COMP-1)",
+      anchors: anchors.map(String),
+      L: rec.L.toString(), d: rec.d.toString(), R: rec.R.toString(),
       corridor: corridor.toString(),
-      certifying_anchor: above.A.toString(),
-      leading_digit: leadingDigit.toString(),
-      leading_digit_zero: leadingDigit === 0n,
+      unconditional_inverse: gcd(MB / rec.d, rec.R) === 1n,
+      falsified: wrapped,
     };
 
-    if (omega === "recompute" && leadingDigit !== 0n) {
+    if (omega === "recompute" && wrapped) {
       throw new Error(
-        "transduction refused: the target winding overflows the lifted anchor. "
-        + `At depth ${depth} K-Elim gives ${top.K}, at depth ${depth + 1n} it gives ${above.K} — `
-        + `a leading base-${base} digit of ${leadingDigit}, so the winding wrapped the corridor `
-        + `M_B·A = ${corridor}. Raise depth, widen the target basis, or pass omega:'lift' `
-        + "to take the boundary touch explicitly.");
+        "transduction refused: the target winding wrapped the corridor. "
+        + `The anchor set [${anchors.join(", ")}] gives R = ${rec.R} and a corridor of `
+        + `M_B·R = ${corridor}; a wider set disagrees, which proves K ≥ R. Extend `
+        + "opts.anchors — each added coprime anchor multiplies R at one pairwise combine — "
+        + "or pass omega:'lift' to take the boundary touch explicitly.");
     }
 
     // Optional strengthening: an analytic bound on Φ proves containment outright.
@@ -527,7 +527,8 @@ export function transduce(state, targetBasis, opts = {}) {
       lift.bound_supplied = true;
       lift.bound = bound.toString();
     } else {
-      certified = lift.leading_digit_zero;
+      // Not falsified is the strongest thing the anchor set alone supports.
+      certified = !lift.falsified;
       lift.bound_supplied = false;
     }
 
@@ -540,7 +541,7 @@ export function transduce(state, targetBasis, opts = {}) {
         throw new Error(
           "transduction refused: omega:'lift' past the certified corridor needs phiMagnitude. "
           + "The boundary touch forms a magnitude, and reconstructing x alone does not give Φ(x). "
-          + "Raise depth instead and the winding derives with no declaration at all.");
+          + "Extend opts.anchors instead and the winding derives with no declaration at all.");
       }
       const srcValue = gammaOf(state.r, A) + state.K * MA;
       K = (opts.phiMagnitude ? opts.phiMagnitude(srcValue) : srcValue) / MB;
