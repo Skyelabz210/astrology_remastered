@@ -202,8 +202,13 @@ export function run() {
     // the certificate: what makes a transduction admissible
     const c = certifyTransduction([2n, 3n, 5n, 7n], [3n, 7n, 11n]);
     t("a transduction is certified by an UNBROKEN SAFE BASIS, not by the tower",
-      c.admissible && c.source_unbroken && c.target_unbroken && c.idempotents_exist
-      && c.certified_by === "unbroken safe basis");
+      c.admissible && c.source_unbroken && c.idempotents_exist
+      && c.certified_by === "unbroken safe basis in the FIRST tray");
+    t("AMENDED (P28) — only the FIRST tray must be unbroken; the target inherits",
+      certifyTransduction([2n, 3n, 5n, 7n], [4n, 6n, 10n]).admissible
+      && certifyTransduction([2n, 3n, 5n, 7n], [4n, 6n, 10n]).target_inherits
+      && !certifyTransduction([4n, 6n, 10n], [2n, 3n, 5n]).admissible,
+      "requiring both refused arbitrary composites the lock makes admissible");
     t("shared lanes are allowed and are exactly where the phase lock lives",
       c.shared_lanes.join() === "3,7" && !c.disjoint,
       "disjointness of the two bases is NOT required");

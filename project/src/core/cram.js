@@ -369,8 +369,17 @@ export function idempotents(basis) {
 }
 
 /**
- * The certificate. A transduction is admissible exactly when both bases are
- * unbroken safe bases. Disjointness is not required.
+ * The certificate. CORRECTED (P28): only the SOURCE tray must be an unbroken
+ * safe basis. The target inherits primality and coprimality from it through the
+ * phase lock, so the target may hold arbitrary composites.
+ *
+ * The earlier version required both. That refused valid configurations — a lane
+ * of the target is a READING, and x mod q is exact for every q whether or not q
+ * is prime or coprime to its neighbours. Coprimality buys RECONSTRUCTION FROM
+ * THE TRAY ALONE, and the target never needs it: the identity (r, w) lives in
+ * the first tray and rides along.
+ *
+ * Disjointness is not required either; the shared lanes are where the lock is.
  */
 export function certifyTransduction(A, B) {
   const repeated = (b) => new Set(b.map(String)).size !== b.length;
@@ -380,14 +389,16 @@ export function certifyTransduction(A, B) {
   let idem = false;
   try { idempotents(A); idem = true; } catch { idem = false; }
   return {
-    kind: "TRANSDUCTION_CERTIFICATE_V1",
+    kind: "TRANSDUCTION_CERTIFICATE_V2",
     source_unbroken: aOk,
-    target_unbroken: bOk,
+    target_unbroken: bOk,            // reported, NOT required
+    target_inherits: !bOk,
     idempotents_exist: idem,
     shared_lanes: shared.map(String),
     disjoint: shared.length === 0,
-    admissible: aOk && bOk && idem,
-    certified_by: "unbroken safe basis",
+    // the target's own structure does not gate this
+    admissible: aOk && idem,
+    certified_by: "unbroken safe basis in the FIRST tray",
   };
 }
 

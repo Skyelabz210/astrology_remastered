@@ -25,6 +25,7 @@ const SUITES = [
   ["hidden carry", "carry.test.js"],
   ["anchor-set recovery", "tower-recover.test.js"],
   ["identity of a number", "identity.test.js"],
+  ["two-tray architecture", "tray.test.js"],
 ];
 
 // The no-float audit reads source; in the browser it fetches, here it reads the

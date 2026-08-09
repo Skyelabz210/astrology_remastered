@@ -271,3 +271,36 @@ leaving the existing browser apps working against the demo layer.
   Also added Ω = "bound" (bounded but not retained), the fourth winding policy;
   only preserve and recompute are reversible.
   New suite: 16 assertions. 471 total; no-float audit 19 modules.
+- P28: the two-tray architecture. Everything reduces to it, and it corrects the
+  transduction certificate.
+  (1) The FIRST tray — the CRT fixture — holds the Safe Basis, 100% SATURATED at
+  30,030: the CRT map is a bijection with zero slack, ∏ lane sizes = span. Span
+  is the LCM, not the product — that is what makes saturation a bijection claim
+  rather than an arithmetic identity, and {4,6,10} shows the difference: 240
+  states over a span of 60, 180 slack. (Caught as a bug: `saturationOf` first
+  used the product for both sides and reported every bag as saturated.)
+  (2) Saturation coupled with the 36/37 star lift instantiates the ARROW OF
+  TIME: S₃ = 37 with shell 36 = S₄ − S₃, adjacent hence coprime, depth
+  unbounded, winding monotone. Both halves are load-bearing — a broken tray does
+  not instantiate it.
+  (3) The first tray is left UNBROKEN. It is the only thing that has to be.
+  (4) A second tray is PHASE LOCKED through the prime 11 lane (phase, 11 states)
+  and the recommissioned unit lane 1 (origin, zero bits, shared by every fixture
+  since gcd(1,n) = 1).
+  (5) The second tray INHERITS primality, coprimality and the identity of a
+  number through that lock.
+  (6) So the second tray may hold ARBITRARY COMPOSITES with no heed of primality
+  or coprimality.
+  CORRECTS the certificate. `certifyTransduction` required BOTH bases to be
+  unbroken safe bases and so refused valid configurations — {4,6,10} as a target
+  was rejected outright. Only the SOURCE must be unbroken. A lane of the target
+  is a READING, and x mod q is exact for every q whether or not q is prime or
+  coprime to its neighbours; what coprimality buys is reconstruction FROM THE
+  TRAY ALONE, and the target never needs it because the identity (r, w) lives in
+  the first tray and rides along. Now TRANSDUCTION_CERTIFICATE_V2 with
+  `target_inherits`; a broken SOURCE is still refused, and that asymmetry is the
+  architecture. Verified: every lane of a deliberately non-coprime tray
+  {1,11,4,6,10} reads exactly over 3,000 values, redundant lanes always agree on
+  their overlaps, and dropping lane 11 refuses the inheritance — composites are
+  unlocked BY the lock, not instead of it.
+  New suite: 19 assertions. 493 total; no-float audit 20 modules.
