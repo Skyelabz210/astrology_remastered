@@ -45,7 +45,7 @@
 // BigInt only. No floats, no Date, no ephemeris.
 
 import { mod } from "./residues.js";
-import { towerRecover } from "./tower-recover.js";
+import { towerRecover, anchorSetCorridor } from "./tower-recover.js";
 import { B6, B8, M6, M8 } from "./basis.js";
 
 // ── basis hygiene: coprimality, not primality ──────────────────────
@@ -548,6 +548,24 @@ export function transduce(state, targetBasis, opts = {}) {
     }
   } else if (omega === "preserve") K = state.K;
   else if (omega === "project") K = 0n;
+  else if (omega === "bound") {
+    // Ω = BOUND — "bounded but not retained". The winding is never committed to:
+    // the corridor it must lie in is recorded and the value is not. This is not
+    // projection — projection destroys a known winding by setting it to 0, and
+    // claims a definite (wrong) value. Bound claims none, so it is honest about
+    // what it has and is non-reversible for the opposite reason. (P27)
+    const anchors = opts.anchors || [MB + 1n];
+    const { R } = anchorSetCorridor(MB, anchors);
+    K = null;
+    corridor = MB * R;
+    lift = {
+      mechanism: "bound (Ω, not retained)",
+      anchors: anchors.map(String),
+      R: R.toString(),
+      corridor: corridor.toString(),
+      winding_retained: false,
+    };
+  }
   else throw new Error("unknown winding policy");
 
   const topo = Pi(state.topology);
@@ -574,6 +592,7 @@ export function transduce(state, targetBasis, opts = {}) {
       // caller's assertion, not a result, and is flagged as such.
       phi_active: phiLane !== null,
       winding_asserted: (omega === "preserve" || omega === "project") && phiLane !== null,
+      winding_retained: omega !== "bound",
     }],
     support: targetBasis.map((_, i) => i),
   };
@@ -589,6 +608,14 @@ export function gammaOf(r, basis) {
 }
 
 /** A transduction is reversible exactly when Ω preserves the winding. */
+/**
+ * Ω has four settings — preserve · recompute · project · bound — and only the
+ * first two are reversible. `lift` is recompute with a declared boundary touch,
+ * so it reverses too. Projection discards a known winding; bound never forms
+ * one. Neither can be undone.
+ */
+export const WINDING_POLICIES = ["preserve", "recompute", "project", "bound"];
+
 export function isReversiblePolicy(omega) {
   return omega === "recompute" || omega === "preserve" || omega === "lift";
 }

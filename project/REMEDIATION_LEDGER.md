@@ -240,3 +240,34 @@ leaving the existing browser apps working against the demo layer.
   written compared K mod R against K mod R — a tautology that never fired; and a
   test expected crtCombine([1,3],[4,6]) = 3 when it is 9.
   New suite: 14 assertions. 455 total; no-float audit 18 modules.
+- P27: D-030, the identity of a number. An integer on the CRT ring is not a
+  magnitude but a COMPOUND STATE ID_p(x) = (r, w) with r = x mod p and
+  w = ⌊x/p⌋. ℤ_p is a cylinder: r is the ANGULAR coordinate, w the AXIAL one.
+  Two integers with the same residue and different windings are distinct states
+  at the same angle on different levels; the residue tuple is a projection that
+  discards the axial coordinate.
+  CORRECTS P23/P24. "Double K-Elimination" is SECOND ORDER, not two levels of
+  one lane: κ₁ = K-Elim(x, M, A₁) is the winding, κ₂ = K-Elim(κ₁, A₁, A₂) is the
+  winding OF the winding — the acceleration along the cylinder, and the third
+  mixed-radix digit. P23 read it as 11 then 11², which is precision on the same
+  κ₁. Verified exhaustively over the full two-digit corridor x < M·A₁·A₂.
+  Both digits are read off x by independent eliminations, so `windingDigits`
+  gives mixed-radix WITHOUT a Garner cascade — digit i never reads digit i−1.
+  §6.1 settles the "leak" framing with a mechanism: Garner reconstruction
+  DESTROYS the winding; staying residue-native and using K-Elimination PRESERVES
+  it, and the windings are a deterministic source of noise that MASKS power and
+  timing side channels. An attacker's trace measures the residue; the winding is
+  invisible to them. Structure in the carry is the defence, not an escape. The
+  word "leak" never entered the repo but the framing was mine and was inverted.
+  §4 binds the substrate to the astrology layer, and the document is explicit
+  that it is not metaphor: the natal chart is (r₀, 0); a carry event is a life
+  event; a RETURN is r_p(t) = r_p(t₀) with w > 0 — same angle as birth, changed
+  identity — and κ at the return measures the journey. Implemented as
+  natalChart / carryEvent / isReturn / returns, with the ring's own parked lane
+  carrying the same structure.
+  §3 irreversibility: the winding is non-decreasing under integer-polynomial
+  dynamics and acts as a Lyapunov function, so the natal state is algebraically
+  unreachable once wound — the arrow of time is arithmetic.
+  Also added Ω = "bound" (bounded but not retained), the fourth winding policy;
+  only preserve and recompute are reversible.
+  New suite: 16 assertions. 471 total; no-float audit 19 modules.
