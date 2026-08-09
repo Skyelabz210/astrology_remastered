@@ -3,44 +3,130 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>HCRM Core · Exact Test Harness</title>
+<title>Astrology Remastered · Core Gate</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;1,400&family=Inter+Tight:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 <style>
-.th{max-width:1000px;margin:0 auto;padding:28px 32px 80px;position:relative;z-index:1}
+.th{max-width:1180px;margin:0 auto;padding:28px 32px 96px;position:relative;z-index:1}
 .th-hdr{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:22px;flex-wrap:wrap}
 .th-hdr-l{display:flex;align-items:center;gap:14px}
-.th-back{background:transparent;border:1px solid var(--line-2);color:var(--ink-2);text-decoration:none;width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:16px}
-.th-title{font-family:var(--serif);font-style:italic;font-size:26px}
-.th-sub{font-family:var(--mono);font-size:10px;letter-spacing:0.10em;color:var(--ink-dim);margin-top:2px}
+.th-back{background:transparent;border:1px solid var(--line-2);color:var(--ink-2);text-decoration:none;width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:16px;flex-shrink:0}
+.th-back:hover{color:var(--ink);border-color:var(--ink-dim)}
+.th-title{font-family:var(--serif);font-style:italic;font-size:30px;line-height:1.1}
+.th-sub{font-family:var(--mono);font-size:10px;letter-spacing:0.10em;color:var(--ink-dim);margin-top:4px}
+
+/* ── gate ─────────────────────────────────────────────── */
 .gate{display:flex;align-items:center;gap:14px;padding:18px 22px;border-radius:12px;border:1px solid var(--line);margin-bottom:22px;background:oklch(0.93 0.008 80 / 0.02)}
-.gate-badge{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:0.08em;padding:8px 16px;border-radius:8px}
+.gate-badge{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:0.08em;padding:8px 16px;border-radius:8px;flex-shrink:0}
+.gate.pass{border-color:oklch(0.80 0.12 150 / 0.4)}
 .gate.pass .gate-badge{background:oklch(0.80 0.12 150);color:var(--bg)}
+.gate.fail{border-color:oklch(0.72 0.14 25 / 0.5)}
 .gate.fail .gate-badge{background:oklch(0.72 0.14 25);color:var(--bg)}
 .gate.run .gate-badge{background:oklch(0.84 0.11 75);color:var(--bg)}
-.gate-txt{font-family:var(--serif);font-style:italic;font-size:16px;color:var(--ink-2)}
-.ctrls{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+.gate-txt{font-family:var(--serif);font-style:italic;font-size:16px;color:var(--ink-2);line-height:1.4}
+.gate-tally{font-family:var(--mono);font-size:10px;color:var(--ink-dim);letter-spacing:0.08em;margin-left:auto;text-align:right;white-space:nowrap}
+.ctrls{display:flex;gap:10px;margin-bottom:30px;flex-wrap:wrap}
 .btn{background:var(--ink);color:var(--bg);border:none;padding:11px 18px;border-radius:6px;font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer}
 .btn.sec{background:transparent;color:var(--ink-2);border:1px solid var(--line-2)}
+.btn.sec:hover{color:var(--ink);border-color:var(--ink-dim)}
 .btn:disabled{opacity:0.4;cursor:not-allowed}
-.sec-h{font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-dim);margin:24px 0 10px;display:flex;align-items:center;gap:10px}
-.sec-h .pill{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid var(--line-2)}
-.prog{height:5px;border-radius:3px;background:var(--bg-3,oklch(0.20 0.01 60));overflow:hidden;margin:8px 0 14px}
-.prog-fill{height:100%;background:linear-gradient(90deg,oklch(0.6 0.04 60),oklch(0.80 0.12 150));width:0%;transition:width .2s}
-.row{display:flex;align-items:center;gap:12px;padding:7px 12px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px}
+
+/* ── section chrome ───────────────────────────────────── */
+.sec-h{font-family:var(--mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-dim);margin:34px 0 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sec-h .pill{font-family:var(--mono);font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid var(--line-2);letter-spacing:0.08em;text-transform:none;color:var(--ink-dim)}
+.sec-h .pill.proven{border-color:oklch(0.80 0.12 150 / 0.5);color:oklch(0.80 0.12 150)}
+.sec-h .pill.open{border-color:oklch(0.84 0.11 75 / 0.5);color:oklch(0.84 0.11 75)}
+.lede{font-family:var(--serif);font-size:16px;font-style:italic;line-height:1.6;color:var(--ink-2);max-width:78ch;margin:0 0 16px}
+.prog{height:5px;border-radius:3px;background:oklch(0.20 0.01 60);overflow:hidden;margin:8px 0 14px}
+.prog-fill{height:100%;background:linear-gradient(90deg,oklch(0.6 0.04 60),oklch(0.80 0.12 150));width:0%;transition:width .18s}
+.row{display:flex;align-items:baseline;gap:12px;padding:7px 12px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px}
 .row:last-child{border-bottom:none}
 .tick{width:18px;text-align:center;flex-shrink:0}
 .tick.ok{color:oklch(0.80 0.12 150)}
 .tick.no{color:oklch(0.72 0.14 25)}
-.row-n{flex:1;color:var(--ink)}
-.row-d{color:var(--ink-dim);font-size:11px;text-align:right}
+.row-n{flex:1;color:var(--ink);line-height:1.5}
+.row-d{color:var(--ink-dim);font-size:11px;text-align:right;max-width:44%;line-height:1.5}
 .sweepbox{padding:16px 20px;border:1px solid var(--line);border-radius:12px;background:oklch(0.10 0.006 60);margin-top:8px}
 .sweep-stat{display:flex;gap:28px;flex-wrap:wrap;font-family:var(--mono);font-size:13px;margin-top:8px}
 .sweep-stat b{color:var(--ink);font-size:20px;font-family:var(--serif);font-style:italic;display:block}
 .sweep-stat span{color:var(--ink-dim);font-size:9px;text-transform:uppercase;letter-spacing:0.1em}
-.formula{font-family:var(--mono);font-size:12px;color:oklch(0.72 0.10 180);background:oklch(0.08 0.005 60);padding:10px 14px;border-radius:6px;margin-top:10px}
+.formula{font-family:var(--mono);font-size:12px;color:oklch(0.72 0.10 180);background:oklch(0.08 0.005 60);padding:10px 14px;border-radius:6px;margin-top:10px;overflow-x:auto}
+
+/* ── the spine ────────────────────────────────────────── */
+.ringline{font-family:var(--mono);font-size:15px;color:var(--ink);background:oklch(0.08 0.005 60);border:1px solid var(--line);border-radius:8px;padding:14px 18px;margin-bottom:6px;overflow-x:auto}
+.ringline em{font-family:var(--serif);font-size:17px;color:oklch(0.84 0.11 75);font-style:italic}
+.spine{display:flex;gap:8px;margin-top:14px;overflow-x:auto;padding-bottom:6px}
+.vert{flex:1 0 108px;border-radius:10px;padding:12px 12px 11px;border:1px solid var(--line);background:oklch(0.11 0.006 60);position:relative}
+.vert-p{font-family:var(--serif);font-style:italic;font-size:26px;line-height:1;color:var(--ink)}
+.vert-id{font-family:var(--mono);font-size:9px;letter-spacing:0.12em;margin-top:6px;text-transform:uppercase}
+.vert-role{font-family:var(--sans);font-size:11px;color:var(--ink-dim);margin-top:5px;line-height:1.35}
+.vert-def{font-family:var(--mono);font-size:10px;margin-top:8px;padding-top:7px;border-top:1px solid var(--line)}
+.vert.closing{opacity:0.55}
+.vert.closing .vert-def{color:var(--ink-dim)}
+.vert.closing .vert-id{color:var(--ink-dim)}
+.vert.spinal{background:oklch(0.13 0.008 60)}
+.spine-note{font-family:var(--sans);font-size:12.5px;color:var(--ink-dim);margin-top:12px;line-height:1.6;max-width:82ch}
+
+/* ── visual class system — layers must never collapse ─── */
+.chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid var(--line-2);color:var(--ink-2);white-space:nowrap;line-height:1.4}
+.chip b{font-weight:500;font-size:9px;opacity:0.75;letter-spacing:0.06em}
+.chip.k-close{border-style:solid;border-color:var(--line-2);color:var(--ink-2)}
+.chip.k-h7{border-style:dashed;border-color:oklch(0.84 0.11 75 / 0.65);color:oklch(0.84 0.11 75);background:oklch(0.84 0.11 75 / 0.07)}
+.chip.k-sh11{border-style:dashed;border-color:oklch(0.70 0.15 300 / 0.7);color:oklch(0.76 0.13 300);background:oklch(0.70 0.15 300 / 0.09)}
+.chip.k-b13{border-style:dashed;border-color:oklch(0.72 0.12 190 / 0.7);color:oklch(0.76 0.11 190);background:oklch(0.72 0.12 190 / 0.08)}
+.chip.k-g17,.chip.k-g19{border-style:dashed;border-color:oklch(0.74 0.13 15 / 0.65);color:oklch(0.78 0.12 15);background:oklch(0.74 0.13 15 / 0.07)}
+.chip.k-alien{border-style:dotted;border-color:var(--line-2);color:var(--ink-dim)}
+.chip.k-exact{border-color:oklch(0.80 0.12 150 / 0.5);color:oklch(0.80 0.12 150)}
+.chip.k-open{border-style:dashed;border-color:oklch(0.84 0.11 75 / 0.5);color:oklch(0.84 0.11 75)}
+.chip.k-defined{border-color:var(--line-2);color:var(--ink-dim)}
+.chip.k-shadow{border-style:dashed;border-color:oklch(0.70 0.15 300 / 0.7);color:oklch(0.76 0.13 300);background:oklch(0.70 0.15 300 / 0.09)}
+.chip .rho{font-style:normal;font-size:9px;padding:1px 5px;border-radius:3px;margin-left:2px;border:1px solid currentColor;opacity:0.9}
+.rho.b-stable{color:oklch(0.80 0.12 150)}
+.rho.b-mild{color:oklch(0.84 0.11 75)}
+.rho.b-strong{color:oklch(0.78 0.12 15)}
+.rho.b-chaotic{color:oklch(0.72 0.14 25)}
+
+/* ── the 2×2 cross — the correction made visible ─────── */
+.cross{display:grid;grid-template-columns:150px 1fr 1fr;gap:8px;margin-top:16px}
+.cross-hd{font-family:var(--mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-dim);padding:0 4px 2px}
+.cross-rl{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-2);display:flex;flex-direction:column;justify-content:center;padding:0 4px;line-height:1.5}
+.cross-rl span{font-size:9px;color:var(--ink-dim);text-transform:none;letter-spacing:0.02em}
+.cell{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:oklch(0.11 0.006 60)}
+.cell-l{font-family:var(--mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-dim)}
+.cell-p{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.cell-p .chip{font-size:13px;padding:4px 11px;font-family:var(--serif);font-style:italic}
+.cell-n{font-family:var(--sans);font-size:11.5px;color:var(--ink-dim);line-height:1.55}
+.cell-n b{color:var(--ink-2);font-weight:500}
+.satnote{font-family:var(--sans);font-size:12.5px;color:var(--ink-dim);line-height:1.65;margin-top:14px;max-width:86ch;padding:14px 16px;border-left:2px solid oklch(0.74 0.13 15 / 0.5);background:oklch(0.10 0.006 60)}
+.satnote b{color:var(--ink-2);font-weight:500}
+@media (max-width:820px){.cross{grid-template-columns:1fr}.cross-hd{display:none}}
+
+.legend{display:flex;gap:8px;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:oklch(0.10 0.006 60);margin-bottom:18px}
+.legend-l{font-family:var(--mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-dim);width:100%;margin-bottom:2px}
+
+/* ── coverage matrix ──────────────────────────────────── */
+.vgrid{display:grid;gap:12px}
+.vcard{border:1px solid var(--line);border-radius:12px;background:oklch(0.11 0.006 60);padding:16px 18px}
+.vcard-h{display:flex;align-items:baseline;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+.vcard-n{font-family:var(--serif);font-style:italic;font-size:19px;color:var(--ink)}
+.vcard-t{font-family:var(--mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-dim)}
+.vcard-note{font-family:var(--sans);font-size:12.5px;color:var(--ink-dim);line-height:1.55;margin:2px 0 12px;max-width:80ch}
+.vrow{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.vrow-l{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-dim);width:96px;flex-shrink:0;padding-top:4px}
+.vrow-b{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.vcard.has-defect{border-color:oklch(0.84 0.11 75 / 0.28)}
+
+/* ── reinforcement panel ──────────────────────────────── */
+.reinf{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:12px}
+.rcard{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:oklch(0.10 0.006 60)}
+.rcard h4{font-family:var(--serif);font-style:italic;font-size:17px;margin:0 0 8px;color:var(--ink);font-weight:400}
+.rcard p{font-family:var(--sans);font-size:12.5px;line-height:1.65;color:var(--ink-dim);margin:0 0 10px}
+.rcard .m{font-family:var(--mono);font-size:11px;color:oklch(0.72 0.10 180);line-height:1.7;display:block}
+.tally{display:flex;gap:26px;flex-wrap:wrap;margin:0 0 22px;padding:16px 20px;border:1px solid var(--line);border-radius:12px;background:oklch(0.10 0.006 60)}
+.tally div b{display:block;font-family:var(--serif);font-style:italic;font-size:22px;color:var(--ink);line-height:1.1}
+.tally div span{font-family:var(--mono);font-size:9px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-dim)}
 </style>
 </head>
 <body>
@@ -49,25 +135,88 @@
     <div class="th-hdr-l">
       <a class="th-back" href="HCRM Console.html" title="Back to HCRM Console">←</a>
       <div>
-        <div class="th-title">HCRM Core · Exact Test Harness</div>
-        <div class="th-sub">P4 hard gate · BigInt-only · full ecliptic sweep + no-float audit</div>
+        <div class="th-title">Astrology Remastered</div>
+        <div class="th-sub">exact core gate · every major variant · the shadow spine · BigInt-only</div>
       </div>
     </div>
   </header>
 
   <div class="gate run" id="gate">
     <span class="gate-badge" id="gateBadge">READY</span>
-    <span class="gate-txt" id="gateTxt">Run the suite to certify the integer core over the whole arcsecond ring.</span>
+    <span class="gate-txt" id="gateTxt">Run the gate to certify the integer core, the variant coverage, and the shadow spine over the whole arcsecond ring.</span>
+    <span class="gate-tally" id="gateTally"></span>
   </div>
 
   <div class="ctrls">
     <button class="btn" id="runAll" onclick="runAll()">▶ run full gate</button>
-    <button class="btn sec" id="runUnit" onclick="runUnitOnly()">unit only</button>
-    <button class="btn sec" id="runSweep" onclick="runSweepOnly()">sweep only</button>
+    <button class="btn sec" id="runStatic" onclick="runStatic()">static suites only</button>
+    <button class="btn sec" id="runSweeps" onclick="runSweeps()">exhaustive sweeps only</button>
   </div>
 
-  <div class="sec-h">Full ecliptic K-Elim sweep <span class="pill">PROVEN target</span></div>
-  <div class="formula">∀ x ∈ [0, 1,296,000): &nbsp; ⌊x/M₆⌋ ≡ (x mod 323 − x mod 30030)·287 (mod 323)</div>
+  <!-- ══ the Safe Basis ══════════════════════════════════════════ -->
+  <div class="sec-h">The Safe Basis, and the two axes it carries <span class="pill proven">PROVEN</span></div>
+  <p class="lede">
+    The basis is not eight interchangeable primes. Each carries a role, a class in the Gaussian
+    integers, and a family. <em>Shadow</em> is the Gaussian class — inert, p ≡ 3 (mod 4), the primes
+    Fermat's two-square theorem excludes. <em>Off-ring</em> is a separate question about the circle.
+    Collapsing the two was the error this gate now pins shut.
+  </p>
+  <div class="ringline" id="ringline">—</div>
+  <div class="spine" id="spine"></div>
+  <div class="cross" id="cross"></div>
+  <div class="satnote" id="satNote"></div>
+
+  <!-- ══ CRAM vs RNS ════════════════════════════════════════════ -->
+  <div class="sec-h">Using the basis as CRAM, not as RNS <span class="pill proven">PROVEN</span> <span class="pill">correction of record</span></div>
+  <p class="lede">
+    An RNS treats the basis as a bag of prime moduli and recovers magnitude through an anchor drawn
+    from inside it. CRAM anchors <em>adjacent</em> to the shell — A = M + 1 — where M is its own
+    inverse and the winding falls out of a single subtraction.
+  </p>
+  <div class="tally" id="cramTally"></div>
+  <div class="cross" id="cramCmp"></div>
+  <div class="satnote" id="cramNote"></div>
+
+  <!-- ══ star lift / tower / fixture ════════════════════════════ -->
+  <div class="sec-h">Star lift · winding tower · phase-locked fixture <span class="pill proven">PROVEN</span></div>
+  <p class="lede">
+    Star numbers S<sub>n</sub> = 6n(n−1) + 1 are adjacent to their own shells, so the whole family is
+    self-inverse. Iterating the 36/37 lift to zero is the winding tower — arbitrary <em>depth</em>.
+    Transduction widens the fixture — arbitrary <em>precision</em>. The unit lane holds the origin;
+    the shadow lane holds the phase.
+  </p>
+  <div class="tally" id="starTally"></div>
+  <div class="spine" id="starFam"></div>
+  <div class="satnote" id="starNote"></div>
+
+  <!-- ══ reinforcement ══════════════════════════════════════════ -->
+  <div class="sec-h">What the spine does for traditional astrology <span class="pill proven">PROVEN</span> <span class="pill">one clause ARGUED</span></div>
+  <div class="reinf" id="reinf"></div>
+
+  <!-- ══ operator atlas ═════════════════════════════════════════ -->
+  <div class="sec-h">Lane-wise operator atlas <span class="pill proven">PROVEN by enumeration</span></div>
+  <p class="lede">
+    An exact lane operator is a bijection on ℤ/p that fixes 0. The multiplicative ones are exactly
+    <em>x ↦ c·x<sup>e</sup></em> with gcd(e, p−1) = 1 — so the per-lane count is (p−1)·φ(p−1), which
+    is a theorem, not a tally. It is not uniform across lanes, and it is never 14.
+  </p>
+  <div class="tally" id="opTally"></div>
+  <div class="spine" id="opLanes"></div>
+  <div class="satnote" id="opNote"></div>
+
+  <!-- ══ coverage matrix ════════════════════════════════════════ -->
+  <div class="sec-h">Variant coverage <span class="pill" id="covPill">—</span></div>
+  <p class="lede">
+    Each tradition's own frame, divisions, house systems and aspect families, computed exactly or
+    explicitly gated. Nothing is silently absent, and nothing unprovable is dressed as proven.
+  </p>
+  <div class="tally" id="tally"></div>
+  <div class="legend" id="legend"></div>
+  <div class="vgrid" id="matrix"></div>
+
+  <!-- ══ sweeps ═════════════════════════════════════════════════ -->
+  <div class="sec-h">Full ecliptic K-Elim sweep <span class="pill proven">exhaustive</span> <span class="pill">parked shell (canonical) + gear shell (legacy)</span></div>
+  <div class="formula">∀ x ∈ [0, 1,296,000): &nbsp; ⌊x/881,790⌋ ≡ (x mod 11 − x mod 881,790)·7 (mod 11) &nbsp;·&nbsp; parked lane 11, K ≤ 1</div>
   <div class="prog"><div class="prog-fill" id="prog"></div></div>
   <div class="sweepbox">
     <div class="sweep-stat">
@@ -78,10 +227,43 @@
     </div>
   </div>
 
+  <div class="sec-h">Shadow-spine sweep <span class="pill proven">exhaustive</span> <span class="pill">census · orthogonality · independence</span></div>
+  <div class="formula">classification period 7·11·13·17·19 = 323,323 &nbsp;⟹&nbsp; agreement over one period certifies the whole ring</div>
+  <div class="prog"><div class="prog-fill" id="progSpine"></div></div>
+  <div class="sweepbox" id="censusBox"><div class="sweep-stat"><div><b>—</b><span>not yet run</span></div></div></div>
+  <div id="spineSweep"></div>
+
+  <div class="sec-h">Frame additivity sweep <span class="pill proven">exhaustive</span> <span class="pill">ring × every sidereal frame</span></div>
+  <div class="formula">ρ<sub>ω</sub>(x) = (x − ω) mod R &nbsp;⟹&nbsp; (ρ<sub>ω</sub>x − ρ<sub>ω</sub>y) mod R = (x − y) mod R &nbsp;·&nbsp; separations, orbs and degree-based houses cannot move</div>
+  <div class="prog"><div class="prog-fill" id="progFrame"></div></div>
+  <div id="frameSweep"></div>
+
+  <!-- ══ static suites ══════════════════════════════════════════ -->
   <div class="sec-h">No-float core audit <span class="pill">src/core BigInt-only</span></div>
   <div id="audit"></div>
 
-  <div class="sec-h">Exact unit tests <span class="pill" id="unitCount">—</span></div>
+  <div class="sec-h">Safe Basis · ρ · arrow tests <span class="pill" id="basisCount">—</span></div>
+  <div id="basis"></div>
+
+  <div class="sec-h">CRAM layer tests <span class="pill" id="cramCount">—</span></div>
+  <div id="cram"></div>
+
+  <div class="sec-h">Anchor admissibility tests <span class="pill" id="anchorCount">—</span></div>
+  <div id="anchor"></div>
+
+  <div class="sec-h">Star / tower / fixture tests <span class="pill" id="fixCount">—</span></div>
+  <div id="fixture"></div>
+
+  <div class="sec-h">Operator atlas tests <span class="pill" id="opCount">—</span></div>
+  <div id="operators"></div>
+
+  <div class="sec-h">Variant coverage tests <span class="pill" id="varCount">—</span></div>
+  <div id="variant"></div>
+
+  <div class="sec-h">Shadow-spine tests <span class="pill" id="spineCount">—</span></div>
+  <div id="spineStatic"></div>
+
+  <div class="sec-h">Exact register unit tests <span class="pill" id="unitCount">—</span></div>
   <div id="unit"></div>
 </div>
 
@@ -89,57 +271,538 @@
 import { run as runUnit } from "./test/core.test.js";
 import { runSweep } from "./test/full-sweep.test.js";
 import { runNoFloatAudit } from "./test/no-float-core.test.js";
+import { run as runVariants } from "./test/variant-coverage.test.js";
+import { run as runSpineStatic, runSpineSweep, runFrameSweep } from "./test/shadow-spine.test.js";
+
+import { run as runSafeBasis } from "./test/safe-basis.test.js";
+import { run as runOperators } from "./test/operators.test.js";
+import { run as runCram } from "./test/cram.test.js";
+import { run as runFixture } from "./test/fixture.test.js";
+import { run as runAnchor } from "./test/anchor.test.js";
+import { RING, RING_PRIMES, RING_EXPONENTS, OFF_RING_PRIMES, defect, closes, divisionReport } from "./src/core/ring.js";
+import { OFF_RING_LANES, SPINE, crossClassify, divisionClosure, divisionShadow } from "./src/core/shadow-spine.js";
+import {
+  basisProfile, saturationReport, SHADOW_SPINE, SHADOW_ANCHOR, isShadowPrime,
+} from "./src/core/safe-basis.js";
+import { rhoReport, BANDS } from "./src/core/rho.js";
+import { atlas, sqrtDiagnostics, keyspaceBitsFloor } from "./src/core/operators.js";
+import { recoveryCost, resolution, shadowLift, canonicalAnchor, gcd as cgcd } from "./src/core/cram.js";
+import { starFamily, starNumber, towerReport, fixture, phaseLock, UNIT_LANE } from "./src/core/fixture.js";
+import { anchorReport, starLiftBasis, undeterminedWitness, laneDependency, trayDeterminesAnchor } from "./src/core/anchor.js";
+import { M6, M8, GEAR_PRODUCT, M6_INV_MOD_GEAR } from "./src/core/basis.js";
+import {
+  VARIANTS, DIVISIONS, FRAMES, HOUSE_SYSTEMS, ASPECT_FAMILIES, allVariantReports,
+} from "./src/core/variants.js";
 
 const $ = (id) => document.getElementById(id);
-let unitPass = null, auditPass = null, sweepPass = null;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const grp = (n) => BigInt(n).toLocaleString("en-US");
+const yield_ = () => new Promise((r) => setTimeout(r, 0));
+
+/* ── gate state ────────────────────────────────────────────────── */
+const GATE = {
+  unit: null, audit: null, kelim: null,
+  basis: null, cram: null, anchor: null, fixture: null, operators: null, variants: null, spineStatic: null, spineSweep: null, frames: null,
+};
+const GATE_LABELS = {
+  unit: "register", audit: "no-float", kelim: "K-Elim", basis: "safe basis", cram: "CRAM", anchor: "anchor", fixture: "star/tower", operators: "operators",
+  variants: "variants", spineStatic: "lanes", spineSweep: "lane sweep", frames: "frames",
+};
+
+function setGate() {
+  const keys = Object.keys(GATE);
+  const done = keys.filter((k) => GATE[k] !== null);
+  const anyFail = done.some((k) => GATE[k] === false);
+  const allKnown = done.length === keys.length;
+  const g = $("gate"), b = $("gateBadge"), t = $("gateTxt");
+  g.className = "gate " + (anyFail ? "fail" : allKnown ? "pass" : "run");
+  if (anyFail) {
+    b.textContent = "FAIL";
+    t.textContent = "Not evidence-grade — " + done.filter((k) => GATE[k] === false).map((k) => GATE_LABELS[k]).join(", ") + " failed.";
+  } else if (allKnown) {
+    b.textContent = "PROVEN";
+    t.textContent = "Integer core certified over the full ecliptic ring. Safe Basis carried with its roles, Gaussian classes and ρ bands intact; shadow and closure kept as separate axes; every registered variant's arithmetic verified; the whole layer shown strictly additive to the classical one.";
+  } else {
+    b.textContent = done.length ? "PARTIAL" : "READY";
+    t.textContent = "Static suites pass. Run the exhaustive sweeps to certify.";
+  }
+  $("gateTally").innerHTML = keys
+    .map((k) => `<span style="color:${GATE[k] === null ? "var(--ink-dim)" : GATE[k] ? "oklch(0.80 0.12 150)" : "oklch(0.72 0.14 25)"}">${GATE[k] === null ? "·" : GATE[k] ? "✓" : "✗"} ${GATE_LABELS[k]}</span>`)
+    .join("&nbsp; ");
+}
 
 function rowHTML(r) {
-  return `<div class="row"><span class="tick ${r.ok?"ok":"no"}">${r.ok?"✓":"✗"}</span><span class="row-n">${r.name}</span><span class="row-d">${r.detail||""}</span></div>`;
+  return `<div class="row"><span class="tick ${r.ok ? "ok" : "no"}">${r.ok ? "✓" : "✗"}</span>`
+    + `<span class="row-n">${esc(r.name)}</span><span class="row-d">${esc(r.detail || "")}</span></div>`;
 }
-function setGate() {
-  const g = $("gate"), b = $("gateBadge"), t = $("gateTxt");
-  const done = [unitPass, auditPass, sweepPass].filter(v => v !== null);
-  if (done.length === 0) return;
-  const allKnown = unitPass !== null && auditPass !== null && sweepPass !== null;
-  const anyFail = done.some(v => v === false);
-  g.className = "gate " + (anyFail ? "fail" : allKnown ? "pass" : "run");
-  if (anyFail) { b.textContent = "FAIL"; t.textContent = "Core is not evidence-grade — a check failed."; }
-  else if (allKnown) { b.textContent = "PROVEN"; t.textContent = "Integer core certified over the full ecliptic ring with zero mismatches, no floating point."; }
-  else { b.textContent = "PARTIAL"; t.textContent = "Some checks passed; run the full gate to certify."; }
+function paint(targetId, rows, countId) {
+  $(targetId).innerHTML = rows.map(rowHTML).join("");
+  if (countId) $(countId).textContent = `${rows.filter((r) => r.ok).length}/${rows.length}`;
+  return rows.every((r) => r.ok);
 }
 
-window.runUnitOnly = async function() {
-  const res = runUnit();
-  $("unit").innerHTML = res.map(rowHTML).join("");
-  const pass = res.filter(r => r.ok).length;
-  $("unitCount").textContent = `${pass}/${res.length}`;
-  unitPass = res.every(r => r.ok); setGate();
-};
-async function runAudit() {
-  const res = await runNoFloatAudit();
-  $("audit").innerHTML = res.map(rowHTML).join("");
-  auditPass = res.every(r => r.ok); setGate();
+/* ── the Safe Basis, its two axes, and the ring ────────────────── */
+function renderBasis() {
+  const fact = RING_PRIMES.map((p, i) => `${p}<sup>${RING_EXPONENTS[i]}</sup>`).join(" · ");
+  const rr = rhoReport(RING), rs = rhoReport(30030n), rc = rhoReport(9699690n);
+  $("ringline").innerHTML =
+    `R &nbsp;=&nbsp; 360° &nbsp;=&nbsp; <em>1,296,000″</em> &nbsp;=&nbsp; ${fact}`
+    + `<span style="color:var(--ink-dim)"> &nbsp;·&nbsp; ρ = ${rr.rho} ${rr.band_label}`
+    + ` &nbsp;|&nbsp; shell 30,030 ρ = ${rs.rho} ${rs.band_label}`
+    + ` &nbsp;|&nbsp; Colony 9,699,690 ρ = ${rc.rho} ${rc.band_label}</span>`;
+
+  // the eight vertebrae, each carrying role + Gaussian class + both axes
+  const prof = basisProfile();
+  $("spine").innerHTML = prof.primes.map((p) => {
+    const shadow = p.is_shadow;
+    const off = !p.divides_ring;
+    const key = shadow ? (p.prime === "11" ? "sh11" : "shadow") : off ? "b13" : "close";
+    return `<div class="vert ${shadow ? "spinal" : "closing"}" title="${esc(p.note)}">
+      <div class="vert-p">${p.prime}</div>
+      <div class="vert-id chip k-${key}" style="border:none;background:none;padding:0">${esc(p.role)}</div>
+      <div class="vert-role">${esc(p.gaussian_class)}${p.two_squares ? " · " + esc(p.two_squares) : ""}</div>
+      <div class="vert-def">
+        <span style="color:${shadow ? "oklch(0.76 0.13 300)" : "var(--ink-dim)"}">${shadow ? "SHADOW" : "—"}</span>
+        &nbsp;/&nbsp;
+        <span style="color:${off ? "oklch(0.84 0.11 75)" : "var(--ink-dim)"}">${off ? p.ring_defect + "″ off-ring" : "closes"}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  // the 2×2 — the correction made visible
+  const c = crossClassify();
+  const cellHTML = (list, key, label, note) =>
+    `<div class="cell">
+       <div class="cell-l">${esc(label)}</div>
+       <div class="cell-p">${list.map((p) => `<span class="chip k-${key}">${p}</span>`).join("")}</div>
+       <div class="cell-n">${note}</div>
+     </div>`;
+  $("cross").innerHTML =
+    `<div class="cross-hd"></div><div class="cross-hd">closes on the ring</div><div class="cross-hd">off-ring</div>`
+    + `<div class="cross-rl">shadow<br /><span>inert · p ≡ 3 (mod 4)</span></div>`
+    + cellHTML(c.shadow_closing, "sh11", "absorbed shadow",
+        "The <b>trine</b> lives here — 432,000″ exact, on an inert Gaussian prime. Shadow structure the received apparatus already carries.")
+    + cellHTML(c.shadow_off_ring, "shadow", "irreducible shadow",
+        "Septile, undecile and the 19-harmonic. Shadow the circle cannot absorb; 11 is the anchor, 19 the δ = 2 escalation.")
+    + `<div class="cross-rl">split / ramified<br /><span>p ≡ 1 (mod 4), and 2</span></div>`
+    + cellHTML(c.nonshadow_closing, "close", "plain ring primes",
+        "2 parity, 5 surface. They divide the circle and carry no Gaussian obstruction.")
+    + cellHTML(c.nonshadow_off_ring, "b13", "boundary & saturation",
+        "13 boundary witness, 17 saturation extender. Off-ring, but <b>not shadow</b> — 13 = 2²+3², 17 = 1²+4².");
+
+  // saturation: why 17 and 19 are in the basis
+  const sat = saturationReport();
+  $("satNote").innerHTML =
+    `The classical six give a shell of <b>${grp(sat.shell)}</b>, which is <b>smaller</b> than the ecliptic ring. `
+    + `Within one lap the residue tuple is a bijection — a faithful clock — but the ring needs `
+    + `<b>${sat.laps_required}</b> laps, so a position also carries a winding K ∈ [0, ${sat.winding_bound}]. `
+    + `The twin pair <b>17 · 19 = ${sat.gear_product}</b> exceeds ${sat.winding_bound}, so K mod 323 determines K outright. `
+    + `That is what "saturation extender" means, and it is the same fact the K-Elimination certificate rests on — `
+    + `the Colony ${grp(sat.colony)} saturates the ring, the shell alone does not.`;
 }
-window.runSweepOnly = async function() {
-  $("swStatus").textContent = "running"; $("runSweep").disabled = true; $("runAll").disabled = true;
+
+/* ── CRAM vs RNS ───────────────────────────────────────────────── */
+function renderCram() {
+  const adj = recoveryCost("adjacency"), gen = recoveryCost("general");
+  const A6 = canonicalAnchor(M6), A8 = canonicalAnchor(M8);
+  const lift = shadowLift(0n, 0n, M8, 11n, 6n);
+
+  $("cramTally").innerHTML = [
+    [grp(GEAR_PRODUCT), "canonical anchor 17·19 — internal"],
+    ["17, 19", "lanes it reads · disjoint from shell"],
+    [gen.total_ops + " ops + inverse", "internal recovery"],
+    [grp(A6) + " ✗", "adjacent modulus — external"],
+    ["4, 9, 37", "star-lift basis: adjacent AND internal"],
+    [grp(lift.modulus), "shadow lift: K mod 11⁵"],
+  ].map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("");
+
+  const cell = (key, label, note) =>
+    `<div class="cell"><div class="cell-l">${esc(label)}</div><div class="cell-n">${note}</div></div>`;
+  const wit = undeterminedWitness([2n,3n,5n,7n,11n,13n,17n,19n], 30031n);
+  const sl = starLiftBasis(3n);
+  $("cramCmp").innerHTML =
+    `<div class="cross-hd"></div><div class="cross-hd">RNS reading</div><div class="cross-hd">CRAM reading</div>`
+    + `<div class="cross-rl">anchor<br /><span>where K comes from</span></div>`
+    + cell("close", "any coprime modulus",
+        `Treats A = M + 1 = <b>${grp(A6)}</b> as usable because gcd(M, M+1) = 1. But 30,031 = 59 · 509 is <b>external</b> to the basis, and x and x + M₈ share the entire tray while reading <b>${wit.anchor_x}</b> vs <b>${wit.anchor_y}</b> mod 30,031. The tray cannot evaluate it.`)
+    + cell("sh11", "a sub-product of the fixed basis",
+        `A = 17 · 19 = <b>${GEAR_PRODUCT}</b>. Lanes 17 and 19 are already in the tray, produced by their own reductions, disjoint from the six shell lanes. Costs the precomputed inverse <b>${M6_INV_MOD_GEAR}</b> — that is the price of internality, and internality is not optional.`)
+    + `<div class="cross-rl">i.i.d.<br /><span>lane independence</span></div>`
+    + cell("close", "broken",
+        "Reaching an external anchor means reconstructing the integer — which couples every lane — or adjoining lanes 59 and 509, which violates A3. Either way no lane is produced independently any more.")
+    + cell("sh11", "preserved",
+        "The internal anchor reads exactly lanes <b>17, 19</b> and touches no shell lane. Every lane is still x mod p and nothing else.")
+    + `<div class="cross-rl">adjacency<br /><span>the one-subtraction collapse</span></div>`
+    + cell("close", "reached for externally",
+        "K ≡ r − s is genuinely cheaper — no multiply, no inverse — so it is tempting to take M + 1 and go outside for it.")
+    + cell("sh11", "designed in, via the star lift",
+        `A star pair (6n(n−1), S<sub>n</sub>) is adjacent AND realisable inside one basis: S₃ gives <b>{${sl.basis.map(String).join(", ")}}</b>, shell ${sl.shell}, anchor ${sl.anchor}. One subtraction, tray-determined, i.i.d. intact. SafeS8 simply is not such a basis.`)
+    + `<div class="cross-rl">off-coprime<br /><span>gcd(M, A) > 1</span></div>`
+    + cell("close", "failure",
+        "Treated as invalid: the inverse does not exist, so the anchor is rejected.")
+    + cell("b13", "graceful degradation",
+        `Resolution drops to A/d rather than failing. <b>gcd(260, 365) = 5 → resolution 73</b>, and 73 · 260 = 52 · 365 = <b>18,980</b> — the Maya Calendar Round falls out of the gradient.`);
+
+  $("cramNote").innerHTML =
+    `<b>Correction of record:</b> an earlier pass here called the adjacent anchor canonical and the gear `
+    + `pair "an RNS move". That is reversed. The decisive fact is not cost — it is that the tray does not `
+    + `determine an external anchor at all: x mod A is a function of the tray if and only if A divides M, `
+    + `and M₈ mod 30,031 = <b>${wit.differ_by}</b> ≠ 0. The internal gear anchor is canonical for SafeS8; `
+    + `adjacency is recovered by choosing a star-lift basis rather than by leaving residue space. `
+    + `The state carried is also no longer just (r, K): it is the eight-field tuple `
+    + `(B, r, K, Σ, T, Sh, L, F), with the per-lane operator topology first-class per A4, and the fifth `
+    + `operator χ transducing between frames with declared Φ / Θ / Π / Ω — including the projection `
+    + `policy, which discards the winding and is recorded as irreversible rather than silently lossy.`;
+}
+
+/* ── star lift · tower · fixture ───────────────────────────────── */
+function renderStar() {
+  const t128 = towerReport(2n ** 128n - 1n, 36n);
+  const fxA = fixture([2n, 3n, 5n, 7n, 11n, 13n]);
+  const fxB = fixture([11n, 17n, 19n, 23n]);
+  const lock = phaseLock(fxA, fxB);
+
+  $("starTally").innerHTML = [
+    ["36 / 37", "the star lift, S\u2083"],
+    [t128.depth, "tower depth on 2\u00B9\u00B2\u2078\u22121"],
+    [t128.certified_levels + " / " + t128.depth, "certified by one anchor"],
+    ["0 bits", "unit lane \u2014 the origin"],
+    [lock.strength + " states", "shadow lane \u2014 the phase"],
+    ["lane " + lock.carrier_lanes.join(), "where the lock rides"],
+  ].map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("");
+
+  const notes = {
+    "1": "the recommissioned unit",
+    "13": "boundary witness",
+    "37": "the star lift",
+    "73": "Maya resolution modulus",
+    "121": "11\u00B2 \u2014 shadow prime squared",
+    "181": "shell 180 = folding period",
+  };
+  $("starFam").innerHTML = starFamily(8n).map((s) => {
+    const known = notes[s.anchor];
+    return `<div class="vert ${known ? "spinal" : "closing"}">
+      <div class="vert-p">${s.anchor}</div>
+      <div class="vert-id" style="color:var(--ink-dim)">S<sub>${s.n}</sub></div>
+      <div class="vert-role">shell ${s.shell} \u00B7 adjacent</div>
+      <div class="vert-def" style="color:${known ? "oklch(0.76 0.13 300)" : "var(--ink-dim)"}">${known ? esc(known) : "\u2014"}</div>
+    </div>`;
+  }).join("");
+
+  $("starNote").innerHTML =
+    `Every anchor this project already used turns out to sit in the star family \u2014 <b>1</b> (S\u2081, the unit), `
+    + `<b>13</b> (S\u2082, boundary), <b>37</b> (S\u2083, the lift), <b>73</b> (S\u2084, the Maya resolution modulus), `
+    + `<b>121 = 11\u00B2</b> (S\u2085, at n = 5, the shadow lane), <b>181</b> (S\u2086, whose shell 180 is the folding `
+    + `period). None of that was designed in; it was derived. `
+    + `The tower on 2\u00B9\u00B2\u2078\u22121 runs <b>${t128.depth}</b> levels deep and terminates at zero with every level `
+    + `exact, but only <b>${t128.certified_levels}</b> are corridor-certified by the single adjacent `
+    + `anchor \u2014 level 0 alone would need one above ${grp(t128.anchor_needed_for_level_0)}. That is the `
+    + `handover: the tower supplies depth, transduction supplies the width, and neither substitutes for `
+    + `the other. Levels are independent \u2014 each recomputes standalone from its own (r, s) pair, with no `
+    + `accumulator threading through, which is exactly what separates a tower from the radix a Garner `
+    + `cascade emits. Finally, the lock: the unit lane is admissible in every fixture and carries zero `
+    + `bits, so it fixes the origin but cannot relate two windings; the phase rides on the shared shadow `
+    + `lane, and a transduction holds the lock precisely when \u03A6(x) \u2261 x (mod 11).`;
+}
+
+/* ── operator atlas ────────────────────────────────────────────── */
+function renderOperators() {
+  const a = atlas(), d = sqrtDiagnostics();
+  $("opTally").innerHTML = [
+    [grp(a.total_twisted), "exact lane operators c·x<sup>e</sup>"],
+    [grp(a.total_monomial), "pure monomials x<sup>e</sup>"],
+    [grp(a.total_units), "pure multiplications = φ(M)"],
+    [keyspaceBitsFloor(BigInt(a.total_twisted)) + " bits", "keyspace if used as a key"],
+    [grp(d.defined_everywhere), "residues with a root in every lane"],
+    [d.root_multiplicity, "roots a generic square has mod M"],
+  ].map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("");
+
+  $("opLanes").innerHTML = a.lanes.map((l, i) => `<div class="vert spinal">
+      <div class="vert-p">${l.prime}</div>
+      <div class="vert-id" style="color:var(--ink-dim)">p − 1 = ${l.order}</div>
+      <div class="vert-role">φ(p−1) = ${l.monomials} monomials</div>
+      <div class="vert-def">
+        <b style="color:oklch(0.80 0.12 150)">${l.twisted}</b> operators
+        <span style="color:var(--ink-dim)"> · ${d.lanes[i].squares}/${l.prime} squares</span>
+      </div>
+    </div>`).join("");
+
+  $("opNote").innerHTML =
+    `Per-lane counts run <b>${a.lanes.map((l) => l.twisted).join(" · ")}</b> — enumerated as function `
+    + `tables and matched against (p−1)·φ(p−1) in every lane. No lane admits 14; lane 2's `
+    + `multiplicative group is trivial, so it admits exactly one. Square root is <b>not</b> in this `
+    + `family: it is undefined on ${grp(BigInt(d.defined_everywhere_of) - BigInt(d.defined_everywhere))} `
+    + `of ${grp(d.defined_everywhere_of)} residues and ${d.root_multiplicity}-valued where it is defined, `
+    + `so no fixed per-lane branch can return the intended root — it succeeds on `
+    + `${grp(d.branch_hits)}/${grp(d.branch_of)} of inputs. Frobenius is unavailable in-lane for the `
+    + `same structural reason: on a prime field x<sup>p</sup> = x, so it is the identity.`;
+}
+
+/* ── reinforcement panel ───────────────────────────────────────── */
+function renderReinforce() {
+  const ptol = ASPECT_FAMILIES.find((f) => f.id === "ptolemaic");
+  const marginal = ["septile", "undecile", "harmonic_13"].map((id) => ASPECT_FAMILIES.find((f) => f.id === id));
+  const trad = [12n, 36n, 144n, 360n, 21600n, RING];
+  const DIVCOUNT = DIVISIONS.length;
+
+  $("reinf").innerHTML = `
+    <div class="rcard">
+      <h4>The Ptolemaic set is the closing set</h4>
+      <p>The classical aspects are generated by the divisors 1, 2, 3, 4 and 6 — every one of them
+      divides 1,296,000 exactly. The families astrologers have always treated as marginal are exactly
+      the ones that leave a remainder.</p>
+      <span class="m">conjunction · opposition 648,000″ · trine 432,000″<br />square 324,000″ · sextile 216,000″ &nbsp;—&nbsp; all exact
+      <br /><span style="color:oklch(0.84 0.11 75)">septile ${defect(7n)}″ · undecile ${defect(11n)}″ · 13th ${defect(13n)}″ &nbsp;—&nbsp; never exact</span></span>
+    </div>
+    <div class="rcard">
+      <h4>The received apparatus is {2,3,5}-smooth throughout</h4>
+      <p>Twelve signs, thirty-six decans, a hundred and forty-four dodecatemoria, three hundred and
+      sixty degrees, arcminutes, arcseconds. Every division the tradition actually kept tiles the
+      circle with nothing left over.</p>
+      <span class="m">${trad.map((n) => `${grp(n)} → ${grp(RING / n)}″`).join("<br />")}</span>
+    </div>
+    <div class="rcard">
+      <h4>Changing tradition re-labels; it never scrambles</h4>
+      <p>Every sidereal frame is a rotation of the ring. Rotations cancel in every difference, so no
+      ayanamsa can create, destroy or retune an aspect, and no degree-based house placement moves.
+      Sign naming shifts by a fixed amount; a whole-sign house can move by at most one.</p>
+      <span class="m">(ρ<sub>ω</sub>x − ρ<sub>ω</sub>y) mod R = (x − y) mod R<br />swept over 1,296,000 × ${FRAMES.filter((f) => f.offset_arcsec !== null).length} frames</span>
+    </div>
+    <div class="rcard">
+      <h4>The lanes are a new axis, not a re-reading</h4>
+      <p>Over the whole ring, every sign contains every residue of every off-ring lane, and every
+      event class fires in every sign. Neither partition determines the other, so the lanes record
+      structure that sign, decan and house cannot express — while changing none of them.</p>
+      <span class="m">12 signs × 5 lanes × all residues present<br />classification period 7·11·13·17·19 = 323,323</span>
+    </div>
+    <div class="rcard">
+      <h4>Shadow is a Gaussian property, not a ring property</h4>
+      <p>A shadow prime is one that stays <i>inert</i> in ℤ[i] — exactly the primes Fermat's
+      two-square theorem excludes. In the Safe Basis that is {3, 7, 11, 19}, anchored at 11. It is
+      not the off-ring set: 3 is shadow and closes, 13 and 17 are off-ring and split. Two axes,
+      four occupied cells, neither reducible to the other.</p>
+      <span class="m">shadow  {3, 7, 11, 19}   inert, p ≡ 3 (mod 4)<br />off-ring {7, 11, 13, 17, 19}   R mod p ≠ 0</span>
+    </div>
+    <div class="rcard">
+      <h4>Every division any tradition names is Stable</h4>
+      <p>ρ(n) = ω(n) + δ(n) classifies a system by its factor count plus its shadow escalation.
+      Run it over all ${DIVCOUNT} registered divisions — Western, Vedic, Maya, Chinese, Uranian, KP —
+      and not one leaves the Stable band. The circle itself is ρ = 3; its own basis shell is ρ = 7
+      Strong and the Colony ρ = 10 Chaotic. The zodiac is the quiet object here.</p>
+      <span class="m">ring 1,296,000 → ρ 3 Stable<br />shell 30,030 → ρ 7 Strong<br />Colony 9,699,690 → ρ 10 Chaotic</span>
+    </div>
+    <div class="rcard">
+      <h4>Where it stops</h4>
+      <p>That the received apparatus closes and the marginal families do not is proven arithmetic.
+      That the tradition <i>selected</i> for closure is historical reasoning — recorded as ARGUED, not
+      as a theorem. Quadrant houses, the heliocentric frame and every ephemeris longitude still
+      require a certified ledger.</p>
+      <span class="m"><span class="chip k-exact" style="margin:2px 0">PROVEN closure</span>
+      <span class="chip k-defined" style="margin:2px 0">DEFINED ayanamsa</span>
+      <span class="chip k-open" style="margin:2px 0">OPEN quadrant houses</span></span>
+    </div>`;
+}
+
+/* ── coverage matrix ───────────────────────────────────────────── */
+function divisionChip(id, label, n) {
+  const rep = divisionReport(n);
+  const cl = divisionClosure(n);
+  const sh = divisionShadow(n);
+  let key, badge;
+  if (rep.closes) {
+    key = "k-close";
+    badge = `${grp(rep.step_arcsec)}″`;
+  } else {
+    key = cl.off_ring_lanes.length ? "k-" + cl.off_ring_lanes[0].toLowerCase() : "k-alien";
+    const blocker = cl.off_ring_lanes.length ? cl.off_ring_lanes.join("+") : "×" + cl.alien_factor;
+    badge = `${blocker} · ${rep.defect_arcsec}″`;
+  }
+  // the shadow axis rides alongside, never merged into the closure key
+  const rhoTag = `<i class="rho b-${sh.band}" title="ω ${sh.omega} + δ ${sh.delta} · q = ${sh.q}">ρ${sh.rho}</i>`;
+  const title = `${label} — n=${n} = ${rep.factorisation.join(" · ")}\n`
+    + `closure: ${rep.closes ? `closes, step ${rep.step_arcsec}″` : `off-ring via ${cl.off_ring_lanes.join("+") || "×" + cl.alien_factor}, defect ${rep.defect_arcsec}″`}\n`
+    + `shadow: q = ${sh.q}, δ = ${sh.delta}, ρ = ${sh.rho} (${sh.band_label})`;
+  return `<span class="chip ${key}" title="${esc(title)}">${esc(label)} <b>${esc(badge)}</b>${rhoTag}</span>`;
+}
+
+function renderMatrix() {
+  const reports = allVariantReports();
+  const nonClosing = DIVISIONS.filter((d) => !closes(d.n));
+  const exactHouses = HOUSE_SYSTEMS.filter((h) => h.exact).length;
+
+  $("covPill").textContent = `${VARIANTS.length} traditions`;
+  $("tally").innerHTML = [
+    [VARIANTS.length, "traditions"],
+    [DIVISIONS.length, "divisions"],
+    [FRAMES.length, "frames"],
+    [`${exactHouses}/${HOUSE_SYSTEMS.length}`, "houses integer-exact"],
+    [ASPECT_FAMILIES.length, "aspect families"],
+    [nonClosing.length, "non-closing divisions"],
+  ].map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join("");
+
+  $("legend").innerHTML =
+    `<div class="legend-l">closure axis — does the division tile the ring?</div>`
+    + `<span class="chip k-close">closes exactly <b>step″</b></span>`
+    + OFF_RING_LANES.map((l) =>
+      `<span class="chip k-${l.id.toLowerCase()}">${l.id} — ${esc(l.role)} <b>${defect(l.prime)}″</b></span>`).join("")
+    + `<span class="chip k-alien">prime outside the Safe Basis</span>`
+    + `<div class="legend-l" style="margin-top:10px">shadow axis — ρ(n) = ω(n) + δ(n), δ from the largest inert factor</div>`
+    + BANDS.map((b) => `<span class="chip k-close"><i class="rho b-${b.id}">ρ${b.min}${b.max === null ? "+" : b.max === b.min ? "" : "–" + b.max}</i> ${esc(b.label)} — ${esc(b.note)}</span>`).join("")
+    + `<div class="legend-l" style="margin-top:10px">claim status</div>`
+    + `<span class="chip k-exact">integer-exact / PROVEN</span>`
+    + `<span class="chip k-defined">DEFINED constant</span>`
+    + `<span class="chip k-open">OPEN — needs a certified ledger</span>`;
+
+  $("matrix").innerHTML = reports.map((r) => {
+    // A tradition carries spine defect through its divisions *or* its aspect
+    // families — the Harmonic set has no zodiacal division but three off-ring
+    // families, so both have to count.
+    const divDefects = r.divisions.filter((d) => !d.closes).length;
+    const aspDefects = r.aspects.reduce((n, f) => n + f.angles.filter((a) => !a.closes).length, 0);
+    const defectCount = divDefects + aspDefects;
+    const defectLabel = defectCount === 0
+      ? "fully closing"
+      : [divDefects ? `${divDefects} division${divDefects > 1 ? "s" : ""}` : null,
+         aspDefects ? `${aspDefects} aspect divisor${aspDefects > 1 ? "s" : ""}` : null]
+        .filter(Boolean).join(" + ") + " off-ring";
+    const frameChip = `<span class="chip ${r.frame.status === "OPEN" ? "k-open" : r.frame.status === "DEFINED" ? "k-defined" : "k-close"}" `
+      + `title="${esc(r.frame.status)}">${esc(r.frame.label)}`
+      + (r.frame.offset_arcsec === null ? ` <b>runtime</b>` : ` <b>+${grp(r.frame.offset_arcsec)}″</b>`) + `</span>`;
+
+    const divChips = r.divisions.length
+      ? r.divisions.map((d) => divisionChip(d.id, d.label, BigInt(d.n))).join("")
+      : `<span class="chip k-defined">no zodiacal division</span>`;
+
+    const houseChips = r.houses.length
+      ? r.houses.map((h) => `<span class="chip ${h.exact ? "k-exact" : "k-open"}" title="${esc(h.status)}">${esc(h.label)} <b>${h.exact ? "exact" : "OPEN"}</b></span>`).join("")
+      : `<span class="chip k-defined">no house division</span>`;
+
+    const aspChips = r.aspects.length
+      ? r.aspects.map((f) => {
+          const bad = f.angles.filter((a) => !a.closes);
+          const key = bad.length ? "k-" + laneKeyFor(bad[0]) : "k-close";
+          const badge = bad.length ? `${bad.length}/${f.angles.length} off-ring` : "all exact";
+          return `<span class="chip ${key}" title="${esc(f.label)}">${esc(f.short || f.id)} <b>${badge}</b></span>`;
+        }).join("")
+      : `<span class="chip k-defined">no aspect doctrine</span>`;
+
+    const lords = r.time_lords
+      ? `<div class="vrow"><div class="vrow-l">time lords</div><div class="vrow-b"><span class="chip k-close">${esc(r.time_lords)}</span></div></div>`
+      : "";
+
+    return `<div class="vcard ${defectCount ? "has-defect" : ""}">
+      <div class="vcard-h">
+        <div class="vcard-n">${esc(r.name)}</div>
+        <div class="vcard-t">${esc(r.tradition)} · ${esc(defectLabel)}</div>
+      </div>
+      <div class="vcard-note">${esc(r.note)}</div>
+      <div class="vrow"><div class="vrow-l">frame</div><div class="vrow-b">${frameChip}</div></div>
+      <div class="vrow"><div class="vrow-l">divisions</div><div class="vrow-b">${divChips}</div></div>
+      <div class="vrow"><div class="vrow-l">houses</div><div class="vrow-b">${houseChips}</div></div>
+      <div class="vrow"><div class="vrow-l">aspects</div><div class="vrow-b">${aspChips}</div></div>
+      ${lords}
+    </div>`;
+  }).join("");
+}
+
+function laneKeyFor(angle) {
+  const p = angle.off_ring_primes[0];
+  const lane = OFF_RING_LANES.find((l) => l.prime.toString() === p);
+  return lane ? lane.id.toLowerCase() : "alien";
+}
+
+/* ── suites ────────────────────────────────────────────────────── */
+window.runStatic = async function () {
+  GATE.unit = paint("unit", runUnit(), "unitCount");
+  GATE.basis = paint("basis", runSafeBasis(), "basisCount");
+  GATE.cram = paint("cram", runCram(), "cramCount");
+  GATE.anchor = paint("anchor", runAnchor(), "anchorCount");
+  GATE.fixture = paint("fixture", runFixture(), "fixCount");
+  GATE.operators = paint("operators", runOperators(), "opCount");
+  GATE.variants = paint("variant", runVariants(), "varCount");
+  GATE.spineStatic = paint("spineStatic", runSpineStatic(), "spineCount");
+  setGate();
+  await yield_();
+  GATE.audit = paint("audit", await runNoFloatAudit());
+  setGate();
+};
+
+async function kelimSweep() {
+  $("swStatus").textContent = "running";
   const out = await runSweep(async (pct, checked, mis) => {
-    $("prog").style.width = pct + "%"; $("swChecked").textContent = Number(checked).toLocaleString(); $("swMis").textContent = mis;
-    await new Promise(r => setTimeout(r, 0));
+    $("prog").style.width = pct + "%";
+    $("swChecked").textContent = grp(checked);
+    $("swMis").textContent = mis;
+    await yield_();
   });
   $("prog").style.width = "100%";
-  $("swChecked").textContent = Number(out.checked).toLocaleString();
-  $("swMis").textContent = out.mismatches; $("swMaxK").textContent = out.maxK;
+  $("swChecked").textContent = grp(out.checked);
+  $("swMis").textContent = out.mismatches;
+  $("swMaxK").textContent = out.maxK;
   $("swStatus").textContent = out.ok ? "PROVEN" : "FAIL";
-  sweepPass = out.ok; $("runSweep").disabled = false; $("runAll").disabled = false; setGate();
+  GATE.kelim = out.ok;
+  setGate();
+}
+
+async function spineSweep() {
+  const out = await runSpineSweep(async (p) => {
+    $("progSpine").style.width = p.pct + "%";
+    await yield_();
+  });
+  $("progSpine").style.width = "100%";
+  const c = out.census;
+  $("censusBox").innerHTML = `<div class="sweep-stat">`
+    + [
+      ["R", "ordinary"],
+      ["SH-body", "SH-body · r₁₁ = 0"],
+      ["B13-pre", "B13-pre · r₁₃ = 12"],
+      ["B13-zero", "B13-zero · r₁₃ = 0"],
+      ["H7-body", "H7-body · r₇ = 0"],
+      ["G19-body", "G19-body · r₁₉ = 0"],
+      ["G-zero", "G-zero"],
+      ["G-pre", "G-pre"],
+      ["G-low", "G-low"],
+    ].map(([k, label]) => `<div><b>${grp(c[k] || 0)}</b><span>${esc(label)}</span></div>`).join("")
+    + `</div>`;
+  GATE.spineSweep = paint("spineSweep", out.results);
+  setGate();
+}
+
+async function frameSweep() {
+  const out = await runFrameSweep(async (p) => {
+    $("progFrame").style.width = p.pct + "%";
+    await yield_();
+  });
+  $("progFrame").style.width = "100%";
+  GATE.frames = paint("frameSweep", out.results);
+  setGate();
+}
+
+window.runSweeps = async function () {
+  for (const b of ["runAll", "runStatic", "runSweeps"]) $(b).disabled = true;
+  try {
+    await kelimSweep();
+    await spineSweep();
+    await frameSweep();
+  } finally {
+    for (const b of ["runAll", "runStatic", "runSweeps"]) $(b).disabled = false;
+  }
 };
-window.runAll = async function() {
-  await window.runUnitOnly();
-  await runAudit();
-  await window.runSweepOnly();
+
+window.runAll = async function () {
+  await window.runStatic();
+  await window.runSweeps();
 };
-// auto-run unit + audit on load (fast); sweep is explicit
-window.runUnitOnly();
-runAudit();
+
+/* ── boot ──────────────────────────────────────────────────────── */
+renderBasis();
+renderCram();
+renderStar();
+renderOperators();
+renderReinforce();
+renderMatrix();
+setGate();
+window.runStatic();
 </script>
 </body>
 </html>

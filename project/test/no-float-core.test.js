@@ -11,6 +11,16 @@ const CORE_FILES = [
   "src/core/shell-kelim.js",
   "src/core/validators.js",
   "src/core/hcrm-core.js",
+  "src/core/ring.js",
+  "src/core/variants.js",
+  "src/core/safe-basis.js",
+  "src/core/rho.js",
+  "src/core/shadow-spine.js",
+  "src/core/arrow.js",
+  "src/core/operators.js",
+  "src/core/cram.js",
+  "src/core/fixture.js",
+  "src/core/anchor.js",
 ];
 
 // Forbidden tokens. validators.js legitimately *names* the things it rejects,
@@ -41,7 +51,14 @@ export async function runNoFloatAudit() {
   for (const path of CORE_FILES) {
     let src;
     try { src = await (await fetch(path)).text(); }
-    catch (e) { results.push({ name: path, ok: false, detail: "fetch failed: " + e.message }); continue; }
+    catch (e) {
+      // The audit reads its own sources, so the page must be served over http.
+      const hint = location.protocol === "file:"
+        ? "unreadable under file:// — serve the folder over http to audit"
+        : "fetch failed: " + e.message;
+      results.push({ name: path, ok: false, detail: hint });
+      continue;
+    }
     const clean = stripCommentsAndStrings(src);
     const hits = [];
     for (const f of FORBIDDEN) if (f.re.test(clean)) hits.push(f.tok);

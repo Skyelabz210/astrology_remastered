@@ -1,0 +1,10 @@
+{
+  "name": "hcrm",
+  "private": true,
+  "type": "module",
+  "description": "HCRM — exact integer register core, astrological variant coverage, and shadow-spine certification.",
+  "scripts": {
+    "test": "node test/run.js",
+    "test:quick": "node test/run.js --quick"
+  }
+}
