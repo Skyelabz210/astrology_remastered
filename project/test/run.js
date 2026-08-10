@@ -3,75 +3,58 @@
 // The browser gate (`Core Test Harness.html`) runs the same modules; this is the
 // headless path so CI and `npm test` exercise exactly what the gate does.
 //
+// Suites are DISCOVERED, not registered: every *.test.js file in this directory
+// (minus EXCLUDE below) is imported and its exported run() executed. To add a
+// suite, drop a file in test/ that exports run() returning [{name, ok, detail}]
+// rows — no edit here needed. Discovered suite names are printed so drift is
+// visible.
+//
 //   node test/run.js          full suite + the exhaustive ring sweep
 //   node test/run.js --quick  skip the 1,296,000-point sweep
+//
+// The no-float audit shares its pattern set, stripping logic, and file manifest
+// with the browser gate via test/no-float-audit.js (single source of truth).
 
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { auditPairs } from "./no-float-audit.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CORE = join(HERE, "..", "src", "core");
 
-const SUITES = [
-  ["core", "core.test.js"],
-  ["variant coverage", "variant-coverage.test.js"],
-  ["safe basis · ρ · arrow", "safe-basis.test.js"],
-  ["shadow spine", "shadow-spine.test.js"],
-  ["operator atlas", "operators.test.js"],
-  ["CRAM layer", "cram.test.js"],
-  ["star · tower · fixture", "fixture.test.js"],
-  ["anchor", "anchor.test.js"],
-  ["hidden carry", "carry.test.js"],
-  ["anchor-set recovery", "tower-recover.test.js"],
-  ["identity of a number", "identity.test.js"],
-  ["two-tray architecture", "tray.test.js"],
-];
+// Files discovery must skip. Keep this list short and each entry justified:
+//   no-float-core.test.js — browser-only twin of the no-float audit (relative
+//     fetch() + `location`; cannot run under Node). The audit below covers the
+//     same ground from disk through the shared no-float-audit.js module.
+//   full-sweep.test.js — exports runSweep(), not run(); special-cased after the
+//     suites so --quick can skip the 1,296,000-point sweep.
+const EXCLUDE = new Set(["no-float-core.test.js", "full-sweep.test.js"]);
 
-// The no-float audit reads source; in the browser it fetches, here it reads the
-// filesystem. Same rule either way: no float construct may appear in src/core.
-const FLOAT_PATTERNS = [
-  [/\bNumber\s*\(/, "Number()"],
-  [/\bparseFloat\s*\(/, "parseFloat()"],
-  [/\bparseInt\s*\(/, "parseInt()"],
-  [/\bMath\s*\./, "Math."],
-  [/\.toFixed\s*\(/, ".toFixed()"],
-  [/\bnew\s+Date\b/, "new Date"],
-  [/\bDate\s*\.\s*now\b/, "Date.now"],
-  [/(^|[^\w.])\d+\.\d+/, "decimal literal"],
-];
-
-/** Blank out block comments, keeping newlines so line numbers stay true. */
-function stripBlockComments(src) {
-  return src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
-}
-
-function auditNoFloat() {
-  const files = readdirSync(CORE).filter((f) => f.endsWith(".js")).sort();
-  const rows = [];
-  for (const f of files) {
-    const src = stripBlockComments(readFileSync(join(CORE, f), "utf8"));
-    const hits = [];
-    src.split("\n").forEach((line, i) => {
-      // strip line comments and string literals before testing
-      const code = line.replace(/\/\/.*$/, "").replace(/"[^"]*"|'[^']*'|`[^`]*`/g, '""');
-      for (const [re, label] of FLOAT_PATTERNS) {
-        if (re.test(code)) hits.push(`${label} @${i + 1}`);
-      }
-    });
-    rows.push({ name: `src/core/${f}`, ok: hits.length === 0, detail: hits.join(", ") });
-  }
-  return rows;
-}
+const discovered = readdirSync(HERE)
+  .filter((f) => f.endsWith(".test.js") && !EXCLUDE.has(f))
+  .sort();
 
 const quick = process.argv.includes("--quick");
 let total = 0, failed = 0;
 const failures = [];
 
-for (const [label, file] of SUITES) {
+console.log(`  discovered ${discovered.length} suites: ${discovered.map((f) => f.replace(/\.test\.js$/, "")).join(", ")}`);
+
+for (const file of discovered) {
+  const label = file.replace(/\.test\.js$/, "");
   const mod = await import(`./${file}`);
-  const fn = mod.run || Object.values(mod).find((v) => typeof v === "function");
-  const rows = await fn();
+  if (typeof mod.run !== "function") {
+    // A discovered suite with no run() is contributor error, not a skip — fail
+    // loudly instead of silently dropping coverage. Browser-only files belong
+    // in EXCLUDE above.
+    total += 1;
+    failed += 1;
+    failures.push(`${label} :: no run() export — export run() or add the file to EXCLUDE in test/run.js`);
+    console.log(`  FAIL ${label.padEnd(24)} 0/1 (no run() export)`);
+    continue;
+  }
+  const rows = await mod.run();
   const pass = rows.filter((r) => r.ok).length;
   total += rows.length;
   failed += rows.length - pass;
@@ -79,7 +62,13 @@ for (const [label, file] of SUITES) {
   console.log(`  ${pass === rows.length ? "ok " : "FAIL"} ${label.padEnd(24)} ${pass}/${rows.length}`);
 }
 
-const audit = auditNoFloat();
+// Unified no-float audit: read every src/core/*.js from disk and feed the
+// (filename, sourceText) pairs through the shared audit module. The audited
+// file count therefore always equals the directory listing; the manifest the
+// browser gate uses is asserted against the same listing in
+// no-float-selftest.test.js.
+const coreFiles = readdirSync(CORE).filter((f) => f.endsWith(".js")).sort();
+const audit = auditPairs(coreFiles.map((f) => [`src/core/${f}`, readFileSync(join(CORE, f), "utf8")]));
 const auditPass = audit.filter((r) => r.ok).length;
 total += audit.length;
 failed += audit.length - auditPass;
