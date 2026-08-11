@@ -37,8 +37,73 @@ degree, `Math.*`, or similar) in that file.
   obliquity), `produce-ledger.mjs` (the CLI that calls `astronomy-engine` and
   emits schema-conformant ledger entries), `houses.js` (WP-11/12),
   `fetch-horizons.mjs` (WP-09, reference-vector regeneration; not run in CI).
-- `build-standalone.mjs` (arriving with WP-25) — pre-transpiles the JSX bundle
-  and vendors `astronomy-engine` into a single offline HTML file.
+- `build-standalone.mjs` (WP-25) — regenerates a single-file, offline-openable
+  `dist/standalone.html` from the live `HCRM Console.html` page. See below.
+
+## build-standalone.mjs (WP-25)
+
+`HCRM Console.html` (the live page) is normally served over HTTP
+(`npx serve project`) and loads its `.jsx` files via a `<script
+type="text/babel">` + babel-standalone CDN combo, plus a `type="module"`
+`core-shim.js` that imports the real `src/core/`/`src/ledger/` ESM graph.
+Both of those load paths are broken when the HTML is opened directly off
+disk (`file://`): module `import` is blocked cross-origin under `file://`,
+and the babel-standalone/React/ReactDOM `<script src="https://unpkg.com/...">`
+tags need network access.
+
+Run from `project/`:
+
+```sh
+node tools/build-standalone.mjs
+```
+
+This reads `HCRM Console.html` and, walking its `<link>`/`<script>` tags in
+document order (so it tracks whatever the live page actually loads — nothing
+about the asset list is hardcoded), inlines everything into
+`project/dist/standalone.html` (git-ignored, per the root `.gitignore`
+`dist/` rule from WP-01 — re-run the build after pulling changes, don't
+expect a stale copy to be committed):
+
+- **CSS** (`styles.css`, `hcrm.css`) — inlined as `<style>`.
+- **JSX pages** (`astro.jsx`, `cities.jsx`, `globe.jsx`, `landing.jsx`,
+  `hcrm.jsx`, `hcrm-view.jsx`, `hcrm-app.jsx`) — pre-transpiled with
+  `@babel/core` + `@babel/preset-react` (classic runtime, matching
+  babel-standalone's `data-presets="react"` behavior) and inlined as plain
+  `<script>`.
+- **`core-shim.js` / `tzresolve.js`** (real ES modules, importing the
+  `src/core/`/`src/ledger/` graph) — bundled into a single IIFE with
+  `esbuild` (`buildSync`, `bundle: true, format: "iife"`) and inlined as a
+  plain `<script>`, so `window.HCRM_CORE` / `window.TzResolve` are populated
+  with no runtime `import` left at all.
+- **`vendor/astronomy.browser.min.js`** — inlined verbatim (already a plain
+  UMD script, WP-17).
+- **React / ReactDOM** — swapped from the live page's
+  `unpkg.com/react@18.3.1`/`react-dom@18.3.1` CDN `<script>` tags for the
+  matching local `node_modules/react{,-dom}/umd/*.development.js` UMD
+  builds and inlined.
+- **babel-standalone** — dropped entirely (JSX is already pre-transpiled at
+  build time, so the in-browser transpiler is dead weight offline).
+
+Requires `@babel/core`, `@babel/preset-react`, `esbuild`, `react`, and
+`react-dom` as devDependencies (pinned to `react`/`react-dom` `18.3.1` to
+match the live page). If they're missing, `npm install --save-dev
+@babel/core @babel/preset-react esbuild react@18.3.1 react-dom@18.3.1` from
+`project/` first — check `ls node_modules/@babel/core` etc. before
+re-installing. The script fails loudly (does not silently fall back to a
+CDN `<script>`) if a required local package is missing, rather than
+emitting a bundle it can't honestly call offline-capable.
+
+**Known gap:** the Google Fonts `<link rel="stylesheet"
+href="https://fonts.googleapis.com/...">` on the live page is left as-is —
+cosmetic only (falls back to the system serif/sans stack offline), and
+vendoring webfont files was judged out of scope for this package.
+
+Verified (this session): the emitted `dist/standalone.html` was smoke-tested
+with a real headless Chromium (`playwright-core`, installed with
+`--no-save` for the one-off check, not a project dependency) opened via a
+`file://` URL — the app rendered its full register-ledger UI with real
+computed chart data and no JS console errors other than the expected
+Google Fonts network failure.
 
 ## Using astronomy-engine here
 

@@ -27,23 +27,22 @@ const DEFAULT_SETTINGS = /*EDITMODE-BEGIN*/{
   "voiceName":   ""
 }/*EDITMODE-END*/;
 
-// Error boundary so a single bad parse doesn't black out the whole app.
-class Boundary extends React.Component {
-  constructor(p) { super(p); this.state = { err: null }; }
-  static getDerivedStateFromError(e) { return { err: e }; }
-  componentDidCatch(e, info) { console.error("boundary caught", e, info); }
-  render() {
-    if (this.state.err) {
-      return (
-        <div className="boundary">
-          <div className="boundary-title">recomputing…</div>
-          <div className="boundary-sub">a transient input made the substrate unsolvable. adjust the inputs to recover.</div>
-          <button onClick={() => this.setState({ err: null })}>reset</button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
+// Render-time error boundary — errors.jsx's ErrorBoundary (WP-19), wrapped
+// here with this app's own wording so a single bad parse doesn't black out
+// the whole app. This catches exceptions thrown WHILE RENDERING (a bug in a
+// downstream component); it is a distinct failure mode from the
+// useMemo-level chart-build failures below, which throw inside a try/catch
+// and never reach a render-time boundary at all — those use
+// useErrorBanner()/<ErrorBanner> instead (also from errors.jsx).
+function Boundary({ children }) {
+  return (
+    <ErrorBoundary
+      title="recomputing…"
+      resetLabel="reset"
+    >
+      {children}
+    </ErrorBoundary>
+  );
 }
 
 function App() {
@@ -53,6 +52,13 @@ function App() {
   const [landingState, setLandingState] = $useState(null);
   const [partner, setPartner] = $useState(null);       // partner birth payload
   const [partnerState, setPartnerState] = $useState(null);
+  // WP-19: the DST ambiguous/nonexistent note landing.jsx computes at
+  // submit time (tzresolve.js's resolveUtcInstant kind !== "ok"). Kept as
+  // plain component state rather than a tweak — it's a one-shot notice
+  // about how *this* birth instant was resolved, not a persisted setting
+  // useTweaks would try to write back into DEFAULT_SETTINGS's EDITMODE
+  // block on every change.
+  const [dstNote, setDstNote] = $useState(null);
 
   // expose rigorous + prime layer flags as document classes
   $useEffect(() => {
@@ -69,6 +75,7 @@ function App() {
       timeUnknown: !!payload.timeUnknown,
     });
     setLandingState(payload.formState);
+    setDstNote(payload.dstNote || null);
     setScreen("session");
   };
 
@@ -91,6 +98,7 @@ function App() {
         <SessionScreen
           settings={settings}
           setTweak={setTweak}
+          dstNote={dstNote}
           onBack={() => setScreen("landing")}
           onOpenSpread={() => setScreen("spread")}
           onOpenSynastry={() => setScreen("partner")}
@@ -116,6 +124,7 @@ function App() {
         <SynastryScreen
           settings={settings}
           partner={partner}
+          dstNote={dstNote}
           onBack={() => setScreen("session")}
         />
       </Boundary>
@@ -123,14 +132,71 @@ function App() {
   }
   return (
     <Boundary>
-      <Spread settings={settings} setTweak={setTweak} t={t}
+      <Spread settings={settings} setTweak={setTweak} t={t} dstNote={dstNote}
               onBack={() => setScreen("session")}
               onOpenSynastry={() => setScreen("partner")} />
     </Boundary>
   );
 }
 
-function SynastryScreen({ settings, partner, onBack }) {
+// WP-19: status banners shown near the top of every chart screen —
+// SYNTHETIC-ephemeris badge, polar-latitude house-system fallback warning,
+// the DST ambiguous/nonexistent note landing.jsx computed at submit time,
+// an unknown-birth-time reminder, and (via <ErrorBanner>) any chart-build
+// failures pushed by useErrorBanner(). All are read fresh on every render
+// rather than cached, per the brief: window.EPHEMERIS_MODE is set
+// synchronously by astro.jsx's own script execution, so it must be
+// re-checked at chart-render time, not just once at module load.
+function ChartStatusBanners({ chart, settings, dstNote, banners, onDismiss }) {
+  const notes = [];
+
+  if (typeof window !== "undefined" && window.EPHEMERIS_MODE === "SYNTHETIC") {
+    notes.push({
+      id: "synthetic-mode",
+      kind: "info",
+      text: "Offline / synthetic ephemeris — planetary positions come from the built-in mean-motion model, not the verified astronomy-engine vendor data. Expect lower precision (typically a few arcminutes to roughly a degree).",
+    });
+  }
+
+  if (chart && settings && typeof window !== "undefined" && window.Validate && window.HousesPolicy) {
+    const warning = window.Validate.polarHouseWarning(
+      settings.lat, settings.houseSystem, window.HousesPolicy.POLAR_FALLBACK_POLICY
+    );
+    if (warning) notes.push({ id: "polar-house", kind: "warn", text: warning.message });
+  }
+
+  if (dstNote) {
+    notes.push({ id: "dst-note", kind: "warn", text: dstNote });
+  }
+
+  if (chart && chart.timeUnknown) {
+    notes.push({
+      id: "time-unknown",
+      kind: "info",
+      text: "Birth time unknown — positions computed for 12:00 local. Ascendant, Midheaven, houses, and the Moon's exact degree are not reliable on this chart.",
+    });
+  }
+
+  return (
+    <>
+      {notes.length > 0 && (
+        <div className="chart-notes">
+          {notes.map((n) => (
+            <div key={n.id} className={`chart-note ${n.kind === "warn" ? "chart-note-warn" : ""}`}>
+              <span className="chart-note-icon" aria-hidden="true">{n.kind === "warn" ? "⚠" : "ⓘ"}</span>
+              <span>{n.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <ErrorBanner banners={banners} onDismiss={onDismiss} />
+    </>
+  );
+}
+
+function SynastryScreen({ settings, partner, dstNote, onBack }) {
+  const { banners, pushError, dismiss } = useErrorBanner();
+
   const chartA = $useMemo(() => {
     try {
       return computeNatal({
@@ -139,8 +205,8 @@ function SynastryScreen({ settings, partner, onBack }) {
         placeLabel: settings.placeLabel, subjectName: "You",
         timeUnknown: !!settings.timeUnknown,
       });
-    } catch (e) { console.error(e); return null; }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown]);
+    } catch (e) { pushError(e, "your chart"); return null; }
+  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown, pushError]);
 
   const chartB = $useMemo(() => {
     if (!partner) return null;
@@ -151,22 +217,34 @@ function SynastryScreen({ settings, partner, onBack }) {
         placeLabel: partner.placeLabel, subjectName: partner.subjectName || "Them",
         timeUnknown: !!partner.timeUnknown,
       });
-    } catch (e) { console.error(e); return null; }
-  }, [partner, settings.houseSystem, settings.sect]);
+    } catch (e) { pushError(e, "their chart"); return null; }
+  }, [partner, settings.houseSystem, settings.sect, pushError]);
 
   if (!chartA || !chartB) {
     return (
       <div className="boundary">
+        <ChartStatusBanners chart={null} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
         <div className="boundary-title">synastry needs two charts</div>
-        <div className="boundary-sub">one of the two birth inputs did not resolve.</div>
+        <div className="boundary-sub">
+          {chartA && !chartB && !partner
+            ? "the second birth input hasn't been entered yet."
+            : "one of the two birth inputs did not resolve into a valid chart — see the error above."}
+        </div>
         <button onClick={onBack}>back</button>
       </div>
     );
   }
-  return <SynastryView chartA={chartA} chartB={chartB} settings={settings} onBack={onBack} />;
+  return (
+    <>
+      <ChartStatusBanners chart={chartA} settings={settings} dstNote={dstNote || (partner && partner.dstNote)} banners={banners} onDismiss={dismiss} />
+      <SynastryView chartA={chartA} chartB={chartB} settings={settings} onBack={onBack} />
+    </>
+  );
 }
 
-function SessionScreen({ settings, setTweak, onBack, onOpenSpread, onOpenSynastry }) {
+function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOpenSynastry }) {
+  const { banners, pushError, dismiss } = useErrorBanner();
+
   const chart = $useMemo(() => {
     try {
       return computeNatal({
@@ -178,22 +256,30 @@ function SessionScreen({ settings, setTweak, onBack, onOpenSpread, onOpenSynastr
         placeLabel: settings.placeLabel,
         timeUnknown: !!settings.timeUnknown,
       });
-    } catch (e) { console.error(e); return null; }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown]);
+    } catch (e) { pushError(e, "natal chart"); return null; }
+  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown, pushError]);
 
   if (!chart) {
     return (
       <div className="boundary">
+        <ChartStatusBanners chart={null} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
         <div className="boundary-title">substrate failed to resolve</div>
-        <div className="boundary-sub">the natal inputs did not produce a valid chart.</div>
+        <div className="boundary-sub">the natal inputs did not produce a valid chart — see the error above for why.</div>
         <button onClick={onBack}>return to entry</button>
       </div>
     );
   }
-  return <ReadingSession chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} onOpenSpread={onOpenSpread} onOpenSynastry={onOpenSynastry} />;
+  return (
+    <>
+      <ChartStatusBanners chart={chart} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
+      <ReadingSession chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} onOpenSpread={onOpenSpread} onOpenSynastry={onOpenSynastry} />
+    </>
+  );
 }
 
-function Spread({ settings, setTweak, t, onBack }) {
+function Spread({ settings, setTweak, t, dstNote, onBack }) {
+  const { banners, pushError, dismiss } = useErrorBanner();
+
   // Natal computation — runs through Mayan CRT substrate every time.
   const chart = $useMemo(() => {
     try {
@@ -207,10 +293,10 @@ function Spread({ settings, setTweak, t, onBack }) {
         timeUnknown: !!settings.timeUnknown,
       });
     } catch (e) {
-      console.error(e);
+      pushError(e, "natal chart");
       return null;
     }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown]);
+  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown, pushError]);
 
   const cards = $useMemo(() => {
     if (!chart) return [];
@@ -230,8 +316,9 @@ function Spread({ settings, setTweak, t, onBack }) {
   if (!chart) {
     return (
       <div className="boundary">
+        <ChartStatusBanners chart={null} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
         <div className="boundary-title">substrate failed to resolve</div>
-        <div className="boundary-sub">the natal inputs did not produce a valid chart.</div>
+        <div className="boundary-sub">the natal inputs did not produce a valid chart — see the error above for why.</div>
         <button onClick={onBack}>return to entry</button>
       </div>
     );
@@ -239,6 +326,7 @@ function Spread({ settings, setTweak, t, onBack }) {
 
   return (
     <div className="app">
+      <ChartStatusBanners chart={chart} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
       <Header chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} />
 
       <Synthesis chart={chart} reading={chartReading} settings={settings} />
@@ -331,12 +419,76 @@ function Synthesis({ chart, reading, settings }) {
 
 // ─────────────────────── tweaks groups ────────────────────────
 
+// WP-19: free-entry latitude/longitude field, paired with a slider spanning
+// the TRUE polar range (-90..90 lat, -180..180 lng — the previous ±66°
+// slider clamp silently made polar latitudes impossible to enter at all).
+// Typing a non-numeric or out-of-range value shows an inline error and
+// does NOT call onValid — the underlying setting only changes once the
+// typed value validates, so a mid-edit "-1" or "9" never corrupts the
+// chart's actual latitude/longitude.
+function LatLngTweak({ label, kind, value, onValid }) {
+  const [text, setText] = React.useState(String(value));
+  const [error, setError] = React.useState(null);
+  const min = kind === "lat" ? -90 : -180;
+  const max = kind === "lat" ?  90 :  180;
+
+  // Stay in sync when the value changes from elsewhere (the paired slider,
+  // or a fresh chart cast from the landing screen's city picker).
+  React.useEffect(() => {
+    setText(String(value));
+    setError(null);
+  }, [value]);
+
+  const commitText = (raw) => {
+    setText(raw);
+    const validator = (typeof window !== "undefined" && window.Validate)
+      ? (kind === "lat" ? window.Validate.validateLatitude : window.Validate.validateLongitude)
+      : null;
+    if (!validator) return; // validate.js not loaded — leave uncommitted rather than guess
+    const r = validator(raw);
+    if (r.ok) { setError(null); onValid(r.value); }
+    else { setError(r.error); }
+  };
+
+  return (
+    <div className="tw-latlng">
+      <TweakSlider label={label} value={value} min={min} max={max} step={0.1} unit="°"
+        onChange={(v) => onValid(Number(v))} />
+      <div className="tw-row">
+        <label className="tw-lbl">{label.toLowerCase()} (type a value)</label>
+        <input
+          className={`tw-inp ${error ? "tw-inp-invalid" : ""}`}
+          type="text"
+          inputMode="decimal"
+          value={text}
+          aria-invalid={!!error}
+          onChange={(e) => commitText(e.target.value)}
+        />
+      </div>
+      {error && <div className="tw-err" role="alert">{error}</div>}
+    </div>
+  );
+}
+
 function NatalTweaks({ t }) {
   const date = new Date(t.tweaks.dateISO);
   const dateStr = isNaN(date) ? "" : t.tweaks.dateISO.slice(0,10);
   const timeStr = isNaN(date) ? "" : t.tweaks.dateISO.slice(11,16);
+  const [dateError, setDateError] = React.useState(null);
   const setDate = (s) => {
-    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return;
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) { setDateError(null); return; }
+    const [y, m, d] = s.split("-").map(Number);
+    // WP-19: real-calendar validation (leap years etc.) — the native
+    // <input type="date"> UI blocks most of this already, but a
+    // programmatically-set or non-conforming value shouldn't be trusted
+    // silently, and this is the one free-entry date field in the app
+    // (landing.jsx's own date pickers are constrained to real days by
+    // construction — see project/docs/ux-validation-checklist.md #1).
+    if (typeof window !== "undefined" && window.Validate && !window.Validate.isValidCalendarDate({ year: y, month: m, day: d })) {
+      setDateError(`${s} is not a real calendar date.`);
+      return;
+    }
+    setDateError(null);
     const t2 = /^\d{2}:\d{2}$/.test(timeStr) ? timeStr : "12:00";
     t.setTweak('dateISO', `${s}T${t2}:00`);
   };
@@ -351,14 +503,13 @@ function NatalTweaks({ t }) {
         <label className="tw-lbl">date</label>
         <input className="tw-inp" type="date" value={dateStr} onChange={e => setDate(e.target.value)} />
       </div>
+      {dateError && <div className="tw-err" role="alert">{dateError}</div>}
       <div className="tw-row">
         <label className="tw-lbl">time</label>
         <input className="tw-inp" type="time" value={timeStr} onChange={e => setTime(e.target.value)} />
       </div>
-      <TweakSlider label="Latitude"  value={t.tweaks.lat} min={-66} max={66}  step={0.1} unit="°"
-        onChange={v => t.setTweak('lat', Number(v))} />
-      <TweakSlider label="Longitude" value={t.tweaks.lng} min={-180} max={180} step={0.1} unit="°"
-        onChange={v => t.setTweak('lng', Number(v))} />
+      <LatLngTweak label="Latitude"  kind="lat" value={t.tweaks.lat} onValid={v => t.setTweak('lat', v)} />
+      <LatLngTweak label="Longitude" kind="lng" value={t.tweaks.lng} onValid={v => t.setTweak('lng', v)} />
       <TweakText label="Place" value={t.tweaks.placeLabel}
         onChange={v => t.setTweak('placeLabel', v)} />
       <TweakRadio label="House system" value={t.tweaks.houseSystem} options={[

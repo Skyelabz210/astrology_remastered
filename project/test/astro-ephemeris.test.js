@@ -47,9 +47,26 @@ const vendorSrc = readFileSync(join(ROOT, "vendor", "astronomy.browser.min.js"),
 const REAL_BODIES = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
 const SYNTHETIC_ONLY_BODIES = ["NorthNode", "Chiron", "Lilith"];
 
+// WP-21: astro.jsx's interpretation logic (dignityFor, nearestAspect,
+// criticalKind, computeAllLots, detectPatterns, sect determination, etc.)
+// now delegates to `AstroCore`, which every HTML page loads as
+// `<script type="module" src="src/present/astro-core.js"></script>` BEFORE
+// astro.jsx's own script tag (see astro.jsx's file header). Mirroring that
+// load order here: astro-core.js is a genuine ES module (real `export`
+// statements), so it cannot be fed to `vm.runInContext` as a classic script
+// the way astro.jsx and the vendor UMD build are — it is `import()`ed for
+// real (exercising the actual shipped implementation, not a copy) and its
+// module namespace object is attached to the sandbox as the bare global
+// `AstroCore` before astro.jsx runs, exactly mirroring what astro.jsx's
+// top-level code expects to find (bare `AstroCore` resolving to
+// `window.AstroCore` in a real browser, since `window` IS the global object
+// there — same as `sandbox.window === sandbox` below).
+const astroCoreModule = await import("../src/present/astro-core.js");
+
 function makeSandbox({ withAstronomy }) {
   const sandbox = {};
   sandbox.window = sandbox; // top-level `window.X = ...` and bare `window` refs resolve here
+  sandbox.AstroCore = astroCoreModule;
   vm.createContext(sandbox);
   if (withAstronomy) {
     vm.runInContext(vendorSrc, sandbox, { filename: "astronomy.browser.min.js" });

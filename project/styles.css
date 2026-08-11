@@ -2170,4 +2170,133 @@ body::before {
   border-radius: 999px;
   color: var(--ink-2);
 }
+
+/* ============================================================
+   WP-19: input validation & visible errors
+   ============================================================ */
+
+/* free-entry latitude/longitude field, paired with the polar-range slider */
+.tw-latlng { margin-bottom: 8px; }
+.tw-inp-invalid { border-color: oklch(0.68 0.19 30 / 0.85) !important; }
+.tw-err {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: oklch(0.75 0.16 40);
+  margin: -2px 0 8px;
+  line-height: 1.4;
+}
+
+/* landing form inline error (real-calendar date validation) */
+.lf-err {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: oklch(0.75 0.16 40);
+  margin: 6px 0 0;
+}
+
+/* chart status banners: SYNTHETIC-ephemeris badge, polar-latitude
+   house-system fallback warning, DST ambiguous/nonexistent note,
+   unknown-birth-time reminder */
+.chart-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 20px 0;
+  max-width: 980px;
+  margin: 0 auto;
+}
+.chart-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+  border: 1px solid var(--line-2);
+  background: oklch(0.93 0.008 80 / 0.05);
+  color: var(--ink-2);
+}
+.chart-note-icon { flex: none; }
+.chart-note-warn {
+  border-color: oklch(0.75 0.15 80 / 0.5);
+  background: oklch(0.75 0.15 80 / 0.09);
+  color: oklch(0.88 0.09 80);
+}
+
+/* errors.jsx: render-time error boundary */
+.err-boundary {
+  padding: 24px;
+  margin: 16px auto;
+  max-width: 640px;
+  border: 1px solid oklch(0.65 0.18 30 / 0.4);
+  border-radius: 8px;
+  background: oklch(0.65 0.18 30 / 0.08);
+  text-align: center;
+}
+.err-boundary-title {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 20px;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.err-boundary-detail {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  word-break: break-word;
+  margin-bottom: 12px;
+}
+.err-boundary-reset {
+  background: var(--ink);
+  color: var(--bg);
+  border: 0;
+  padding: 8px 18px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* errors.jsx: useMemo-level chart-build failure toast/banner */
+.err-banner-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 20px 0;
+  max-width: 980px;
+  margin: 0 auto;
+}
+.err-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid oklch(0.65 0.18 30 / 0.5);
+  background: oklch(0.65 0.18 30 / 0.10);
+  color: oklch(0.86 0.10 30);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.err-banner-icon { flex: none; }
+.err-banner-text { flex: 1; }
+.err-banner-dismiss {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.75;
+  padding: 0 2px;
+}
+.err-banner-dismiss:hover { opacity: 1; }
 .landing-back { margin-right: 4px; }

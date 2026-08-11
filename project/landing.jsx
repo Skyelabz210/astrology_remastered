@@ -139,6 +139,7 @@ function Landing({ initial, onCast, mode, onBack }) {
   const [subjectName, setSubjectName] = React.useState(initial?.subjectName ?? (isPartner ? "" : "You"));
   const [timeUnknown, setTimeUnknown] = React.useState(initial?.timeUnknown ?? false);
   const [hoverKey, setHoverKey] = React.useState(null);
+  const [formError, setFormError] = React.useState(null);
 
   const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -155,6 +156,21 @@ function Landing({ initial, onCast, mode, onBack }) {
 
   const submit = (e) => {
     if (e) e.preventDefault();
+    setFormError(null);
+    // WP-19: real-calendar date validation (leap years etc.). The
+    // Month/Day/Year pickers above are already constrained to real dates
+    // by construction — `daysInMonth` is leap-year aware and the Day
+    // picker's option list never exceeds it — so this should be
+    // unreachable through ordinary interaction with this form; it is a
+    // defensive re-check (not dead code: `initial` can hand this
+    // component a stale day for a different month/year on first mount,
+    // before the daysInMonth effect below has a chance to correct it) that
+    // also gives requirement 3 an inline, user-visible message instead of
+    // trusting the picker silently.
+    if (typeof window !== "undefined" && window.Validate && !window.Validate.isValidCalendarDate({ year, month, day })) {
+      setFormError(`${months[month - 1]} ${day}, ${year} is not a real calendar date.`);
+      return;
+    }
     // Prime SpeechSynthesis inside the user-gesture so the first
     // narration isn't silently blocked by autoplay policy.
     try {
@@ -270,6 +286,7 @@ function Landing({ initial, onCast, mode, onBack }) {
                   onChange={setYear}
                 />
               </div>
+              {formError && <p className="lf-err" role="alert">{formError}</p>}
             </fieldset>
 
             <fieldset className="lf-set">
