@@ -23,16 +23,25 @@
 // arithmetic and remains a valid configuration. It is simply no longer the one
 // the register is built on.
 
+/** The classical six-lane Safe Basis (legacy shell lanes). BigInt primes. */
 export const B6 = [2n, 3n, 5n, 7n, 11n, 13n];
+/** The legacy gear-pair extender lanes, used as the legacy external anchor. */
 export const GEAR = [17n, 19n];
+/** The full eight-lane Safe Basis ("the Colony"): B6 ∪ GEAR. BigInt primes. */
 export const B8 = [2n, 3n, 5n, 7n, 11n, 13n, 17n, 19n];
 
+/** ∏ B6 = 30,030 — legacy shell modulus. */
 export const M6 = 30030n;            // ∏ B6        — legacy shell
+/** 17 · 19 = 323 — legacy external anchor modulus. */
 export const GEAR_PRODUCT = 323n;    // 17 · 19     — legacy anchor
+/** ∏ B8 = 9,699,690 — the Colony (full-basis modulus). */
 export const M8 = 9699690n;          // ∏ B8        — the Colony
+/** The ecliptic arcsecond ring: 1,296,000 arcsec = 360°. Every core longitude lives in [0, ARCSEC_CIRCLE). */
 export const ARCSEC_CIRCLE = 1296000n;
 
+/** M6 mod GEAR_PRODUCT = 314 — precomputed for the legacy K-Elimination recovery. */
 export const M6_MOD_GEAR = M6 % GEAR_PRODUCT;   // 314
+/** Modular inverse of M6_MOD_GEAR mod GEAR_PRODUCT: 314⁻¹ ≡ 287 (mod 323). */
 export const M6_INV_MOD_GEAR = 287n;            // 314⁻¹ mod 323
 
 // ── canonical parked split ─────────────────────────────────────────

@@ -65,15 +65,27 @@ import { gcd, isSafeBasis, shellModulus } from "./cram.js";
 
 // ── the star family ────────────────────────────────────────────────
 
-/** S_n = 6n(n−1) + 1. */
+/**
+ * S_n = 6n(n−1) + 1.
+ * @param {bigint} n - the star index.
+ * @returns {bigint} the nth star number.
+ */
 export function starNumber(n) { return 6n * n * (n - 1n) + 1n; }
 
-/** The adjacency pair carried by S_n: shell 6n(n−1), anchor S_n. */
+/**
+ * The adjacency pair carried by S_n: shell 6n(n−1), anchor S_n.
+ * @param {bigint} n - the star index.
+ * @returns {{n: string, shell: string, anchor: string, adjacent: true}}
+ */
 export function starPair(n) {
   const A = starNumber(n);
   return { n: n.toString(), shell: (A - 1n).toString(), anchor: A.toString(), adjacent: true };
 }
 
+/**
+ * @param {bigint} upTo - the highest star index to include.
+ * @returns {Object[]} `starPair(n)` for n = 1..upTo.
+ */
 export function starFamily(upTo) {
   const out = [];
   for (let n = 1n; n <= upTo; n++) out.push(starPair(n));
@@ -87,6 +99,10 @@ export function starFamily(upTo) {
  * — one subtraction — and reports whether the single anchor certifies it.
  *
  * Nothing here reads any other level. That is the no-accumulator property.
+ * @param {bigint} T - the current tower level's value.
+ * @param {bigint} M - the star shell modulus.
+ * @returns {{value: bigint, digit: bigint, k_mod_anchor: bigint, k_true: bigint,
+ *   identity_holds: boolean, certified: boolean, next: bigint}}
  */
 export function towerLevel(T, M) {
   const A = M + 1n;
@@ -109,6 +125,10 @@ export function towerLevel(T, M) {
  * The full tower, descending until the winding reaches zero.
  * Termination is guaranteed for every finite X because each level divides the
  * magnitude by M ≥ 2.
+ * @param {bigint} X - the value to descend.
+ * @param {bigint} M - the star shell modulus (M ≥ 2).
+ * @returns {Object[]} the tower levels, as `towerLevel` outputs, from X down to zero.
+ * @throws {Error} "tower shell must be at least 2" if M < 2.
  */
 export function windingTower(X, M) {
   if (M < 2n) throw new Error("tower shell must be at least 2");
@@ -128,6 +148,9 @@ export function windingTower(X, M) {
  * is exact and it is a useful check that the tower decomposes faithfully, but
  * it is NOT an operation of the tower. The tower's levels stay independent and
  * uncoupled; nothing in the descent forms this.
+ * @param {Object[]} levels - a tower from `windingTower`.
+ * @param {bigint} M - the star shell modulus.
+ * @returns {bigint} the reconstructed original value X.
  */
 export function towerRebuild(levels, M) {
   let acc = 0n;
@@ -139,6 +162,11 @@ export function towerRebuild(levels, M) {
  * Depth/precision report. `handover_depth` is the first level the single
  * adjacent anchor cannot certify — the exact point at which the tower must
  * hand off to a wider fixture via transduction.
+ * @param {bigint} X - the value to descend.
+ * @param {bigint} M - the star shell modulus.
+ * @returns {Object} `STAR_TOWER_V1` — depth, per-level certification counts,
+ *   `handover_depth` (first uncertified level, or null if all are certified),
+ *   and a boundary-projection self-check.
  */
 export function towerReport(X, M) {
   const levels = windingTower(X, M);
@@ -169,6 +197,9 @@ export function towerReport(X, M) {
  * level from its own value alone reproduces the tower's entry for that level.
  * A Garner cascade cannot pass this — its digit i is a function of digits
  * 0..i−1, so it has no such standalone form.
+ * @param {bigint} X - the value to descend.
+ * @param {bigint} M - the star shell modulus.
+ * @returns {boolean} true iff every level is reproducible from its own value alone.
  */
 export function levelsAreIndependent(X, M) {
   const levels = windingTower(X, M);
@@ -183,6 +214,9 @@ export function levelsAreIndependent(X, M) {
  * Garner's mixed-radix digits, for contrast. The accumulator `acc` threads
  * through every step — this is the positional emission A2 prohibits, and it is
  * the radix that DynCRT was carrying.
+ * @param {bigint} X - the value to decompose.
+ * @param {bigint[]} basis - the mixed-radix moduli, in digit order.
+ * @returns {{digits: bigint[], accumulator_threaded: true}}
  */
 export function garnerDigits(X, basis) {
   const digits = [];
@@ -210,12 +244,17 @@ function modInverseOrZero(a, m) {
 
 /** The recommissioned unit. S_1 = 1, terminal ring, indexed as lane 0. */
 export const UNIT_LANE = 1n;
+/** The unit lane's fixed index within a fixture's lane array. */
 export const UNIT_LANE_INDEX = 0n;
 
 /**
  * A CRT fixture: an ordered basis with the unit lane at index 0 and the
  * informative lanes one-indexed after it, so the shadow prime 11 stays on
  * lane 5 no matter what else is adjoined.
+ * @param {bigint[]} basis - the informative lanes (unit lane is prepended automatically).
+ * @returns {Object} `CRT_FIXTURE_V1` — `{kind, basis, lanes, M, anchor}` where
+ *   `lanes` is `[{index, modulus, role}, ...]`.
+ * @throws {Error} "fixture basis must be pairwise coprime" if `basis` is not a safe basis.
  */
 export function fixture(basis) {
   if (!isSafeBasis(basis)) throw new Error("fixture basis must be pairwise coprime");
@@ -232,21 +271,38 @@ export function fixture(basis) {
   };
 }
 
-/** The lane index of a modulus in a fixture, or null. */
+/**
+ * The lane index of a modulus in a fixture, or null.
+ * @param {Object} fx - a fixture from `fixture()`.
+ * @param {bigint} modulus - the lane modulus to look up.
+ * @returns {?bigint} the lane's index, or null if not present.
+ */
 export function laneOf(fx, modulus) {
   const l = fx.lanes.find((z) => z.modulus === modulus);
   return l ? l.index : null;
 }
 
-/** Adjoining the unit lane changes nothing — the identity transduction. */
+/**
+ * Adjoining the unit lane changes nothing — the identity transduction.
+ * @param {bigint[]} basis - the basis to test (before the unit lane is added).
+ * @returns {boolean}
+ */
 export function unitLaneIsIdentity(basis) {
   const a = shellModulus(basis);
   const b = shellModulus([UNIT_LANE, ...basis]);
   return a === b && basis.every((p) => gcd(UNIT_LANE, p) === 1n);
 }
 
-/** Z/1 has one element, so the unit lane carries zero bits. */
+/**
+ * Z/1 has one element, so the unit lane carries zero bits.
+ * @param {bigint} modulus - a lane modulus.
+ * @returns {bigint} the number of distinguishable states of that lane (== modulus).
+ */
 export function laneStates(modulus) { return modulus; }
+/**
+ * @param {bigint} modulus - a lane modulus.
+ * @returns {boolean} true iff the lane carries more than one state (modulus > 1).
+ */
 export function laneIsInformative(modulus) { return modulus > 1n; }
 
 /**
@@ -254,6 +310,11 @@ export function laneIsInformative(modulus) { return modulus > 1n; }
  * `origin` is the unit lane, always shared, guaranteeing a common zero;
  * `carriers` are the shared informative lanes, which is where the phase
  * actually lives. `strength` is the number of distinguishable phases.
+ * @param {Object} fxA - a fixture from `fixture()`.
+ * @param {Object} fxB - a fixture from `fixture()`.
+ * @returns {Object} `PHASE_LOCK_V1` — origin fields plus `carriers`
+ *   (shared informative lanes), `strength` (product of shared lane sizes),
+ *   and `locked`.
  */
 export function phaseLock(fxA, fxB) {
   const shared = fxA.basis.filter((p) => fxB.basis.some((q) => q === p));
@@ -275,6 +336,9 @@ export function phaseLock(fxA, fxB) {
  * Φ(x) ≡ x (mod ℓ) for all x. For Φ with integer coefficients this is decided
  * by one period, so the check below is exhaustive for that class — and that
  * assumption is stated rather than hidden.
+ * @param {function(bigint): bigint} phi - a value map with integer coefficients.
+ * @param {bigint} lane - the lane modulus to check the lock against.
+ * @returns {boolean} true iff Φ(x) ≡ x (mod lane) for every x in one period.
  */
 export function preservesPhase(phi, lane) {
   if (lane <= 1n) return true;            // the unit lane is fixed by everything
@@ -282,5 +346,10 @@ export function preservesPhase(phi, lane) {
   return true;
 }
 
-/** The Φ that shift a value while holding the lock: x ↦ x + k·ℓ. */
+/**
+ * The Φ that shift a value while holding the lock: x ↦ x + k·ℓ.
+ * @param {bigint} lane - the lane to preserve.
+ * @param {bigint} k - the shift multiple.
+ * @returns {function(bigint): bigint} the shift function.
+ */
 export function lockedShift(lane, k) { return (x) => x + k * lane; }

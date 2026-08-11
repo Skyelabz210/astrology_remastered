@@ -48,6 +48,11 @@ export const FRAMES = [
   { id: "heliocentric", label: "Heliocentric projection", offset_arcsec: null, status: "OPEN" },
 ];
 
+/**
+ * @param {string} id - a frame id (see `FRAMES`).
+ * @returns {Object} the matching `FRAMES` entry.
+ * @throws {Error} `"unknown frame: ${id}"` if not found.
+ */
 export function frame(id) {
   const f = FRAMES.find((v) => v.id === id);
   if (!f) throw new Error(`unknown frame: ${id}`);
@@ -58,12 +63,21 @@ export function frame(id) {
  * Rotate a ring position into a frame. A frame change subtracts the offset
  * modulo the ring — a bijection that preserves every difference, hence every
  * aspect. Only attribution (which sign, which nakshatra, which house) moves.
+ * BigInt arcsecond regime: x and offset are integer arcseconds in [0, RING).
+ * @param {bigint} x - a tropical ring position, in arcseconds.
+ * @param {bigint} offset - the frame's offset, in arcseconds.
+ * @returns {bigint} x rotated into the frame, in [0, RING).
  */
 export function toFrame(x, offset) {
   return mod(x - offset, RING);
 }
 
-/** Rotation is invertible on the ring; this is its exact inverse. */
+/**
+ * Rotation is invertible on the ring; this is its exact inverse.
+ * @param {bigint} x - a frame-relative ring position, in arcseconds.
+ * @param {bigint} offset - the frame's offset, in arcseconds.
+ * @returns {bigint} x rotated back to tropical, in [0, RING).
+ */
 export function fromFrame(x, offset) {
   return mod(x + offset, RING);
 }
@@ -71,6 +85,9 @@ export function fromFrame(x, offset) {
 /**
  * Separation between two ring positions, as the shorter arc in [0, RING/2].
  * Frame-independent by construction.
+ * @param {bigint} a - a ring position, in arcseconds.
+ * @param {bigint} b - a ring position, in arcseconds.
+ * @returns {bigint} the angular separation, in arcseconds, in [0, RING/2].
  */
 export function separation(a, b) {
   const d = mod(a - b, RING);
@@ -133,20 +150,35 @@ export const DIVISIONS = [
   { id: "mansion_arabic", n: 28n, label: "Arabic lunar mansions (manāzil)", traditions: ["medieval"] },
 ];
 
+/**
+ * @param {string} id - a division id (see `DIVISIONS`).
+ * @returns {Object} the matching `DIVISIONS` entry.
+ * @throws {Error} `"unknown division: ${id}"` if not found.
+ */
 export function division(id) {
   const d = DIVISIONS.find((v) => v.id === id);
   if (!d) throw new Error(`unknown division: ${id}`);
   return d;
 }
 
-/** Which cut of a division does x fall in? Exact; null when the cut does not close. */
+/**
+ * Which cut of a division does x fall in? Exact; null when the cut does not close.
+ * @param {bigint} x - a ring position, in arcseconds.
+ * @param {bigint} n - the division divisor.
+ * @returns {?bigint} the 0-indexed cut number, or null if n does not divide RING.
+ */
 export function divisionIndex(x, n) {
   const step = stepArcsec(n);
   if (step === null) return null;
   return mod(x, RING) / step;
 }
 
-/** Sign index 0–11 in a given frame. */
+/**
+ * Sign index 0–11 in a given frame.
+ * @param {bigint} x - a tropical ring position, in arcseconds.
+ * @param {bigint} offset - the frame's offset, in arcseconds.
+ * @returns {bigint} the 0-indexed sign (0 = Aries in the tropical frame).
+ */
 export function signIndex(x, offset) {
   return toFrame(x, offset) / ARCSEC_PER_SIGN;
 }
@@ -165,7 +197,11 @@ export const ASPECT_FAMILIES = [
   { id: "harmonic_13", short: "13th harmonic", label: "Thirteenth-harmonic family (360/13)", divisors: [13n], status: "CLASSICAL" },
 ];
 
-/** Exact aspect angles for a family, in arcseconds; non-closing divisors yield null. */
+/**
+ * Exact aspect angles for a family, in arcseconds; non-closing divisors yield null.
+ * @param {Object} fam - an `ASPECT_FAMILIES` entry.
+ * @returns {Object[]} one `{divisor, angle_arcsec, closes, defect_arcsec, off_ring_primes}` per divisor.
+ */
 export function familyAngles(fam) {
   return fam.divisors.map((n) => ({
     divisor: n.toString(),
@@ -208,19 +244,35 @@ export const HOUSE_SYSTEMS = [
   { id: "meridian", label: "Meridian / axial rotation", exact: false, status: "LEDGER" },
 ];
 
-/** Whole-sign house 1–12 of x given the ascendant, in a frame. Exact. */
+/**
+ * Whole-sign house 1–12 of x given the ascendant, in a frame. Exact.
+ * @param {bigint} x - a tropical ring position, in arcseconds.
+ * @param {bigint} asc - the ascendant, in tropical arcseconds.
+ * @param {bigint} offset - the frame's offset, in arcseconds.
+ * @returns {bigint} the house number, 1–12.
+ */
 export function wholeSignHouse(x, asc, offset) {
   const s = signIndex(x, offset);
   const a = signIndex(asc, offset);
   return mod(s - a, 12n) + 1n;
 }
 
-/** Equal house 1–12 measured from a cusp origin. Exact. */
+/**
+ * Equal house 1–12 measured from a cusp origin. Exact.
+ * @param {bigint} x - a ring position, in arcseconds.
+ * @param {bigint} origin - the house-1 cusp origin, in arcseconds.
+ * @returns {bigint} the house number, 1–12.
+ */
 export function equalHouse(x, origin) {
   return mod(x - origin, RING) / ARCSEC_PER_SIGN + 1n;
 }
 
-/** Vehlow: equal houses with the ascendant at the mid-point of house 1. */
+/**
+ * Vehlow: equal houses with the ascendant at the mid-point of house 1.
+ * @param {bigint} x - a ring position, in arcseconds.
+ * @param {bigint} asc - the ascendant, in arcseconds.
+ * @returns {bigint} the house number, 1–12.
+ */
 export function vehlowHouse(x, asc) {
   return equalHouse(x, mod(asc - ARCSEC_PER_SIGN / 2n, RING));
 }
@@ -234,6 +286,9 @@ export function vehlowHouse(x, asc) {
  * remainder (0, 1, or 2 arcseconds) is distributed to the earliest houses of
  * that quadrant, so every cusp stays on the arcsecond lattice and the twelve
  * houses partition the ring with no gap and no overlap.
+ * @param {bigint} asc - the ascendant, in arcseconds.
+ * @param {bigint} mc - the midheaven, in arcseconds.
+ * @returns {bigint[]} the twelve house cusps, in arcseconds, house 1 first.
  */
 export function porphyryCusps(asc, mc) {
   const ic = mod(mc + RING / 2n, RING);
@@ -271,6 +326,10 @@ export const VIMSHOTTARI_YEARS = [
   { lord: "Jupiter", years: 16n }, { lord: "Saturn", years: 19n }, { lord: "Mercury", years: 17n },
 ];
 
+/**
+ * @param {{lord: string, years: bigint}[]} table - a time-lord table (`FIRDARIA_YEARS` or `VIMSHOTTARI_YEARS`).
+ * @returns {bigint} the sum of every lord's years.
+ */
 export function totalYears(table) {
   return table.reduce((a, r) => a + r.years, 0n);
 }
@@ -379,6 +438,11 @@ export const VARIANTS = [
   },
 ];
 
+/**
+ * @param {string} id - a variant id (see `VARIANTS`).
+ * @returns {Object} the matching `VARIANTS` entry.
+ * @throws {Error} `"unknown variant: ${id}"` if not found.
+ */
 export function variant(id) {
   const v = VARIANTS.find((z) => z.id === id);
   if (!v) throw new Error(`unknown variant: ${id}`);
@@ -389,6 +453,11 @@ export function variant(id) {
  * Exact coverage report for one variant: its frame, every division it cuts with
  * closure verdict and defect, its house systems split exact/ledger-gated, and
  * its aspect families with per-divisor closure.
+ * @param {string} id - a variant id.
+ * @returns {Object} `HCRM_VARIANT_REPORT_V1` — frame, divisions (each with a
+ *   `divisionReport`), houses (split exact vs ledger-gated), and aspects
+ *   (each with `familyAngles`).
+ * @throws {Error} propagated from `variant(id)` if id is unknown.
  */
 export function variantReport(id) {
   const v = variant(id);
@@ -421,6 +490,7 @@ export function variantReport(id) {
   };
 }
 
+/** @returns {Object[]} `variantReport(id)` for every entry in `VARIANTS`. */
 export function allVariantReports() {
   return VARIANTS.map((v) => variantReport(v.id));
 }

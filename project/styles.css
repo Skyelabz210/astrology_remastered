@@ -596,6 +596,13 @@ body::before {
 }
 .zc-agent-text { font-style: normal; }
 .zc-fallback-line { font-size: 11.5px; }
+.zc-source-tag {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.03em;
+  color: var(--card-ink-dim);
+  font-style: normal;
+}
 .zc-agent-error { font-size: 10px; color: oklch(0.45 0.12 30); }
 
 .zc-back-math {

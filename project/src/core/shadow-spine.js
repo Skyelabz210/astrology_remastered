@@ -56,7 +56,10 @@ export const SPINE = SHADOW_SPINE.map((p) => ({
   ring_defect: mod(RING, p),
 }));
 
-/** The lanes that block exact closure — the closure axis, named as such. */
+/**
+ * The lanes that block exact closure — the closure axis, named as such.
+ * @type {{prime: bigint, id: string, role: string, shadow: boolean}[]}
+ */
 export const OFF_RING_LANES = [
   { prime: 7n, id: "H7", role: "bridge witness", shadow: true },
   { prime: 11n, id: "SH11", role: "shadow anchor", shadow: true },
@@ -65,7 +68,12 @@ export const OFF_RING_LANES = [
   { prime: 19n, id: "G19", role: "saturation extender", shadow: true },
 ];
 
-/** The 2×2 cross-classification of the Safe Basis. Every cell is occupied. */
+/**
+ * The 2×2 cross-classification of the Safe Basis. Every cell is occupied.
+ * @returns {{shadow_closing: string[], shadow_off_ring: string[],
+ *   nonshadow_closing: string[], nonshadow_off_ring: string[]}} each cell as
+ *   an array of stringified basis primes.
+ */
 export function crossClassify() {
   const cell = (sh, off) => B8.filter((p) =>
     isShadowPrime(p) === sh && (mod(RING, p) !== 0n) === off).map(String);
@@ -100,26 +108,45 @@ export const EVENT_CLASSES = [
 ];
 
 export const CLASS_IDS = EVENT_CLASSES.map((c) => c.id);
+/**
+ * @param {string} id - an event class id (see `CLASS_IDS`).
+ * @returns {Object} the matching `EVENT_CLASSES` entry.
+ * @throws {Error} `"unknown event class: ${id}"` if not found.
+ */
 export function eventClass(id) {
   const c = EVENT_CLASSES.find((z) => z.id === id);
   if (!c) throw new Error(`unknown event class: ${id}`);
   return c;
 }
+/**
+ * @param {string} id - an event class id.
+ * @returns {string} its axis ("shadow"|"boundary"|"saturation"|"none").
+ */
 export function axisOf(id) { return eventClass(id).axis; }
 
 const BODY_CLASSES = EVENT_CLASSES.filter((c) => c.scope !== "edge").map((c) => c.id);
 const EDGE_CLASSES = EVENT_CLASSES.filter((c) => c.scope !== "body").map((c) => c.id);
+/** @returns {string[]} every event-class id with body scope. */
 export function bodyClassVocabulary() { return BODY_CLASSES.slice(); }
+/** @returns {string[]} every event-class id with edge scope. */
 export function edgeClassVocabulary() { return EDGE_CLASSES.slice(); }
 
-/** The residue tray on the off-ring lanes. */
+/**
+ * The residue tray on the off-ring lanes.
+ * @param {bigint} x
+ * @returns {Object<string, string>} `{ mod_<p>: "<x mod p>", ... }` for each `OFF_RING_LANES` prime.
+ */
 export function laneResidues(x) {
   const out = {};
   for (const l of OFF_RING_LANES) out[`mod_${l.prime.toString()}`] = mod(x, l.prime).toString();
   return out;
 }
 
-/** The residue tray on the shadow spine — including lane 3, which the ring absorbs. */
+/**
+ * The residue tray on the shadow spine — including lane 3, which the ring absorbs.
+ * @param {bigint} x
+ * @returns {Object<string, string>} `{ mod_<p>: "<x mod p>", ... }` for each `SPINE` prime.
+ */
 export function shadowResidues(x) {
   const out = {};
   for (const s of SPINE) out[`mod_${s.prime.toString()}`] = mod(x, s.prime).toString();
@@ -129,6 +156,9 @@ export function shadowResidues(x) {
 /**
  * Body-level events. Order is significant and mirrored exactly by the census
  * classifier in test/shadow-spine.test.js.
+ * @param {bigint} x - the ring position (arcseconds) to classify.
+ * @param {?string} [label] - an optional body label attached to each event.
+ * @returns {Object[]} event records `{eventClass, axis, trigger, scope, body, prime, value, proofStatus}`.
  */
 export function bodyEvents(x, label) {
   const r7 = mod(x, 7n), r11 = mod(x, 11n), r13 = mod(x, 13n);
@@ -156,7 +186,13 @@ export function bodyEvents(x, label) {
   return ev;
 }
 
-/** Edge-level events — residue preservation across an aspect edge. */
+/**
+ * Edge-level events — residue preservation across an aspect edge.
+ * @param {bigint} x - first ring position.
+ * @param {bigint} y - second ring position.
+ * @param {?string} [label] - an optional edge label attached to each event.
+ * @returns {Object[]} event records `{eventClass, axis, trigger, scope, edge, prime, value, proofStatus}`.
+ */
 export function edgeEvents(x, y, label) {
   const ev = [];
   const push = (id, value) => {
@@ -182,6 +218,9 @@ export function edgeEvents(x, y, label) {
 /**
  * Why a division of the zodiac fails to close — the CLOSURE axis only.
  * Says nothing about shadow; use divisionShadow for that.
+ * @param {bigint} n - the division divisor.
+ * @returns {Object} axis:"closure", closes, defect_arcsec, off_ring_lanes,
+ *   off_ring_primes, alien_factor (a non-basis prime factor, if any).
  */
 export function divisionClosure(n) {
   const carried = OFF_RING_LANES.filter((l) => mod(n, l.prime) === 0n);
@@ -202,6 +241,8 @@ export function divisionClosure(n) {
  * The SHADOW axis for a division: which inert primes it carries, its q, δ, ω,
  * ρ and stability band. This is the classifier the framework actually defines,
  * and it is independent of whether the division closes.
+ * @param {bigint} n - the division divisor.
+ * @returns {Object} axis:"shadow", omega, q, delta, rho, band, band_label, anchored, escalated.
  */
 export function divisionShadow(n) {
   const q = largestShadowFactor(n);
@@ -221,7 +262,11 @@ export function divisionShadow(n) {
   };
 }
 
-/** Both axes at once, kept as separate objects so they cannot be merged. */
+/**
+ * Both axes at once, kept as separate objects so they cannot be merged.
+ * @param {bigint} n - the division divisor.
+ * @returns {{divisor: string, closure: Object, shadow: Object}}
+ */
 export function divisionProfile(n) {
   return { divisor: n.toString(), closure: divisionClosure(n), shadow: divisionShadow(n) };
 }
@@ -231,6 +276,7 @@ export function divisionProfile(n) {
 /**
  * Closed-form census of body events over the ring. The exhaustive sweep must
  * reproduce these exactly — arithmetic checking arithmetic, no magic numbers.
+ * @returns {Object<string, string>} event-class id → decimal-string count over the full ring.
  */
 export function censusClosedForm() {
   const countCongruent = (m, t) => (RING - 1n - mod(t, m)) / m + 1n;
@@ -254,6 +300,9 @@ export function censusClosedForm() {
  * The classical attribution of a ring position. Deliberately independent of
  * everything above: the spine functions never call this, and this never calls
  * them. That separation is what the non-interference certificate checks.
+ * @param {bigint} x - the ring position in arcseconds.
+ * @param {bigint} offset - a frame offset in arcseconds (e.g. an ayanamsa).
+ * @returns {{sign: string, decan: string, dwad: string, degree_in_sign: string, arcsec_in_degree: string}}
  */
 export function classicalAttribution(x, offset) {
   const t = mod(x - offset, RING);

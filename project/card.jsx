@@ -170,8 +170,8 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
 }
 
 function CardBack({ card, chart, settings, active }) {
-  const reading  = readingFor(card);   // synchronous fallback / skeleton
-  const math     = rigorousFor(card);
+  const reading  = readingFor(card, chart);   // synchronous fallback / skeleton
+  const math     = rigorousFor(card, chart);
   const agent    = useAgentReading(card, chart, active);
 
   return (
@@ -204,7 +204,10 @@ function CardBack({ card, chart, settings, active }) {
           )}
           {agent.text && <p className="zc-agent-text">{agent.text}</p>}
           {!agent.loading && !agent.text && !agent.error && reading.body.map((line, i) => (
-            <p key={i} className="zc-fallback-line">{line}</p>
+            <p key={i} className="zc-fallback-line">
+              {line.text}
+              <span className="zc-source-tag"> — {line.sourceTag}</span>
+            </p>
           ))}
         </div>
 

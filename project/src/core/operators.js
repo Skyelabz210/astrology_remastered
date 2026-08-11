@@ -46,18 +46,36 @@ import { B8 } from "./basis.js";
 
 // ── small exact helpers ────────────────────────────────────────────
 
+/**
+ * Euclidean greatest common divisor.
+ * @param {bigint} a
+ * @param {bigint} b
+ * @returns {bigint} gcd(|a|, |b|), non-negative.
+ */
 export function gcd(a, b) {
   let x = a < 0n ? -a : a, y = b < 0n ? -b : b;
   while (y) { const t = mod(x, y); x = y; y = t; }
   return x;
 }
 
+/**
+ * Euler's totient, by direct counting (n is expected small — lane orders here).
+ * @param {bigint} n
+ * @returns {bigint} |{k in [1,n] : gcd(k,n)=1}|.
+ */
 export function totient(n) {
   let c = 0n;
   for (let k = 1n; k <= n; k++) if (gcd(k, n) === 1n) c++;
   return c;
 }
 
+/**
+ * Modular exponentiation by repeated squaring.
+ * @param {bigint} base
+ * @param {bigint} exp - exponent, ≥ 0.
+ * @param {bigint} m - modulus.
+ * @returns {bigint} base^exp mod m.
+ */
 export function powMod(base, exp, m) {
   let r = 1n, b = mod(base, m), e = exp;
   while (e > 0n) {
@@ -70,7 +88,11 @@ export function powMod(base, exp, m) {
 
 // ── per-lane enumeration ───────────────────────────────────────────
 
-/** Exponents in [1, p−1] that permute the multiplicative group: gcd(e, p−1) = 1. */
+/**
+ * Exponents in [1, p−1] that permute the multiplicative group: gcd(e, p−1) = 1.
+ * @param {bigint} p - the lane prime.
+ * @returns {bigint[]} the admissible exponents.
+ */
 export function bijectiveExponents(p) {
   const out = [];
   const order = p - 1n;
@@ -78,14 +100,25 @@ export function bijectiveExponents(p) {
   return out;
 }
 
-/** The function table of x ↦ c·x^e mod p, as an array of length p. */
+/**
+ * The function table of x ↦ c·x^e mod p, as an array of length p.
+ * @param {bigint} p - the lane prime.
+ * @param {bigint} c - the multiplicative constant.
+ * @param {bigint} e - the exponent.
+ * @returns {bigint[]} table[x] = c·x^e mod p, for x = 0..p-1.
+ */
 export function laneTable(p, c, e) {
   const t = [];
   for (let x = 0n; x < p; x++) t.push(mod(c * powMod(x, e, p), p));
   return t;
 }
 
-/** Is this table a bijection on Z/p that fixes 0? */
+/**
+ * Is this table a bijection on Z/p that fixes 0?
+ * @param {bigint[]} table - a candidate lane function table.
+ * @param {bigint} p - the lane prime.
+ * @returns {boolean}
+ */
 export function isExactLaneOperator(table, p) {
   if (BigInt(table.length) !== p) return false;
   if (table[0] !== 0n) return false;
@@ -97,6 +130,8 @@ export function isExactLaneOperator(table, p) {
  * Every exact lane operator of the form c·x^e, enumerated as distinct function
  * tables. Deduplicated, so the returned count is the true number of distinct
  * maps rather than the number of (c, e) labels.
+ * @param {bigint} p - the lane prime.
+ * @returns {{c: string, e: string, table: bigint[]}[]} the distinct operators.
  */
 export function laneOperators(p) {
   const seen = new Map();
@@ -110,7 +145,11 @@ export function laneOperators(p) {
   return [...seen.values()];
 }
 
-/** Pure monomials only (c = 1): the maps x ↦ x^e. Count is φ(p−1). */
+/**
+ * Pure monomials only (c = 1): the maps x ↦ x^e. Count is φ(p−1).
+ * @param {bigint} p - the lane prime.
+ * @returns {{e: string, table: bigint[]}[]}
+ */
 export function laneMonomials(p) {
   return bijectiveExponents(p).map((e) => ({ e: e.toString(), table: laneTable(p, 1n, e) }));
 }
@@ -120,6 +159,9 @@ export function laneMonomials(p) {
 /**
  * Per-lane and global operator counts over a basis. Every number is derived by
  * enumeration or by the closed form it is checked against — none is asserted.
+ * @param {bigint[]} [basis=B8] - the lanes to profile.
+ * @returns {Object} `CRAM_OPERATOR_ATLAS_V1` — per-lane counts (monomials,
+ *   twisted, enumerated, units) and basis-wide totals.
  */
 export function atlas(basis = B8) {
   const lanes = basis.map((p) => {
@@ -147,7 +189,13 @@ export function atlas(basis = B8) {
   };
 }
 
-/** Read a lane table at a BigInt index without leaving BigInt arithmetic. */
+/**
+ * Read a lane table at a BigInt index without leaving BigInt arithmetic.
+ * @param {bigint[]} table - a lane function table.
+ * @param {bigint} v - the index to read (BigInt, converted internally to compare).
+ * @returns {bigint} table[v].
+ * @throws {Error} "index outside the lane" if v is not a valid index of `table`.
+ */
 export function at(table, v) {
   for (let j = 0; j < table.length; j++) if (BigInt(j) === v) return table[j];
   throw new Error("index outside the lane");
@@ -157,6 +205,8 @@ export function at(table, v) {
  * Composition closure check: the exact lane operators form a group under
  * composition (the holomorph of C_{p−1}). Verified by composing every pair and
  * confirming the result is already in the set.
+ * @param {bigint} p - the lane prime.
+ * @returns {boolean} true iff the operator set is closed under composition.
  */
 export function laneClosesUnderComposition(p) {
   const ops = laneOperators(p);
@@ -182,6 +232,9 @@ export function laneClosesUnderComposition(p) {
  *   root_multiplicity     number of square roots a generic square has mod M
  *   branch_hits/branch_of the exact fraction of Y for which a fixed per-lane
  *                         branch rule returns Y itself rather than another root
+ * @param {bigint[]} [basis=B8] - the lanes to profile.
+ * @returns {Object} `CRAM_SQRT_DIAGNOSTICS_V1` — per-lane square counts plus
+ *   basis-wide totality/single-valuedness verdicts. All numeric fields decimal strings.
  */
 export function sqrtDiagnostics(basis = B8) {
   const lanes = basis.map((p) => {
@@ -217,7 +270,11 @@ export function sqrtDiagnostics(basis = B8) {
   };
 }
 
-/** On a prime field x^p = x, so Frobenius is the identity map. Verified exhaustively. */
+/**
+ * On a prime field x^p = x, so Frobenius is the identity map. Verified exhaustively.
+ * @param {bigint} p - the lane prime.
+ * @returns {boolean}
+ */
 export function frobeniusIsIdentity(p) {
   for (let x = 0n; x < p; x++) if (powMod(x, p, p) !== x) return false;
   return true;
@@ -227,6 +284,8 @@ export function frobeniusIsIdentity(p) {
  * Keyspace size of "each operator is a secret permutation", in bits, floored.
  * Returned as an integer bit-count so the figure can be compared against a
  * security level without evaluating a logarithm.
+ * @param {bigint} count - the number of possibilities.
+ * @returns {bigint} ⌊log2(count)⌋.
  */
 export function keyspaceBitsFloor(count) {
   let bits = 0n, n = count;

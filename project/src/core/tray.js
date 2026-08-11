@@ -51,6 +51,9 @@ export const ORIGIN_LANE = UNIT_LANE;          // 1n
 /**
  * 100% saturation: the CRT map is a bijection onto ℤ/Mℤ with no slack. The
  * product of the lane sizes equals the span exactly.
+ * @param {bigint[]} basis - candidate lanes (unit lane, if present, is excluded from the product).
+ * @returns {{lanes: string[], states: bigint, span: bigint, bijective: boolean,
+ *   saturated: boolean, slack: bigint}}
  */
 export function saturationOf(basis) {
   const lanes = basis.filter((p) => p !== UNIT_LANE);
@@ -73,6 +76,9 @@ export function saturationOf(basis) {
 /**
  * The first tray. This is the one that must be unbroken and saturated; it is
  * what every downstream tray inherits from.
+ * @param {bigint[]} basis - the candidate first-tray basis.
+ * @returns {{kind: "FIRST_TRAY_V1", basis: string[], M: bigint, saturated: boolean,
+ *   slack: string, unbroken: boolean, carries_phase: boolean, admissible: boolean}}
  */
 export function firstTray(basis) {
   const sat = saturationOf(basis);
@@ -95,6 +101,10 @@ export function firstTray(basis) {
  * The origin is shared by every fixture (gcd(1, n) = 1 always) and carries zero
  * bits, so it fixes the zero but cannot relate two windings by itself. Lane 11
  * is what carries the phase.
+ * @param {bigint[]} first - the first tray's lane set.
+ * @param {bigint[]} second - the second tray's lane set.
+ * @returns {{origin_shared: true, origin_bits: bigint, phase_lane: bigint,
+ *   phase_shared: boolean, locked: boolean, strength: bigint}}
  */
 export function phaseLockBetween(first, second) {
   const hasPhase = first.some((p) => p === PHASE_LANE) && second.some((p) => p === PHASE_LANE);
@@ -108,7 +118,12 @@ export function phaseLockBetween(first, second) {
   };
 }
 
-/** Φ holds the lock exactly when it fixes the phase lane: Φ(x) ≡ x (mod 11). */
+/**
+ * Φ holds the lock exactly when it fixes the phase lane: Φ(x) ≡ x (mod 11).
+ * @param {function(bigint): bigint} phi - the candidate value map.
+ * @param {bigint[]} sample - sample points to test Φ against.
+ * @returns {boolean} true iff Φ fixes lane 11 on every sample point.
+ */
 export function preservesLock(phi, sample) {
   return sample.every((x) => mod(phi(x), PHASE_LANE) === mod(x, PHASE_LANE));
 }
@@ -119,6 +134,10 @@ export function preservesLock(phi, sample) {
  * What the second tray inherits. It does NOT have to be a safe basis, be
  * pairwise coprime, or be prime — those properties are held by the first tray
  * and reach the second through the lock.
+ * @param {bigint[]} firstBasis - the unbroken, saturated source basis.
+ * @param {bigint[]} secondModuli - the (possibly arbitrary-composite) target moduli.
+ * @returns {Object} `TRAY_INHERITANCE_V1` — source_unbroken/source_saturated,
+ *   the `lock`, target's own (non-gating) properties, and `admissible`.
  */
 export function inheritance(firstBasis, secondModuli) {
   const first = firstTray(firstBasis);
@@ -153,6 +172,10 @@ function isPrime(n) {
  *
  * The second tray is not self-standing: it carries the inherited identity, and
  * that is what makes it a tray rather than a bag of readings.
+ * @param {bigint} x - the value whose identity is held by the first tray.
+ * @param {bigint[]} moduli - the second tray's (arbitrary) moduli.
+ * @param {bigint[]} firstBasis - the source basis.
+ * @returns {?Object} `DERIVED_TRAY_V1`, or null if `inheritance(...)` is not admissible.
  */
 export function deriveTray(x, moduli, firstBasis) {
   const inh = inheritance(firstBasis, moduli);
@@ -170,7 +193,12 @@ export function deriveTray(x, moduli, firstBasis) {
   };
 }
 
-/** Redundant lanes agree, because they are readings of one value, not estimates. */
+/**
+ * Redundant lanes agree, because they are readings of one value, not estimates.
+ * @param {bigint} x - the value.
+ * @param {bigint[]} moduli - the (possibly non-coprime) lane moduli.
+ * @returns {boolean} true iff every pair of lanes agrees on their overlap.
+ */
 export function lanesConsistent(x, moduli) {
   return moduli.every((q, i) => moduli.every((s, j) => {
     if (i >= j) return true;
@@ -185,6 +213,12 @@ export function lanesConsistent(x, moduli) {
  * The arrow of time is instantiated by the pair: a saturated unbroken first
  * tray, and the 36/37 star lift giving the tower arbitrary depth. Monotone
  * winding on unbounded depth is what makes the natal state unreachable.
+ * @param {bigint[]} basis - the first-tray basis.
+ * @param {bigint} [shell=36n] - the star shell (default the 36/37 lift).
+ * @param {bigint} [anchor=37n] - the star anchor.
+ * @returns {{kind: "ARROW_V1", saturated: boolean, star_shell: bigint,
+ *   star_anchor: bigint, adjacent: boolean, star_number: boolean,
+ *   depth_unbounded: true, instantiated: boolean}}
  */
 export function arrowOfTime(basis, shell = 36n, anchor = 37n) {
   const sat = saturationOf(basis);
