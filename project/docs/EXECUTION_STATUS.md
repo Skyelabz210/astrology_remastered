@@ -1,8 +1,10 @@
 # Execution Status — Audit Remediation
 
-Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Update this file as
-packages land. Last updated: 2026-08-11 (Batch I complete, verified, committed —
-28 of 29 work packages done; only WP-28 remains).
+Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Last updated
+2026-08-11: **all 29 work packages complete, verified, and merged to `main`.**
+The plan is done. This file is kept as the historical record of what was
+built and how — see "Flagged for owner decision" below for the one item this
+plan deliberately left for the repo owner rather than resolving unilaterally.
 
 ## Done (verified, committed)
 
@@ -334,12 +336,17 @@ doing this.
   than re-querying Horizons; the committed `fetch-horizons.mjs` script it writes
   remains the regeneration path.
 
-## Remaining (per plan order; briefs in EXECUTION_PLAN.md)
+## Remaining
 
-- [ ] **WP-28** README rewrite + CONTRIBUTING — needs WP-27 (done, unblocked).
-      **The last work package in the plan.**
+None. **WP-28** (README rewrite + CONTRIBUTING, the final package) landed
+last: `README.md` gained a Quickstart, a real Architecture diagram of the
+four layers this plan built, an Accuracy statement with the actual observed
+numbers and the CI job enforcing them, a documentation map, and an honest
+pointer to the one flagged-not-resolved item below; `CONTRIBUTING.md` is new,
+covering the test-first workflow, Mandate A1 and the `CORE_MANIFEST`
+mechanism, and the pre-commit checklist.
 
-## Standing conventions for whoever resumes
+## Standing conventions for whoever resumes (or extends this plan)
 
 1. `cd project && npm test` must stay green; count only grows (baseline now 4404).
 2. Mandate A1: no float constructs under `src/core/` — the audit + self-test enforce.
