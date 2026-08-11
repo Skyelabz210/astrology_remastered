@@ -1,7 +1,7 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Update this file as
-packages land. Last updated: 2026-08-11 (Batch G complete, verified, committed).
+packages land. Last updated: 2026-08-11 (Batch H complete, verified, committed).
 
 ## Done (verified, committed)
 
@@ -190,12 +190,51 @@ packages land. Last updated: 2026-08-11 (Batch G complete, verified, committed).
       against the full combined tree, rendered correctly in a real browser
       — proof all three packages compose.
 
-**Assertion count: 493/493 → 4186/4186** (+13 timescale, +169 producer, +794
+- [x] **WP-24** Performance benchmarks — `project/bench/bench.mjs`: full
+      natal chart, single-body longitude, and a 14-body aspect scan, each
+      with warm-up + multiple iterations (min/median/mean/max). `--assert`
+      gates CI at 3× the target for variance headroom. **Observed:** every
+      threshold passes by 2+ orders of magnitude (full chart ~1.3ms vs
+      250ms target; single-body ~0.04ms vs 5ms; aspect scan ~0.01ms vs
+      10ms). Ring-sweep wall time (~272ms) reported informationally.
+- [x] **WP-22** Port `tests.jsx` to CLI — all ~20 browser-only suites
+      (155 assertions) ported faithfully to `project/test/present/` across
+      4 files, split by actual source module (`astro-core.js`, `astro.jsx`
+      itself via `node:vm`, `readings.jsx`, `time.jsx` — not all of
+      `tests.jsx` tested `astro-core.js` alone). Nothing dropped:
+      89+18+31+17 = 155 matches the original total exactly.
+      **Bug fix of record:** `test/run.js`'s suite discovery was not
+      actually recursive (`readdirSync(HERE)` without `{recursive: true}`)
+      — verified empirically with a probe file before fixing; without this,
+      the new `test/present/` subdirectory would have been silently
+      invisible to `npm test`.
+- [x] **WP-20** Accessibility & privacy — real WCAG AA contrast math
+      (OKLCH→sRGB→luminance, `project/src/present/contrast.js`) found and
+      fixed two failing pairs in `styles.css` (`--ink-dim` was 4.15:1/
+      4.00:1 against its two backgrounds, needs 4.5:1; raised to
+      5.10:1/4.92:1), cross-checked against the live CSS token by a test so
+      the two can't drift apart again. Keyboard-accessibility gap fixed:
+      `card.jsx`'s whole-card flip control was mouse-only (`<div onClick>`,
+      no keyboard path at all) — now a real focusable, Enter/Space-operable
+      control. `project/a11y-table.jsx` gives screen readers a real
+      `<table>` alternative to the visual chart.
+      **Bug caught during integration verification, not by any automated
+      gate:** a JSX comment placed directly inside `return (...)` in
+      `hcrm-view.jsx` is invalid syntax and silently broke Babel parsing of
+      the whole file — eslint didn't catch it (JSX parse happens in a
+      different tool); only rebuilding WP-25's standalone bundle against
+      the combined tree surfaced it. Fixed and reverified with a live
+      Chromium render.
+      **Privacy finding — flagged for owner decision, not silently fixed
+      or hidden (see "Flagged for owner decision" below).**
+
+**Assertion count: 493/493 → 4385/4385** (+13 timescale, +169 producer, +794
 houses total, +1727 fixtures, +67 astro-ephemeris, +212 accuracy, +258
-retrograde, +277 house-cusp-ledger, +24 tzresolve, +49 validate;
-WP-03/05/06/15/04/25/21 were doc/tooling/CI/refactor packages, no new
-assertions). README banner is machine-checked by `scripts/check-claims.mjs`;
-`npm run lint` is clean. **Process notes:**
+retrograde, +277 house-cusp-ledger, +24 tzresolve, +49 validate, +155
+tests.jsx-port, +44 a11y/contrast; WP-03/05/06/15/04/25/21/24 were
+doc/tooling/CI/refactor/bench packages, no new assertions). README banner is
+machine-checked by `scripts/check-claims.mjs`; `npm run lint` is clean.
+**Process notes:**
 (1) WP-07's PR (#4) shipped with a stale README banner because
 `check-claims.mjs --fix` wasn't re-run after adding tests — CI caught it
 before merge; the `claims` CI job itself was also missing `npm ci` and broke
@@ -218,6 +257,28 @@ tree caught nothing broken here, but it's the only check that would have.
 Every package has run `--fix` + verify as a mandatory last step since; keep
 doing this.
 
+## Flagged for owner decision
+
+- **`agent.jsx`'s LLM interpretation feature is on by default and sends raw
+  birth data.** `app.jsx`'s `DEFAULT_SETTINGS.agentOn = true`; the instant a
+  chart resolves, `useAgentChartReading` calls `window.claude.complete()`
+  with a prompt (`buildChartPrompt`, `agent.jsx`) that embeds
+  `chart.birth.dateISO`, `chart.birth.lat`, `chart.birth.lng` **verbatim**.
+  The only in-repo opt-out (`SubstrateTweaks`'s "Agent interpreter" toggle)
+  lives inside `tweaks-panel.jsx`, which only opens on an
+  `__activate_edit_mode` `postMessage` from a *host* iframe — in a
+  standalone deployment (`npx serve project`, no host frame) there is **no
+  reachable UI control** to turn this off. WP-20 (Batch H) verified this by
+  reading the code directly (not just trusting a prior report) and chose to
+  disclose it honestly in the landing-page privacy note rather than
+  silently changing the default or bolting on a new opt-out mechanism —
+  both are product decisions outside a single work package's scope. If this
+  matters to you: options are (a) flip the default to `agentOn: false`,
+  (b) add a standalone-reachable toggle (e.g. a visible settings icon, not
+  only the iframe-host protocol), or (c) accept the current behavior with
+  the disclosure as sufficient. Not resolved by any later package unless
+  explicitly requested.
+
 ## Prefetched assets (do not re-fetch)
 
 - **`project/test/fixtures/horizons-prefetch.json`** — parsed JPL Horizons (DE441)
@@ -231,17 +292,17 @@ doing this.
 
 ## Remaining (per plan order; briefs in EXECUTION_PLAN.md)
 
-- [ ] **WP-20** Accessibility & privacy — needs WP-19 (done, unblocked)
-- [ ] **WP-22** Port `tests.jsx` suites to CLI — needs WP-21 (done, unblocked)
-- [ ] **WP-24** Performance benchmarks — needs WP-08 (done), WP-21 (done, unblocked)
-- [ ] **WP-26** CI final assembly — needs WP-10 (done), WP-13 (done), WP-22, WP-24
-- [ ] **WP-27** Inputs/outputs documentation + JSDoc — needs WP-08 (done), WP-13 (done, unblocked)
+- [ ] **WP-26** CI final assembly — needs WP-10 (done), WP-13 (done), WP-22
+      (done), WP-24 (done, unblocked)
+- [ ] **WP-27** Inputs/outputs documentation + JSDoc — needs WP-08 (done),
+      WP-13 (done, unblocked)
 - [ ] **WP-28** README rewrite + CONTRIBUTING — needs WP-27
-- [ ] **WP-29** Interpretation engine improvements — needs WP-18 (done), WP-21 (done, unblocked)
+- [ ] **WP-29** Interpretation engine improvements — needs WP-18 (done),
+      WP-21 (done, unblocked)
 
 ## Standing conventions for whoever resumes
 
-1. `cd project && npm test` must stay green; count only grows (baseline now 4186).
+1. `cd project && npm test` must stay green; count only grows (baseline now 4385).
 2. Mandate A1: no float constructs under `src/core/` — the audit + self-test enforce.
 3. New test suites: drop `test/<name>.test.js` exporting `run()`; no runner edit.
 4. New core modules: add to `CORE_MANIFEST` in `test/no-float-audit.js` (the
