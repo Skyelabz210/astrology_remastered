@@ -10,6 +10,18 @@
 //   DEFINED    — a constant or convention adopted here, not derived here
 //   PROVEN     — certified by exhaustive exact test in test/
 //   OPEN       — requires a certified ledger this core will not synthesise
+//   LEDGER     — fulfilled via the ledger admission path (not a core float
+//                implementation): a float solver lives in
+//                project/tools/ephemeris/houses.js (outside src/core/, so
+//                Mandate A1 does not apply to it), and its output enters
+//                this core only as a schema-conformant, admitForCore()-
+//                checked ledger entry — see project/src/ledger/
+//                import-ledger.js and project/src/ledger/
+//                ephemeris-ledger-schema.json. This core still never
+//                computes house-circle trigonometry itself; LEDGER records
+//                that the number now has a real, checkable provenance
+//                chain instead of the bare "requires a ledger" placeholder
+//                that OPEN was still communicating. (WP-12)
 //
 // BigInt only. No floats, no Date, no ephemeris.
 
@@ -175,14 +187,25 @@ export const HOUSE_SYSTEMS = [
   { id: "equal_mc", label: "Equal from Midheaven", exact: true, status: "PROVEN" },
   { id: "vehlow", label: "Vehlow equal (ASC at cusp mid-point)", exact: true, status: "PROVEN" },
   { id: "porphyry", label: "Porphyry (quadrant trisection)", exact: true, status: "PROVEN" },
-  { id: "placidus", label: "Placidus", exact: false, status: "OPEN" },
-  { id: "koch", label: "Koch (birthplace)", exact: false, status: "OPEN" },
-  { id: "regiomontanus", label: "Regiomontanus", exact: false, status: "OPEN" },
-  { id: "campanus", label: "Campanus", exact: false, status: "OPEN" },
-  { id: "alcabitius", label: "Alcabitius", exact: false, status: "OPEN" },
-  { id: "topocentric", label: "Topocentric (Polich–Page)", exact: false, status: "OPEN" },
-  { id: "morinus", label: "Morinus", exact: false, status: "OPEN" },
-  { id: "meridian", label: "Meridian / axial rotation", exact: false, status: "OPEN" },
+  // The eight quadrant systems below are all status: "LEDGER" (WP-12,
+  // superseding the earlier "OPEN" placeholder — see the status-vocabulary
+  // comment above). Each has a real float solver in
+  // project/tools/ephemeris/houses.js (Koch/Regiomontanus/Campanus/
+  // Alcabitius/Topocentric/Morinus/Meridian added there in WP-12; Placidus
+  // in WP-11), verified there against genuine Swiss Ephemeris reference
+  // output. This registry still refuses to compute any of them directly —
+  // "exact: false" stays accurate, and the only way a value for one of
+  // these systems reaches this core is by round-tripping through the
+  // ledger contract (see project/src/ledger/import-ledger.js's
+  // admitForCore(), which rejects anything not schema-conformant).
+  { id: "placidus", label: "Placidus", exact: false, status: "LEDGER" },
+  { id: "koch", label: "Koch (birthplace)", exact: false, status: "LEDGER" },
+  { id: "regiomontanus", label: "Regiomontanus", exact: false, status: "LEDGER" },
+  { id: "campanus", label: "Campanus", exact: false, status: "LEDGER" },
+  { id: "alcabitius", label: "Alcabitius", exact: false, status: "LEDGER" },
+  { id: "topocentric", label: "Topocentric (Polich–Page)", exact: false, status: "LEDGER" },
+  { id: "morinus", label: "Morinus", exact: false, status: "LEDGER" },
+  { id: "meridian", label: "Meridian / axial rotation", exact: false, status: "LEDGER" },
 ];
 
 /** Whole-sign house 1–12 of x given the ascendant, in a frame. Exact. */
