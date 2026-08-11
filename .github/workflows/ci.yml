@@ -41,77 +41,138 @@ jobs:
       - run: node scripts/check-claims.mjs
 
   # ---------------------------------------------------------------------
-  # Placeholder jobs — to be filled in by WP-26 (CI final assembly) once
-  # the corresponding suites/scripts exist. Left as comments (not active
-  # YAML) so this workflow stays valid without them.
+  # WP-26: CI final assembly. lint / accuracy / schema-validate are
+  # BLOCKING (a failure here fails the workflow, same as core-tests/
+  # claims). bench is NON-BLOCKING (continue-on-error) — it is a timing
+  # report, not a correctness gate, and CI runners are noisy/shared
+  # hardware.
+  # ---------------------------------------------------------------------
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: project/package-lock.json
+      - run: npm ci
+        working-directory: project
+      # package.json's "lint" script itself `cd`s to the repo root (see
+      # eslint.config.mjs's header on why) — run from project/ same as the
+      # claims job runs check-claims.mjs from root, both invoking a script
+      # that manages its own working directory internally.
+      - run: npm run lint
+        working-directory: project
+
+  accuracy:
+    name: accuracy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: project
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: project/package-lock.json
+      - run: npm ci
+      - run: npm run test:accuracy
+
+  # ui-logic: deliberately NOT a separate job — see rationale below rather
+  # than a silent omission.
   #
-  # accuracy:
-  #   name: accuracy
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       working-directory: project
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 22
-  #         cache: npm
-  #         cache-dependency-path: project/package-lock.json
-  #     - run: npm ci
-  #     - run: npm run test:accuracy
+  # WP-22 ported every browser-only UI-logic suite (tests.jsx, ~155
+  # assertions across astro-core/astro.jsx/readings.jsx/time.jsx coverage)
+  # into project/test/present/*.test.js. project/test/run.js (see its own
+  # header) DISCOVERS every *.test.js file under project/test/ recursively
+  # — including test/present/** — and runs it as part of the plain `npm
+  # test` invocation core-tests already performs. There is no separate
+  # "--ui-logic" flag or code path (confirmed against test/run.js: the only
+  # CLI switch it recognizes is --quick, which just skips the exhaustive
+  # ring sweep and still runs test/present/**).
   #
-  # ui-logic:
-  #   name: ui-logic
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       working-directory: project
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 22
-  #         cache: npm
-  #         cache-dependency-path: project/package-lock.json
-  #     - run: npm ci
-  #     - run: npm test -- --ui-logic  # exact invocation TBD by WP-22/26
+  # A dedicated ui-logic job would therefore either (a) re-run `npm test`
+  # a second time — pure duplicate CI cost/time for zero extra coverage,
+  # since core-tests already fails red the instant any test/present/**
+  # assertion fails, or (b) require inventing a new filtering mechanism in
+  # test/run.js for CI-visibility purposes only, which is scope core-tests
+  # doesn't need. Given that, ui-logic coverage is reported as part of
+  # core-tests's normal output (each discovered suite, including the four
+  # present/*.test.js files, gets its own pass/fail line — see the
+  # `discovered N suites: ...` log line and per-suite `ok/FAIL` rows core-
+  # tests already prints), so failures there are exactly as visible as any
+  # other suite's failure, no additional job needed.
+
+  schema-validate:
+    name: schema-validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: project
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: project/package-lock.json
+      - run: npm ci
+      - run: node tools/validate-ledgers.mjs
+
+  bench:
+    name: bench (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: project
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: project/package-lock.json
+      - run: npm ci
+      - run: npm run bench -- --assert --json bench/bench-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-results
+          path: project/bench/bench-results.json
+          if-no-files-found: warn
+
+  # swiss-crosscheck: deliberately SKIPPED, not just left unfilled.
   #
-  # bench:
-  #   name: bench (non-blocking)
-  #   runs-on: ubuntu-latest
-  #   continue-on-error: true
-  #   defaults:
-  #     run:
-  #       working-directory: project
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 22
-  #         cache: npm
-  #         cache-dependency-path: project/package-lock.json
-  #     - run: npm ci
-  #     - run: npm run bench -- --assert
-  #     # - uses: actions/upload-artifact@v4
-  #     #   with:
-  #     #     name: bench-results
-  #     #     path: project/bench/*.json
+  # The plan (WP-11/WP-12) keeps Swiss Ephemeris (AGPL) out of the
+  # dependency tree on purpose — pyswisseph was installed and used only
+  # inside a prior interactive session (`pip install pyswisseph`, never
+  # committed to package.json or any lockfile) to generate a one-time
+  # cross-check: every house system, including Placidus, was compared
+  # against genuine Swiss Ephemeris output at 5 diverse charts (540
+  # comparisons, worst residual ~12.5", see EXECUTION_STATUS.md's WP-12
+  # entry). The *results* of that session are what's checked in — as
+  # static reference data inside project/test/fixtures/ and reference
+  # comparisons in project/test/accuracy.test.js (search that file for
+  # "swisseph") — not a live dependency. accuracy.test.js's 489 assertions
+  # already exercise those genuine-swisseph-derived numbers on every CI
+  # run, blocking, with no network access or pip install required.
   #
-  # schema-validate:
-  #   name: schema-validate
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       working-directory: project
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 22
-  #         cache: npm
-  #         cache-dependency-path: project/package-lock.json
-  #     - run: npm ci
-  #     - run: node tools/validate-ledgers.mjs  # runs importLedger over every
-  #                                              # *.ledger.json + JSON-parses
-  #                                              # the schema; script TBD by WP-26
+  # A live "pip install pyswisseph && spot-check" job would add: a Python
+  # toolchain to an otherwise pure-Node CI pipeline, a build of a C
+  # extension (pyswisseph ships no manylinux wheel for every runner/Python
+  # combo, so this can fail on toolchain grounds alone), a dependency on
+  # PyPI network access, and — per the plan's own AGPL-avoidance stance —
+  # a job whose only job is to reintroduce, transiently, the exact
+  # dependency the architecture deliberately keeps out. That's a lot of
+  # fragile machinery for a check that's already captured, deterministically
+  # and reproducibly, in accuracy.test.js's committed fixture comparisons.
+  # Per the WP-26 brief this job is explicitly optional/low-priority; given
+  # the above it is not judged worth the complexity and is left unimplemented
+  # rather than added as a job that would mostly just demonstrate pip
+  # flakiness in CI.

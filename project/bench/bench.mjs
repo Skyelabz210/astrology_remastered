@@ -18,10 +18,18 @@
 // Without --assert (the default), just print the table and exit 0
 // regardless of timings — informational mode.
 //
+// `--json <path>`: also write the benchmark rows + sweep summary as JSON to
+// <path> (WP-26: consumed by the CI `bench` job's actions/upload-artifact
+// step, so timings survive past the job log). Purely additive — printed
+// table/exit-code behavior is unchanged whether or not this flag is passed.
+//
 // Usage:
-//   node bench/bench.mjs             informational
-//   node bench/bench.mjs --assert    CI gate (exit 1 on a >3x-threshold miss)
+//   node bench/bench.mjs                   informational
+//   node bench/bench.mjs --assert          CI gate (exit 1 on a >3x-threshold miss)
+//   node bench/bench.mjs --json out.json   also write results as JSON
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { produceLedgerEntries, produceHouseLedgerEntries, DEFAULT_BODIES } from "../tools/ephemeris/produce-ledger.mjs";
 import { nearestAspect, mod360 } from "../src/present/astro-core.js";
 import { runSweep } from "../test/full-sweep.test.js";
@@ -128,6 +136,13 @@ function benchAspectScan() {
 
 async function main() {
   const assertMode = process.argv.includes("--assert");
+  const jsonFlagIndex = process.argv.indexOf("--json");
+  const jsonOutPath = jsonFlagIndex !== -1 ? process.argv[jsonFlagIndex + 1] : null;
+  if (jsonFlagIndex !== -1 && !jsonOutPath) {
+    console.error("--json requires a <path> argument");
+    process.exitCode = 1;
+    return;
+  }
 
   const rows = [];
 
@@ -206,6 +221,36 @@ async function main() {
   }
   console.log("");
   console.log(`Ring sweep: checked=${sweep.result.checked} mismatches=${sweep.result.mismatches} maxK=${sweep.result.maxK} ok=${sweep.result.ok}`);
+
+  if (jsonOutPath) {
+    const payload = {
+      instant: TIME,
+      lat: LAT,
+      lng: LNG,
+      generatedAt: new Date().toISOString(),
+      benchmarks: rows.map((r) => ({
+        name: r.name,
+        iterations: r.iterations,
+        minMs: r.min,
+        medianMs: r.median,
+        meanMs: r.mean,
+        maxMs: r.max,
+        thresholdMs: r.thresholdMs,
+        assertMs: r.assertMs,
+        status: r.median <= r.thresholdMs ? "OK" : (r.median <= r.assertMs ? "SLOW_WITHIN_3X" : "FAIL"),
+      })),
+      ringSweep: {
+        elapsedMs: sweep.elapsed,
+        checked: sweep.result.checked,
+        mismatches: sweep.result.mismatches,
+        maxK: sweep.result.maxK,
+        ok: sweep.result.ok,
+      },
+    };
+    mkdirSync(dirname(jsonOutPath), { recursive: true });
+    writeFileSync(jsonOutPath, JSON.stringify(payload, null, 2) + "\n");
+    console.log(`Wrote JSON results to ${jsonOutPath}`);
+  }
 
   if (!sweep.result.ok) {
     // The sweep is a correctness certificate, not a perf number — a
