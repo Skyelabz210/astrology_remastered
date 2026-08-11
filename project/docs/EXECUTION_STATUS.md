@@ -1,7 +1,7 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Update this file as
-packages land. Last updated: 2026-08-11 (Batch B complete, verified, committed).
+packages land. Last updated: 2026-08-11 (Batch C complete, verified, committed).
 
 ## Done (verified, committed)
 
@@ -44,10 +44,27 @@ packages land. Last updated: 2026-08-11 (Batch B complete, verified, committed).
       **Bug fix of record:** `cram-int.js` `cramStarIndex` Newton isqrt was seeded
       at N instead of the radicand d — returned null for genuine star numbers
       (13, 37, 73). Fixed; pinned by regression test.
+- [x] **WP-04** Initial CI — `.github/workflows/ci.yml`: `core-tests` (Node 20/22
+      matrix, `npm ci && npm test`) and `claims` (`node scripts/check-claims.mjs`)
+      jobs; inert commented placeholders for `accuracy`/`ui-logic`/`bench`/
+      `schema-validate` awaiting WP-26.
+- [x] **WP-07** Astronomy timescale module — `project/tools/ephemeris/timescale.js`
+      (outside `src/core/`, floats legal): `julianDayUTC`, `deltaTSeconds`
+      (Espenak-Meeus), `ttFromUtc`, `gmstDeg` (full IAU 1982 polynomial, not
+      linear-only), `gastDeg` (2-term nutation reduction, documented
+      ~0.3–0.5″ accuracy — **not** sub-mas, upgrade before any sub-arcsecond
+      consumer), `meanObliquityDeg` (IAU 2006/Hilton 2006/SOFA `iauObl06`).
+      **Corrections of record:** the J2000 obliquity constant is
+      23.439279444° (IAU2006) — the plan's original test target
+      (23.4392911°) was the pre-2006 Lieske-1977 value, off by 0.042″, now
+      fixed at the source; the 2020 ΔT anchor tolerance was widened to ±2.5s
+      because the Espenak-Meeus 2005–2050 predictive fit itself overshoots
+      IERS-observed ΔT by ~2.2s at 2020 (a property of the published
+      formula, cited in both the module and its test).
 
-**Assertion count: 493/493 → 596/596** (Batches A+B add tests, no new assertions in
-B — WP-03/05/06/15 were doc/tooling/refactor packages). README banner is now
-machine-checked by `scripts/check-claims.mjs`; `npm run lint` is clean.
+**Assertion count: 493/493 → 609/609** (+13 from WP-07's timescale suite;
+WP-03/05/06/15/04 were doc/tooling/CI packages, no new assertions). README
+banner is machine-checked by `scripts/check-claims.mjs`; `npm run lint` is clean.
 
 ## Prefetched assets (do not re-fetch)
 
@@ -62,12 +79,10 @@ machine-checked by `scripts/check-claims.mjs`; `npm run lint` is clean.
 
 ## Remaining (per plan order; briefs in EXECUTION_PLAN.md)
 
-- [ ] **WP-04** GitHub Actions CI (initial) — needs WP-03 (done, unblocked)
-- [ ] **WP-07** Timescale module (ΔT, GMST/GAST, IAU-2006 obliquity) — needs WP-06 (done, unblocked)
-- [ ] **WP-08** Ledger producer CLI — needs WP-07
+- [ ] **WP-08** Ledger producer CLI — needs WP-07 (done, unblocked)
 - [ ] **WP-09** Reference vectors — needs WP-08; **consume horizons-prefetch.json**
 - [ ] **WP-10** Accuracy gate + retrograde/station tests — needs WP-09
-- [ ] **WP-11** ASC/MC + Placidus — needs WP-07
+- [ ] **WP-11** ASC/MC + Placidus — needs WP-07 (done, unblocked)
 - [ ] **WP-12** Remaining quadrant systems + registry `"OPEN"` → `"LEDGER"` — needs WP-11
 - [ ] **WP-13** House cusps into the ledger (schema v1.1) — needs WP-08, WP-12
 - [ ] **WP-17** Real ephemeris in the browser (vendored astronomy-engine) — needs WP-06 (done, unblocked)
