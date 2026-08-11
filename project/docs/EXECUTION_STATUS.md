@@ -1,8 +1,7 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Update this file as
-packages land. Last updated: 2026-08-11 (hold point requested by owner; Batch A
-complete and merged).
+packages land. Last updated: 2026-08-11 (Batch B complete, verified, committed).
 
 ## Done (verified, committed)
 
@@ -15,10 +14,29 @@ complete and merged).
       `*.test.js` suites exporting `run()` (justified EXCLUDE list; `--quick`
       preserved). Never edit `run.js` to register a suite — just drop the file in
       `test/`.
+- [x] **WP-03** Claim-consistency script — `scripts/check-claims.mjs` (CHECK mode +
+      `--fix`, anchored on stable banner wording, never on the digits). README repo
+      map completed (all 20 core modules listed) with pointers to
+      `CLAIM_BOUNDARY.md`/`STATUS.md`/`REMEDIATION_LEDGER.md`.
+      `REMEDIATION_LEDGER.md` retitled P1–P28 with stub rows for the previously
+      narrative-only P22–P28.
+- [x] **WP-05 + WP-06** ESLint flat config (`eslint.config.mjs`, root) scoped to
+      `src/**`/`test/**`/`tools/**`/`scripts/**`, `lint` script; pinned
+      `astronomy-engine@2.1.19` dependency + `project/package-lock.json` +
+      `project/tools/README.md` (dependency confined to `tools/`/presentation, never
+      `src/core/` — audit-enforced). Lint-driven dead-code removal in 4 core files +
+      3 test files, verified behavior-neutral (same assertion count before/after).
 - [x] **WP-14** Core browser shim — `project/core-shim.js` exposes
       `window.HCRM_CORE` (42 core exports + `importLedger` / `validateLedgerEntry` /
       `admitForCore`); loaded as a `type=module` script in all pages except the
       standalone bundle. Pages require HTTP serving (`npx serve project`).
+- [x] **WP-15** `hcrm.jsx` float-leak fix — Number-based CRT/K-Elimination
+      (`modInverse`, `crtPair`, `kElimWinding`) deleted entirely; gamma/K/roundtrip
+      now sourced from `window.HCRM_CORE` (BigInt, parked-shell anchor 11 — K can now
+      genuinely show 0 or 1, not always-0). `toArcsec()` survives only as the labeled
+      synthetic quantization step; its output is wrapped as a `SYNTHETIC_DEMO` ledger
+      entry, run through `admitForCore`, and the rejection renders as a visible
+      "SYNTHETIC — not admissible to core" badge in `hcrm-view.jsx`/`hcrm.css`.
 - [x] **WP-16** Ledger admission tests — `test/ledger.test.js`, 19 assertions
       pinning the core's sole admission gate.
 - [x] **WP-23** CRAM tools tests — `test/cram-tools.test.js`, 73 assertions;
@@ -27,8 +45,9 @@ complete and merged).
       at N instead of the radicand d — returned null for genuine star numbers
       (13, 37, 73). Fixed; pinned by regression test.
 
-**Assertion count: 493/493 → 596/596.** README banner corrected to live numbers
-(manual interim fix; the machine check arrives with WP-03).
+**Assertion count: 493/493 → 596/596** (Batches A+B add tests, no new assertions in
+B — WP-03/05/06/15 were doc/tooling/refactor packages). README banner is now
+machine-checked by `scripts/check-claims.mjs`; `npm run lint` is clean.
 
 ## Prefetched assets (do not re-fetch)
 
@@ -41,31 +60,17 @@ complete and merged).
   than re-querying Horizons; the committed `fetch-horizons.mjs` script it writes
   remains the regeneration path.
 
-## In progress at hold (no tree changes landed — restart these clean)
-
-- [ ] **WP-03** Claims-consistency script + stale doc fixes — `scripts/check-claims.mjs`
-      (CHECK mode + `--fix` amendment), complete README repo map (6 missing modules),
-      REMEDIATION_LEDGER retitle P1–P28 with P24–P28 stub rows. *(Interim: banner
-      numbers hand-corrected to 596/596 · 20/20; script still needed to keep them
-      honest.)*
-- [ ] **WP-05 + WP-06** (combined; share lockfile) — root ESLint flat config + `lint`
-      script; pinned `astronomy-engine@2.1.19` dependency + `package-lock.json` +
-      `project/tools/README.md`.
-- [ ] **WP-15** `hcrm.jsx` float-leak fix — delete Number-based CRT/K-Elim
-      duplicates, route through `window.HCRM_CORE`, SYNTHETIC provenance badge via
-      `admitForCore` rejection. (WP-14's shim is already in place for this.)
-
 ## Remaining (per plan order; briefs in EXECUTION_PLAN.md)
 
-- [ ] **WP-04** GitHub Actions CI (initial) — needs WP-03
-- [ ] **WP-07** Timescale module (ΔT, GMST/GAST, IAU-2006 obliquity) — needs WP-06
+- [ ] **WP-04** GitHub Actions CI (initial) — needs WP-03 (done, unblocked)
+- [ ] **WP-07** Timescale module (ΔT, GMST/GAST, IAU-2006 obliquity) — needs WP-06 (done, unblocked)
 - [ ] **WP-08** Ledger producer CLI — needs WP-07
 - [ ] **WP-09** Reference vectors — needs WP-08; **consume horizons-prefetch.json**
 - [ ] **WP-10** Accuracy gate + retrograde/station tests — needs WP-09
 - [ ] **WP-11** ASC/MC + Placidus — needs WP-07
 - [ ] **WP-12** Remaining quadrant systems + registry `"OPEN"` → `"LEDGER"` — needs WP-11
 - [ ] **WP-13** House cusps into the ledger (schema v1.1) — needs WP-08, WP-12
-- [ ] **WP-17** Real ephemeris in the browser (vendored astronomy-engine) — needs WP-06
+- [ ] **WP-17** Real ephemeris in the browser (vendored astronomy-engine) — needs WP-06 (done, unblocked)
 - [ ] **WP-18** DST-correct time + unknown-time flag — needs WP-17
 - [ ] **WP-19** Input validation & visible errors — needs WP-18
 - [ ] **WP-20** Accessibility & privacy — needs WP-19
