@@ -22,6 +22,160 @@ counter-computation where one applies), [`project/STATUS.md`](project/STATUS.md)
 corrective-pass history, P1–P28, including what was wrong and how it was found).
 The banner above is machine-checked by [`scripts/check-claims.mjs`](scripts/check-claims.mjs).
 
+### Documentation map
+
+| Doc | What it's for |
+|---|---|
+| [`project/CLAIM_BOUNDARY.md`](project/CLAIM_BOUNDARY.md) | Every claim in the repo, tagged, with counter-computations for rejected ones. |
+| [`project/STATUS.md`](project/STATUS.md) | Current evidence classification per layer/module. |
+| [`project/REMEDIATION_LEDGER.md`](project/REMEDIATION_LEDGER.md) | The corrective-pass history, P1–P28. |
+| [`project/docs/AUDIT_REMEDIATION_PLAN.md`](project/docs/AUDIT_REMEDIATION_PLAN.md) | The external audit this whole remediation effort responds to. |
+| [`project/docs/EXECUTION_PLAN.md`](project/docs/EXECUTION_PLAN.md) | The 29-work-package plan that built the architecture described below. |
+| [`project/docs/EXECUTION_STATUS.md`](project/docs/EXECUTION_STATUS.md) | Live status of every package — what actually landed, including an unresolved item flagged for the repo owner (see [Presentation layer](#presentation-layer) below). |
+| [`project/docs/INPUTS_OUTPUTS.md`](project/docs/INPUTS_OUTPUTS.md) | Field reference for every exported function/class/constant across core, ledger, producer, houses, and timescale. |
+
+---
+
+## Quickstart
+
+```bash
+# 1. Serve the pages — required. ES module <script> tags (the core shim,
+#    the real ephemeris vendor bundle, …) are blocked by browsers on
+#    file://, so opening the .html files directly will not work.
+npx serve project
+#   or: cd project && python3 -m http.server 8000
+# then open e.g. http://localhost:3000/HCRM%20Console.html
+
+# 2. Run the tests (from project/)
+cd project
+npm test              # full suite + the exhaustive 1,296,000-point ring sweep
+npm run test:quick    # same suite, skips the ring sweep (faster iteration)
+npm run test:accuracy # just the ephemeris/house-cusp accuracy gate (see below)
+npm run bench          # performance timings (add -- --assert for CI-style pass/fail)
+
+# 3. Produce a real ephemeris ledger — the only path real astronomical data
+#    takes into the exact BigInt core (see Architecture below)
+node tools/ephemeris/produce-ledger.mjs \
+  --time 1994-01-11T14:30:00Z --lat 29.4241 --lng -98.4936 \
+  [--bodies Sun,Moon,Mercury,...] [--houses placidus] [--out file.json]
+```
+
+No install beyond `npm ci` in `project/` is required for tests; the producer
+CLI needs the pinned `astronomy-engine` dependency, which `npm ci` also
+installs.
+
+---
+
+## Architecture
+
+Four layers, with a hard rule about which ones floats are allowed in:
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ PRESENTATION   *.jsx, *.html — React, floats legal                   │
+│  astro.jsx / src/present/astro-core.js — dignities, aspects, chart   │
+│  logic; real ephemeris in-browser via a vendored astronomy-engine    │
+│  build when present, else a labeled SYNTHETIC fallback               │
+│  hcrm.jsx / hcrm-view.jsx — the exact-register console UI            │
+└──────────────────────────────────────────────────────────────────────┘
+                 │ float degrees, rounded to an integer arcsecond,
+                 │ wrapped as a schema-conformant ledger entry
+                 ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ PRODUCER       project/tools/ephemeris/ — floats legal                │
+│  produce-ledger.mjs — real geocentric apparent ecliptic-of-date       │
+│    longitudes via astronomy-engine, speed by central difference       │
+│  houses.js — ASC/MC, Placidus, Koch, Regiomontanus, Campanus, …       │
+│  timescale.js — ΔT, GMST/GAST, IAU2006 obliquity                      │
+└──────────────────────────────────────────────────────────────────────┘
+                 │ IMPORTED_INTEGER_LEDGER / CERTIFIED_EXACT_LEDGER
+                 │ JSON entries, longitude_arcsec as a decimal-integer
+                 │ string in [0, 1296000)
+                 ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ LEDGER         project/src/ledger/ — the only door into the core      │
+│  ephemeris-ledger-schema.json — the entry shape                       │
+│  import-ledger.js — validateLedgerEntry() / admitForCore(): throws    │
+│    on any malformed entry, and unconditionally on SYNTHETIC_DEMO      │
+└──────────────────────────────────────────────────────────────────────┘
+                 │ admitForCore()-accepted entry only
+                 ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ CORE           project/src/core/ — BigInt only, Mandate A1            │
+│  basis.js, shell-kelim.js, ring.js, variants.js, … (20 modules)       │
+│  no floats, no Math.*, no Date, no Number()/parseFloat/parseInt,      │
+│  no decimal literals — mechanically enforced by the no-float audit    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Data flow, concretely:** a real planetary position is computed once, in
+float degrees, in `tools/ephemeris/produce-ledger.mjs` (which calls
+astronomy-engine — the only place in this repo that talks to a real
+ephemeris library outside the browser). It is rounded to the nearest integer
+arcsecond and emitted as a `longitude_arcsec` decimal-integer string inside a
+ledger entry (`certificate.status: "IMPORTED_INTEGER_LEDGER"`). That entry is
+the only thing `project/src/core/` is allowed to trust: `admitForCore()` in
+`project/src/ledger/import-ledger.js` re-validates it and is the sole
+admission gate — anything tagged `SYNTHETIC_DEMO` (a quantized-but-uncertified
+float, e.g. from the browser demo path) is rejected there, not silently
+passed through. `project/hcrm.jsx` demonstrates this rejection directly: its
+synthetic values run through `admitForCore()`, the throw is caught, and the
+UI renders a visible "SYNTHETIC — not admissible to core" badge rather than
+presenting rounded floats as exact register data.
+
+### Presentation layer
+
+The chart UI (`astro.jsx`, `app.jsx`, and friends) is a separate, more
+conventional presentation path: when a vendored astronomy-engine build is
+loaded in the browser it computes real positions client-side (not through the
+ledger — that path is specific to the exact-register demo); otherwise it
+falls back to a synthetic orbital model and sets `window.EPHEMERIS_MODE =
+"SYNTHETIC"` so the UI can badge it honestly.
+
+One presentation-layer behavior is a **disclosed, unresolved item for the
+repo owner**, not something this package (or any package in the plan) tries
+to resolve: `agent.jsx`'s optional LLM chart-interpretation feature is
+on by default and sends raw birth data to it, with no reachable
+off-switch in a standalone deployment. Full detail, options, and why it was
+left as a disclosed finding rather than silently changed: see
+["Flagged for owner decision" in `project/docs/EXECUTION_STATUS.md`](project/docs/EXECUTION_STATUS.md#flagged-for-owner-decision).
+
+---
+
+## Accuracy statement
+
+Real positions are checked against independent references, and that check
+runs on **every push and pull request**, not just once at implementation
+time — the `accuracy` job in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs
+`npm run test:accuracy` as a blocking CI gate.
+
+- **Planetary longitudes** (Sun through Pluto) — checked against JPL
+  Horizons (DE441) apparent geocentric ecliptic-of-date longitudes at 20
+  reference instants spanning 1700–2050
+  (`project/test/fixtures/reference-vectors.json`). Tolerance: **≤ 60″**
+  for Sun/Mercury/Venus/Mars/Jupiter/Saturn/Uranus/Neptune/Pluto, **≤ 120″**
+  for the Moon (astronomy-engine's lunar theory vs. DE441, documented in
+  `project/test/accuracy.test.js`). Observed: worst single-point error
+  **~29.5″ (Pluto)**; worst per-body mean error **~10.4″ (Neptune)** — both
+  well inside tolerance.
+- **House cusps** (`tools/ephemeris/houses.js`: Placidus, Koch,
+  Regiomontanus, Campanus, Alcabitius, Topocentric, Morinus, Meridian,
+  Porphyry) — checked against genuine Swiss Ephemeris (`pyswisseph`) output
+  across 5 charts × 8 systems × 12 cusps. Tolerance: **≤ 30″**. Observed
+  worst case: **~12.5″**, attributed uniformly to a mean-vs-true-obliquity
+  difference (confirmed not a per-system bug).
+- **Retrograde/station timing** — 5 published stationary instants (Mercury,
+  Mars, Venus; 2022–2023): the sign of the computed speed flips within
+  ±36 h of each published instant, and `retrograde ≡ (speed < 0)` holds
+  across every fixture.
+
+These thresholds are enforced mechanically: `npm run test:accuracy` (and the
+full `npm test`) fails the build the moment a regression pushes any
+comparison out of tolerance — a deliberately corrupted fixture value is
+itself part of the test (`accuracy.test.js` asserts the gate actually
+catches a >5′ error), so the check is verified to work, not just present.
+
 ---
 
 ## If you know residue number systems, read this first
@@ -276,11 +430,17 @@ Uranian, Draconic, Harmonic (Addey), Heliocentric, Western Sidereal, Thirteen-si
 **36 divisions** · **7 aspect families** · **7 frames** with ayanāṁśas as exact
 arcseconds (Lahiri 85,871″ · Fagan–Bradley 86,741″ · Raman 80,568″ · KP 85,691″).
 
-**13 house systems, 5 exact and 8 gated OPEN.** Whole sign, Equal from ASC,
-Equal from MC, Vehlow, and Porphyry are exact integer constructions. Placidus,
-Koch, Regiomontanus, Campanus, Alcabitius, Topocentric, Morinus and Meridian
-require an obliquity model, which would put a float in the path — so they are
-declared OPEN rather than faked.
+**13 house systems, 5 exact in the core and 8 via the ledger.** Whole sign,
+Equal from ASC, Equal from MC, Vehlow, and Porphyry are exact integer
+constructions inside `src/core/`. Placidus, Koch, Regiomontanus, Campanus,
+Alcabitius, Topocentric, Morinus and Meridian require an obliquity model,
+which would put a float in the path — so `src/core/` never computes them
+itself. They are real, float-legal solvers in `tools/ephemeris/houses.js`
+(cross-checked against genuine Swiss Ephemeris output, see
+[Accuracy statement](#accuracy-statement)), and reach `src/core/` only as
+certified ledger entries — the registry marks them `LEDGER`, not the earlier
+placeholder `OPEN`, to reflect that the fulfillment path now exists (see
+[Architecture](#architecture)).
 
 ---
 
@@ -289,7 +449,7 @@ declared OPEN rather than faked.
 Every claim in `CLAIM_BOUNDARY.md` is tagged **PROVEN**, **OPEN**, or
 **REJECTED**, and rejected claims stay in the document with the computation that
 killed them rather than being edited away. `REMEDIATION_LEDGER.md` records each
-corrective pass (P1–P23).
+corrective pass (P1–P28).
 
 **Axioms actually in force:** A1 exactness (no floats, ever) and A2 Garner
 retirement (retires the cascade, not the yield). **A3 (immutable basis) is not
@@ -313,7 +473,7 @@ claim here depends on it.
 
 ```
 project/
-  src/core/            the exact core — BigInt only, no UI, no prose
+  src/core/            the exact core — BigInt only, no UI, no prose (Mandate A1)
     basis.js             S8, both splits, the parked constants
     shell-kelim.js       K-Elimination, the lift, the tray register
     residues.js          pure integer residue helpers (mod), shared primitive
@@ -334,31 +494,40 @@ project/
     tower-recover.js     T-COMP-1 — winding recovery from an anchor SET
     identity.js          identity of a number, ID_p(x)=(r,w) — D-030
     tray.js              the two-tray architecture — fixture + phase lock
+  src/ledger/          the admission contract — the only door into src/core/
+    ephemeris-ledger-schema.json
+    import-ledger.js     validateLedgerEntry() / admitForCore()
+  src/present/          pure presentation logic, dual Node+browser (float-legal)
+    astro-core.js         dignities, terms, faces, lots, sect, aspects, patterns
+    contrast.js            WCAG-AA contrast math backing styles.css
+  src/demo/            explicitly-labeled synthetic demo data (never core input)
+  tools/
+    ephemeris/            the producer — astronomy-engine, floats legal
+      produce-ledger.mjs    CLI: real positions + house cusps → ledger JSON
+      houses.js              ASC/MC, Placidus, Koch, Regiomontanus, …
+      timescale.js            ΔT, GMST/GAST, IAU2006 obliquity
+      fetch-horizons.mjs      regenerates the JPL Horizons reference fixtures
+    validate-ledgers.mjs   schema-validates every *.ledger.json (CI's schema-validate job)
+    build-standalone.mjs   bundles an offline dist/standalone.html
+  vendor/              vendored astronomy-engine UMD build for the in-browser chart UI
   test/
-    run.js               headless runner  →  npm test
-    *.test.js            the suites the browser gate also runs
-  Core Test Harness.html the gate — same modules, in a browser
-  CLAIM_BOUNDARY.md      every claim, tagged, with counter-computations
-  REMEDIATION_LEDGER.md  the corrective passes, P1–P28
-  STATUS.md              current classification per module
-```
-
----
-
-## Running it
-
-```bash
-cd project
-npm test           # full suite + the exhaustive 1,296,000-point ring sweep
-npm run test:quick # skip the sweep
-```
-
-No dependencies and no build step — Node ≥ 18 for BigInt and ES modules. For the
-browser gate, serve the folder over HTTP (the no-float audit reads source, which
-`file://` blocks) and open `Core Test Harness.html`:
-
-```bash
-cd project && python3 -m http.server 8000
+    run.js               headless runner → npm test; auto-discovers *.test.js
+    no-float-audit.js    single source of truth for Mandate A1 enforcement
+    fixtures/             JPL Horizons + Swiss Ephemeris reference data
+    present/              tests against src/present/ and the .jsx presentation layer
+    *.test.js             suites — drop a new one in, no registration needed
+  bench/bench.mjs      performance thresholds → npm run bench
+  docs/
+    EXECUTION_PLAN.md      the 29-work-package plan
+    EXECUTION_STATUS.md    live status of every package (start here for "what's built")
+    INPUTS_OUTPUTS.md      function-level reference for every export
+    AUDIT_REMEDIATION_PLAN.md  the original external audit
+  *.jsx, *.html        the presentation layer — chart UI, HCRM register console
+  Core Test Harness.html the core's own gate — same modules, in a browser
+  CLAIM_BOUNDARY.md    every claim, tagged, with counter-computations
+  REMEDIATION_LEDGER.md the corrective passes, P1–P28
+  STATUS.md            current classification per module
+CONTRIBUTING.md        how to add a test suite, a core module, or a PR
 ```
 
 ---
@@ -373,3 +542,11 @@ computation that settles it.
 This repository began as a Claude Design export bundle; `chats/` retains the
 original design transcripts. The core under `project/src/core/` is
 implementation, not prototype.
+
+---
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the test-first workflow, Mandate
+A1 in detail, and how to add a new core module so both no-float audits (Node
+and browser) see it.
