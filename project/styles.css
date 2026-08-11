@@ -3,12 +3,39 @@
    monochrome graphite + bone, iridescence does the chromatic work
    ============================================================ */
 
+/* WP-20 WCAG AA contrast audit — text-on-background pairs actually used by
+   this stylesheet (--ink-dim/--card-ink-dim sit on --bg/--bg-2/--card-bg/
+   --card-bg-2 throughout: .hdr-subtitle, .lf-hint, .tp-row .l, .hc-*-lbl,
+   err/chart-note secondary text, etc.). Ratios computed for real via the
+   OKLCH → linear-sRGB (Björn Ottosson matrices) → WCAG relative-luminance
+   pipeline, contrast = (L_lighter + 0.05) / (L_darker + 0.05); threshold is
+   4.5:1 for normal text, 3:1 for large text / UI components (WCAG 2.1 AA):
+     --bg      vs --ink        16.37:1  PASS (normal text)
+     --bg      vs --ink-2      10.05:1  PASS (normal text)
+     --bg      vs --ink-dim     4.15:1  FAIL (normal text, needs 4.5) — was
+                                         oklch(0.55 0.010 80); see fix below
+     --bg-2    vs --ink        15.80:1  PASS (normal text)
+     --bg-2    vs --ink-dim     4.00:1  FAIL (normal text, needs 4.5) — same
+                                         fix (--bg-2 is the tighter case,
+                                         being the lighter of the two darks)
+     --card-bg  vs --card-ink       13.96:1  PASS (normal text)
+     --card-bg  vs --card-ink-dim    6.85:1  PASS (normal text)
+     --card-bg-2 vs --card-ink      11.13:1  PASS (normal text)
+     --card-bg-2 vs --card-ink-dim   5.46:1  PASS (normal text)
+     --bg      vs .pos (oklch(0.78 0.10 145))  10.43:1  PASS
+     --bg      vs .neg (oklch(0.62 0.10 25))    5.28:1  PASS
+   Fix: --ink-dim raised from L 0.55 → 0.60 (chroma/hue unchanged), which
+   clears 4.5:1 against BOTH dark backgrounds with margin:
+     --bg   vs new --ink-dim   5.10:1  PASS
+     --bg-2 vs new --ink-dim   4.92:1  PASS
+   --card-ink-dim already passes AA against both card backgrounds and is
+   left unchanged. */
 :root {
   --bg:        oklch(0.13 0.008 60);   /* deep warm graphite */
   --bg-2:      oklch(0.16 0.010 60);
   --ink:       oklch(0.93 0.008 80);   /* bone / parchment text */
   --ink-2:     oklch(0.78 0.010 80);
-  --ink-dim:   oklch(0.55 0.010 80);
+  --ink-dim:   oklch(0.60 0.010 80);   /* WP-20: was 0.55 — 4.15:1 on --bg failed AA (4.5:1); 0.60 clears it (5.10:1), see audit note above */
   --line:      oklch(0.93 0.008 80 / 0.16);
   --line-2:    oklch(0.93 0.008 80 / 0.32);
 
@@ -766,6 +793,20 @@ body::before {
   color: var(--ink-dim);
   letter-spacing: 0.04em;
   margin: 8px 0 0 0;
+}
+/* WP-20 privacy note (see landing.jsx). Same token as .lf-hint — this text
+   sits directly on --bg, so it inherits the --ink-dim AA fix above
+   (5.10:1 against --bg at 10px). */
+.lf-privacy {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  letter-spacing: 0.02em;
+  margin: 14px 0 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  max-width: 46ch;
 }
 .lf-check {
   display: flex;
@@ -1795,6 +1836,57 @@ body::before {
   height: 100%;
   background: var(--ink);
 }
+
+/* ============================================================
+   WP-20 — accessibility utilities + a11y-table.jsx
+   ============================================================ */
+/* Standard visually-hidden-but-accessible clip-rect pattern: removed from
+   the visual flow (no layout box, no paint) but still present for screen
+   readers and still reachable by Tab if it happens to contain a focusable
+   element — unlike `display:none`/`visibility:hidden`, which pull content
+   out of the accessibility tree entirely. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.a11y-table-wrap { margin-top: 18px; }
+.a11y-table-toggle {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--ink-2);
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.a11y-table-toggle:hover, .a11y-table-toggle:focus-visible { color: var(--ink); border-color: var(--ink-dim); }
+.a11y-table-toggle-hint {
+  margin-left: 8px;
+  color: var(--ink-dim);
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.a11y-table {
+  margin-top: 12px;
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.a11y-table caption { text-align: left; color: var(--ink-dim); font-size: 10px; margin-bottom: 8px; }
+.a11y-table th, .a11y-table td { text-align: left; padding: 5px 10px 5px 0; border-bottom: 1px solid var(--line); }
+.a11y-table thead th { color: var(--ink-dim); font-weight: 500; letter-spacing: 0.05em; }
+.a11y-table tbody th[scope="row"] { color: var(--ink); font-weight: 500; }
+.a11y-table tbody td { color: var(--ink-2); }
 
 /* ============================================================
    CYLINDRICAL TIME — live state

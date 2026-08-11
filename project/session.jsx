@@ -250,7 +250,7 @@ function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onBack,
   return (
     <header className="rs-hdr">
       <div className="rs-hdr-l">
-        <button className="hdr-back" onClick={onBack}>←</button>
+        <button className="hdr-back" onClick={onBack} aria-label="Back to entry">←</button>
         <div className="rs-hdr-brand">
           <span className="rs-hdr-mark">✦</span>
           <span>Resonance</span>
@@ -292,16 +292,18 @@ function SpeakerIcon({ active }) {
 function SessionControls({ pos, total, cards, playing, onPlay, onPrev, onNext, onPick }) {
   return (
     <footer className="rs-controls">
-      <button className="rs-ctrl" onClick={onPrev} disabled={pos === 0}>‹</button>
-      <button className="rs-ctrl rs-ctrl-play" onClick={onPlay}>{playing ? "▮▮" : "▶"}</button>
-      <button className="rs-ctrl" onClick={onNext} disabled={pos >= total - 1}>›</button>
-      <div className="rs-dots">
+      <button className="rs-ctrl" onClick={onPrev} disabled={pos === 0} aria-label="Previous card">‹</button>
+      <button className="rs-ctrl rs-ctrl-play" onClick={onPlay} aria-label={playing ? "Pause" : "Play"} aria-pressed={playing}>{playing ? "▮▮" : "▶"}</button>
+      <button className="rs-ctrl" onClick={onNext} disabled={pos >= total - 1} aria-label="Next card">›</button>
+      <div className="rs-dots" role="group" aria-label="Jump to card">
         {cards.map((c, i) => (
           <button
             key={i}
             className={`rs-dot ${i === pos ? "is-active" : ""} ${i < pos ? "is-past" : ""}`}
             onClick={() => onPick(i)}
             title={`${c.principal.name} in ${c.name}`}
+            aria-label={`${c.principal.name} in ${c.name}${i === pos ? " (current)" : ""}`}
+            aria-current={i === pos ? "true" : undefined}
             style={{ "--resonance": c.resonance.toFixed(2) }}
           />
         ))}

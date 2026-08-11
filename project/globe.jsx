@@ -136,7 +136,13 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
 
   return (
     <div className="glb" ref={wrapRef} style={{ width: size, height: size }}>
-      <canvas ref={canvasRef} className="glb-canvas" />
+      {/* WP-20: the canvas itself only paints decorative dots/graticule —
+          every piece of information it conveys (which city is selected,
+          its coordinates, UTC offset) is duplicated as real text in the
+          readout below and as labelled <button>s per city, so the canvas
+          is marked decorative rather than given a role="img" that would
+          just repeat "a globe" with no way to describe a live animation. */}
+      <canvas ref={canvasRef} className="glb-canvas" aria-hidden="true" role="presentation" />
       <div className="glb-cities">
         {CITIES.map((c) => {
           const k = cityKey(c);

@@ -344,6 +344,11 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
         ))}
       </main>
 
+      {/* WP-20: textual alternative to the card spread above — see
+          a11y-table.jsx's own header for the "always in the a11y tree,
+          also toggleable for sighted users" design rationale. */}
+      {typeof window !== "undefined" && window.A11yChartTable && <A11yChartTable chart={chart} title="Natal chart placements" />}
+
       <TraditionalPanel chart={chart} />
 
       <LiveStatePanel chart={chart} />
@@ -385,6 +390,7 @@ function Header({ chart, settings, setTweak, onBack }) {
           className={`hdr-pill ${settings.rigorous ? 'is-on' : ''}`}
           onClick={() => setTweak('rigorous', !settings.rigorous)}
           title="Reveal the integer-arcsec / CRT residues on each card"
+          aria-pressed={settings.rigorous}
         >
           rigorous
         </button>
@@ -392,6 +398,7 @@ function Header({ chart, settings, setTweak, onBack }) {
           className={`hdr-pill ${settings.primeLayer ? 'is-on' : ''}`}
           onClick={() => setTweak('primeLayer', !settings.primeLayer)}
           title="Reveal the underlying Prime Resonance lattice (mod 11 · mod 13)"
+          aria-pressed={settings.primeLayer}
         >
           prime layer
         </button>
@@ -814,7 +821,9 @@ function PrimeLayer({ chart }) {
 
       <div className="pl-grid">
         <div className="pl-lattice">
-          <svg viewBox="0 0 560 440" width="100%" height="100%">
+          <svg viewBox="0 0 560 440" width="100%" height="100%"
+               role="img"
+               aria-label={`Prime resonance lattice: ${planets.length} bodies arranged on a circle, with dashed lines connecting bodies that share a mod-11 shadow lane. The CRT signatures table to the right lists the same data as text.`}>
             <defs>
               <radialGradient id="pl-bg" cx="50%" cy="50%" r="50%">
                 <stop offset="0%"  stopColor="#1a1614" stopOpacity="0.7" />
