@@ -302,5 +302,8 @@
   global.cramNextPrime = nextCoprimePrime;
   global.cramCoprime = coprime;
   global.cramModInv = inv;
-  global.cramStarIndex = (n) => { const N = B(n); if (N < 1n) return null; const d = 12n + 24n * N; let s = N, y = (s + 1n) / 2n; while (y < s) { s = y; y = (s + d / s) / 2n; } s = (s * s <= d) ? s : s - 1n; if (s * s !== d) return null; if ((6n + s) % 12n !== 0n) return null; const k = (6n + s) / 12n; return (6n * k * (k - 1n) + 1n === N) ? Number(k) : null; };
+  // Newton isqrt seeded at d (the radicand), NOT at N: with x₀ = N < √d (true
+  // for every N ≤ 24, so star numbers 1, 13, 37, 73) the first proper iterate
+  // jumps above the seed and the loop exits early with s < √d → false null.
+  global.cramStarIndex = (n) => { const N = B(n); if (N < 1n) return null; const d = 12n + 24n * N; let s = d, y = (s + 1n) / 2n; while (y < s) { s = y; y = (s + d / s) / 2n; } s = (s * s <= d) ? s : s - 1n; if (s * s !== d) return null; if ((6n + s) % 12n !== 0n) return null; const k = (6n + s) / 12n; return (6n * k * (k - 1n) + 1n === N) ? Number(k) : null; };
 })(window);
