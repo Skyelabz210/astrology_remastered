@@ -1,7 +1,7 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Update this file as
-packages land. Last updated: 2026-08-11 (Batch F complete, verified, committed).
+packages land. Last updated: 2026-08-11 (Batch G complete, verified, committed).
 
 ## Done (verified, committed)
 
@@ -145,24 +145,78 @@ packages land. Last updated: 2026-08-11 (Batch F complete, verified, committed).
       precision claims. Verified: NY spring-forward/fall-back, London 1970
       permanent-BST (actually verified against Node's ICU, not assumed),
       Sydney southern DST.
+- [x] **WP-25** Standalone bundle regeneration — deleted the stale,
+      un-regeneratable 2.07 MB `HCRM Console (standalone).html`; replaced
+      with `project/tools/build-standalone.mjs`, which generically discovers
+      `HCRM Console.html`'s own script/link tags (no hardcoded file list —
+      proven by picking up WP-19's and WP-21's new tags with zero code
+      changes when re-run after both landed) and inlines everything needed
+      to run offline: CSS, pre-transpiled JSX, the ESM graph bundled via
+      esbuild, the vendored astronomy-engine build, and local React/ReactDOM
+      UMD builds in place of the CDN tags. Only Google Fonts remains
+      CDN-referenced (cosmetic-only, documented). **Verified in a real
+      browser** (Chromium/Playwright, `file://`): the regenerated bundle
+      renders the actual register console with live computed data.
+- [x] **WP-21** Extract presentation logic to `src/present/astro-core.js` —
+      dignities, terms, faces, triplicities, lots, sect, aspects, patterns,
+      critical degrees, joys, antiscia, lunar phase, chart shape, and CRT
+      residues moved out of `astro.jsx` into a dual-environment ES module;
+      `astro.jsx` becomes data tables + thin wrappers, with all
+      ephemeris-adjacent code (WP-17's real/synthetic branching,
+      `EPHEMERIS_MODE`) and `computeNatal`'s orchestration (WP-18's
+      `timeUnknown`) left untouched. `src/present/` confirmed outside the
+      no-float audit's scan. Zero net assertions (pure refactor) — verified
+      via a throwaway worktree, and WP-17's `astro-ephemeris.test.js`
+      passes with the exact same 67/67 pinned values, proving ephemeris
+      behavior is unaffected.
+- [x] **WP-19** Input validation & visible errors — `validate.js`
+      (real-calendar-date, lat/lng range validation, `polarHouseWarning`
+      reading the actual `POLAR_FALLBACK_POLICY` table); the ±66°
+      latitude clamp is **gone** — the full -90..90 range is enterable, with
+      keystroke-level validation that never corrupts chart state on an
+      invalid mid-edit value. `ChartStatusBanners`/`HcrmStatusBanners`
+      surface the SYNTHETIC-ephemeris badge, a polar house-system warning,
+      and WP-18's DST ambiguous/nonexistent + unknown-time notes.
+      `errors.jsx` replaces all four `console.error → return null`
+      chart-builder catches with a visible error banner, plus a real
+      `ErrorBoundary` for render-time failures. All 12 required UX scenarios
+      documented in `project/docs/ux-validation-checklist.md`, most verified
+      live via a real React/`react-dom/server` render against the actual
+      components. **Honest caveat on record:** the polar-latitude warning is
+      fully implemented and tested, but the shipped house picker only
+      offers Whole/Equal (the only two `astro.jsx` computes), so it's not
+      yet reachable through the live UI — flagged, not hidden.
+      **End-to-end confirmation:** the WP-25 standalone bundle, rebuilt
+      against the full combined tree, rendered correctly in a real browser
+      — proof all three packages compose.
 
-**Assertion count: 493/493 → 4137/4137** (+13 timescale, +169 producer, +794
+**Assertion count: 493/493 → 4186/4186** (+13 timescale, +169 producer, +794
 houses total, +1727 fixtures, +67 astro-ephemeris, +212 accuracy, +258
-retrograde, +277 house-cusp-ledger, +24 tzresolve; WP-03/05/06/15/04 were
-doc/tooling/CI packages, no new assertions). README banner is machine-checked
-by `scripts/check-claims.mjs`; `npm run lint` is clean. **Process notes:**
+retrograde, +277 house-cusp-ledger, +24 tzresolve, +49 validate;
+WP-03/05/06/15/04/25/21 were doc/tooling/CI/refactor packages, no new
+assertions). README banner is machine-checked by `scripts/check-claims.mjs`;
+`npm run lint` is clean. **Process notes:**
 (1) WP-07's PR (#4) shipped with a stale README banner because
 `check-claims.mjs --fix` wasn't re-run after adding tests — CI caught it
 before merge; the `claims` CI job itself was also missing `npm ci` and broke
 on PR #5 the same way, once the suite gained a real dependency. (2) When two
 packages run concurrently in the same working tree and one extends a file the
 other creates (WP-10→WP-13) or both add test suites simultaneously
-(WP-13/WP-18), the shared tree's live `npm test` count is contaminated by
-whichever sibling's files are also sitting uncommitted — verify a package's
-*own* isolated count via a throwaway `git worktree` (`git worktree add
---detach <path> HEAD`, apply just that package's diff, test, discard) before
-trusting its README banner. Every package has run `--fix` + verify as a
-mandatory last step since; keep doing this.
+(WP-13/WP-18, and again WP-19/WP-21 in Batch G), the shared tree's live
+`npm test` count is contaminated by whichever sibling's files are also
+sitting uncommitted — verify a package's *own* isolated count via a
+throwaway `git worktree` (`git worktree add --detach <path> HEAD`, apply
+just that package's diff, test, discard) before trusting its README banner.
+(3) When 3 packages share a batch and two of them touch the *same* shared
+file (e.g. HTML `<script>` tags, `eslint.config.mjs` carve-outs) in small,
+practically-inseparable hunks, don't fight the diff — commit that shared
+file once, in its final combined state, in whichever package's commit lands
+last, and say so explicitly in both commit messages. (4) End-to-end
+smoke-testing across concurrently-landed UI packages is worth doing once,
+after all of them land: WP-25's real-browser render of the fully combined
+tree caught nothing broken here, but it's the only check that would have.
+Every package has run `--fix` + verify as a mandatory last step since; keep
+doing this.
 
 ## Prefetched assets (do not re-fetch)
 
@@ -177,20 +231,17 @@ mandatory last step since; keep doing this.
 
 ## Remaining (per plan order; briefs in EXECUTION_PLAN.md)
 
-- [ ] **WP-19** Input validation & visible errors — needs WP-18 (done, unblocked)
-- [ ] **WP-20** Accessibility & privacy — needs WP-19
-- [ ] **WP-21** Extract presentation logic to `src/present/astro-core.js` — needs WP-17
-- [ ] **WP-22** Port `tests.jsx` suites to CLI — needs WP-21
-- [ ] **WP-24** Performance benchmarks — needs WP-08, WP-21
-- [ ] **WP-25** Standalone bundle: delete stale 2.07 MB file + regeneration script
-- [ ] **WP-26** CI final assembly — needs WP-10, WP-13, WP-22, WP-24
-- [ ] **WP-27** Inputs/outputs documentation + JSDoc — needs WP-08, WP-13
+- [ ] **WP-20** Accessibility & privacy — needs WP-19 (done, unblocked)
+- [ ] **WP-22** Port `tests.jsx` suites to CLI — needs WP-21 (done, unblocked)
+- [ ] **WP-24** Performance benchmarks — needs WP-08 (done), WP-21 (done, unblocked)
+- [ ] **WP-26** CI final assembly — needs WP-10 (done), WP-13 (done), WP-22, WP-24
+- [ ] **WP-27** Inputs/outputs documentation + JSDoc — needs WP-08 (done), WP-13 (done, unblocked)
 - [ ] **WP-28** README rewrite + CONTRIBUTING — needs WP-27
-- [ ] **WP-29** Interpretation engine improvements — needs WP-18, WP-21
+- [ ] **WP-29** Interpretation engine improvements — needs WP-18 (done), WP-21 (done, unblocked)
 
 ## Standing conventions for whoever resumes
 
-1. `cd project && npm test` must stay green; count only grows (baseline now 4137).
+1. `cd project && npm test` must stay green; count only grows (baseline now 4186).
 2. Mandate A1: no float constructs under `src/core/` — the audit + self-test enforce.
 3. New test suites: drop `test/<name>.test.js` exporting `run()`; no runner edit.
 4. New core modules: add to `CORE_MANIFEST` in `test/no-float-audit.js` (the
