@@ -133,8 +133,8 @@ export function run() {
     const gated = HOUSE_SYSTEMS.filter((h) => !h.exact);
     t("5 house systems are integer-exact on the ring", exact.length === 5,
       exact.map((h) => h.id).join(" · "));
-    t("8 quadrant systems gated OPEN (need oblique ascension)",
-      gated.length === 8 && gated.every((h) => h.status === "OPEN"),
+    t("8 quadrant systems gated LEDGER (need oblique ascension; WP-12: fulfilled via the ledger admission path, not core float arithmetic)",
+      gated.length === 8 && gated.every((h) => h.status === "LEDGER"),
       gated.map((h) => h.id).join(" · "));
   }
   {

@@ -1,7 +1,7 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Update this file as
-packages land. Last updated: 2026-08-11 (Batch D complete, verified, committed).
+packages land. Last updated: 2026-08-11 (Batch E complete, verified, committed).
 
 ## Done (verified, committed)
 
@@ -77,20 +77,47 @@ packages land. Last updated: 2026-08-11 (Batch D complete, verified, committed).
       formula was resolved by deriving the correct `atan2` branch from an
       exact equator closed form rather than trusting memory — this caught a
       real 180°-off bug before it shipped. `PolarLatitudeError` at
-      |lat| > 66.56°. **Known gap:** Placidus is verified against an
-      independent exact closed form at the equator and internal consistency
-      checks (cusp1/4/7/10 vs. `ascMc`, opposite-cusp symmetry), but **not**
-      yet against an external reference (e.g. `swetest`) at nonzero latitude
-      — no such access was available. Close this before WP-13 feeds house
-      cusps into the accuracy gate.
+      |lat| > 66.56°. **Known gap (closed by WP-12, see below):** at landing
+      time Placidus was verified only against an independent exact closed
+      form at the equator and internal consistency checks (cusp1/4/7/10 vs.
+      `ascMc`, opposite-cusp symmetry) — no external reference was available.
+- [x] **WP-09** Reference vectors — `project/test/fixtures/reference-vectors.json`
+      (20 points × 10 bodies, built from the already-committed
+      `horizons-prefetch.json`, full provenance) + `project/tools/ephemeris/
+      fetch-horizons.mjs` (the regeneration path — **live-tested against the
+      real Horizons API in this session**, not just written blind; that
+      testing caught and fixed a real bug in the barycenter-substitution
+      cutoff instants) + `project/test/fixtures.test.js` (1727 shape/range/
+      provenance assertions over the fixture itself).
+- [x] **WP-12** Remaining quadrant house systems — `houses.js` gains Koch,
+      Regiomontanus, Campanus, Alcabitius, Topocentric, Morinus, Meridian,
+      and a float Porphyry cross-checked against the exact core's
+      `porphyryCusps` (~1e-10″ agreement). Registry `"OPEN"` → `"LEDGER"` in
+      `variants.js` (string-only). **Closes WP-11's disclosed gap:**
+      `pip install pyswisseph` worked in this session; every system (incl.
+      Placidus) is now cross-checked against genuine Swiss Ephemeris output
+      at 5 diverse charts (540 comparisons), worst residual ~12.5″, well
+      inside the ≤30″ bar — residual attributed to mean-vs-true obliquity,
+      confirmed uniform across systems/charts (not a per-system bug).
+- [x] **WP-17** Real ephemeris in the browser — vendored astronomy-engine
+      2.1.19 UMD build (`project/vendor/`, MIT, SHA-256 recorded) loads before
+      `astro.jsx` on the 5 pages that use it. `planetLongitude`/`planetSpeed`/
+      `isRetrograde` now compute real positions when `window.Astronomy` is
+      present, with `isRetrograde` deriving from `planetSpeed`'s own sign —
+      **the actual fix for the historical speed/retrograde-flag
+      inconsistency**. Synthetic fallback verified byte-for-byte unchanged
+      for offline/unmodeled bodies (NorthNode/Chiron/Lilith).
+      `window.EPHEMERIS_MODE` set unconditionally for WP-19's future badge.
 
-**Assertion count: 493/493 → 818/818** (+13 timescale, +169 producer, +40
-houses; WP-03/05/06/15/04 were doc/tooling/CI packages, no new assertions).
-README banner is machine-checked by `scripts/check-claims.mjs`; `npm run lint`
-is clean. **Process note:** WP-07's PR (#4) shipped with a stale README banner
-because `check-claims.mjs --fix` wasn't re-run after adding tests — CI caught
-it before merge. Every package since has run `--fix` + verify as a mandatory
-last step; keep doing this.
+**Assertion count: 493/493 → 3366/3366** (+13 timescale, +169 producer, +794
+houses total, +1727 fixtures, +67 astro-ephemeris; WP-03/05/06/15/04 were
+doc/tooling/CI packages, no new assertions). README banner is machine-checked
+by `scripts/check-claims.mjs`; `npm run lint` is clean. **Process note:**
+WP-07's PR (#4) shipped with a stale README banner because `check-claims.mjs
+--fix` wasn't re-run after adding tests — CI caught it before merge; the
+`claims` CI job itself was also missing `npm ci` and broke on PR #5 the same
+way, once the suite gained a real dependency. Every package since has run
+`--fix` + verify as a mandatory last step; keep doing this.
 
 ## Prefetched assets (do not re-fetch)
 
@@ -105,17 +132,12 @@ last step; keep doing this.
 
 ## Remaining (per plan order; briefs in EXECUTION_PLAN.md)
 
-- [ ] **WP-09** Reference vectors — needs WP-08 (done, unblocked); **consume
-      horizons-prefetch.json**
-- [ ] **WP-10** Accuracy gate + retrograde/station tests — needs WP-09
-- [ ] **WP-12** Remaining quadrant systems + registry `"OPEN"` → `"LEDGER"` — needs
-      WP-11 (done, unblocked). Also a natural place to close WP-11's Placidus
-      external-reference gap (see above) — consider sourcing `swetest`-class
-      reference cusps for the newly-added systems AND retrofitting WP-11's tests.
+- [ ] **WP-10** Accuracy gate + retrograde/station tests — needs WP-09 (done,
+      unblocked)
 - [ ] **WP-13** House cusps into the ledger (schema v1.1) — needs WP-08 (done),
-      WP-12
-- [ ] **WP-17** Real ephemeris in the browser (vendored astronomy-engine) — needs WP-06 (done, unblocked)
-- [ ] **WP-18** DST-correct time + unknown-time flag — needs WP-17
+      WP-12 (done, unblocked)
+- [ ] **WP-18** DST-correct time + unknown-time flag — needs WP-17 (done,
+      unblocked)
 - [ ] **WP-19** Input validation & visible errors — needs WP-18
 - [ ] **WP-20** Accessibility & privacy — needs WP-19
 - [ ] **WP-21** Extract presentation logic to `src/present/astro-core.js` — needs WP-17

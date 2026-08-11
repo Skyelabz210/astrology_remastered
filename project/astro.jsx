@@ -309,6 +309,47 @@ const PLANET_PHASE0 = {            // ecliptic longitude at J2000 epoch (deg)
 };
 const PLANET_ORDER = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","NorthNode","Chiron","Lilith"];
 
+// ── Real vs. synthetic ephemeris (WP-17) ────────────────────────────────
+// project/vendor/astronomy.browser.min.js (vendored astronomy-engine 2.1.19
+// — see project/vendor/README.md) is loaded via a plain <script> tag before
+// this file's own script tag on every HTML page that uses astro.jsx. When it
+// loads successfully, `window.Astronomy` is defined and planetLongitude()/
+// planetSpeed()/isRetrograde() below compute REAL apparent geocentric
+// ecliptic-of-date longitudes (aberration on) and central-difference speeds,
+// using the exact same astronomy-engine call pattern
+// project/tools/ephemeris/produce-ledger.mjs (WP-08) uses for the Node
+// ledger CLI: Astronomy.GeoVector(body, time, true) → Astronomy.Ecliptic
+// (vec).elon for longitude, and a ±6h central difference for speed. That
+// Node module is the canonical implementation to keep this in sync with —
+// this file duplicates the small amount of logic rather than importing it,
+// since there is no bundler here and astro.jsx runs as a Babel-standalone
+// classic script, not an ES module that could import a shared file across
+// that boundary.
+//
+// Only the 10 classical bodies astronomy-engine's `Body` enum defines have
+// a real-ephemeris path (REAL_EPHEMERIS_BODIES below); NorthNode, Chiron,
+// and Lilith are not modeled by astronomy-engine at all and always fall
+// back to the synthetic mean-motion model further below, in both REAL and
+// SYNTHETIC mode — the same scope boundary produce-ledger.mjs's
+// DEFAULT_BODIES already draws for the Node ledger.
+//
+// If the vendor script failed to load (e.g. offline), `window.Astronomy` is
+// undefined and every body uses the synthetic model unchanged from before
+// — this is the documented offline fallback per
+// project/src/demo/SYNTHETIC_DEMO.js's contract, so it is kept, not deleted.
+//
+// window.EPHEMERIS_MODE is set unconditionally, as early as this script
+// executes (both branches), so a later UI package (WP-19) can surface it as
+// a badge regardless of which path any individual planet ends up using.
+if (typeof window !== "undefined") {
+  window.EPHEMERIS_MODE = window.Astronomy ? "REAL" : "SYNTHETIC";
+}
+
+const REAL_EPHEMERIS_BODIES = new Set([
+  "Sun", "Moon", "Mercury", "Venus", "Mars",
+  "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto",
+]);
+
 function mod360(x) { let m = x % 360; if (m < 0) m += 360; return m; }
 
 // J2000 = JD 2451545.0  → convert a UTC date to Julian Day
@@ -316,18 +357,64 @@ function dateToJD(date) {
   return date.getTime() / 86400000 + 2440587.5;
 }
 
+// Real apparent geocentric ecliptic-of-date longitude (degrees, [0,360))
+// via the vendored astronomy-engine, mirroring produce-ledger.mjs's
+// eclipticLongitudeDeg(). `jd` is JD(UT) in the dateToJD() convention above;
+// dateToJD() is exactly invertible for the millisecond-resolution Date
+// objects this file works with, so we reconstruct the wall-clock instant
+// and hand it to Astronomy.MakeTime(), which derives its own JD(TT)/ΔT
+// internally (see produce-ledger.mjs's header comment on why that — not
+// tools/ephemeris/timescale.js — is the right ΔT source to stay consistent
+// with the position actually computed).
+function realEclipticLongitudeDeg(planet, jd) {
+  const Astronomy = window.Astronomy;
+  const date = new Date((jd - 2440587.5) * 86400000);
+  const time = Astronomy.MakeTime(date);
+  const vec = Astronomy.GeoVector(Astronomy.Body[planet], time, true); // aberration on
+  return Astronomy.Ecliptic(vec).elon;
+}
+
+// Central-difference speed (deg/day) over a ±6h window — same convention as
+// produce-ledger.mjs's speed_arcsec_per_day: the shortest signed arc
+// between the t+6h and t-6h longitudes, divided by the 0.5-day span.
+function realPlanetSpeedDegPerDay(planet, jd) {
+  const lonMinus = realEclipticLongitudeDeg(planet, jd - 0.25);
+  const lonPlus  = realEclipticLongitudeDeg(planet, jd + 0.25);
+  let d = (lonPlus - lonMinus) % 360;
+  if (d <= -180) d += 360;
+  if (d > 180) d -= 360;
+  return d / 0.5;
+}
+
 function planetLongitude(planet, jd) {
+  if (window.Astronomy && REAL_EPHEMERIS_BODIES.has(planet)) {
+    try {
+      return mod360(realEclipticLongitudeDeg(planet, jd));
+    } catch (err) {
+      // Fall through to the synthetic model on any real-ephemeris failure
+      // (e.g. a corrupt/partial vendor load) rather than throwing mid-chart.
+    }
+  }
   const yearsFromJ2000 = (jd - 2451545.0) / 365.25;
   const period = PLANET_PERIODS[planet];
   const phase0 = PLANET_PHASE0[planet] ?? 0;
   return mod360(phase0 + (360 / period) * yearsFromJ2000);
 }
 
-// Simple retrograde model: outer planets retrograde whenever Earth's
+// Simple retrograde model (synthetic-path fallback only — see planetSpeed()
+// for the real-ephemeris path): outer planets retrograde whenever Earth's
 // heliocentric longitude pulls "ahead" by certain phase. We approximate
 // retrograde as a sin-driven boolean against Sun − planet elongation.
 function isRetrograde(planet, jd) {
   if (planet === "Sun" || planet === "Moon") return false;
+  // Real-ephemeris path: derive retrograde from the *same* central-difference
+  // speed value planetSpeed() reports for this planet, so the two can never
+  // disagree (this is the fix for the historical bug where the synthetic
+  // planetSpeed below was a constant positive mean rate independent of this
+  // heuristic flag).
+  if (window.Astronomy && REAL_EPHEMERIS_BODIES.has(planet)) {
+    return planetSpeed(planet, jd) < 0;
+  }
   if (planet === "NorthNode") return true;
   const sunLon = planetLongitude("Sun", jd);
   const pLon   = planetLongitude(planet, jd);
@@ -416,8 +503,28 @@ const ASPECTS = [
   { name: "Tredecile",   angle: 360/13, orb: 1.2, family: "tredecile" },
 ];
 
-// Speed (deg/day) for each modeled body. Derived from period.
-function planetSpeed(name) {
+// Speed (deg/day) for each modeled body.
+//
+// Real-ephemeris path: a central-difference speed computed from
+// window.Astronomy (realPlanetSpeedDegPerDay() above) whenever this body has
+// one (REAL_EPHEMERIS_BODIES) and a jd was supplied. isRetrograde() above
+// derives retrograde = speed < 0 from this exact same call, so the speed
+// number and the retrograde flag can never disagree for a given (planet, jd)
+// — this FIXES the historical bug where the synthetic constant rate below
+// was always positive regardless of isRetrograde()'s separate heuristic.
+//
+// Synthetic path (jd omitted, body has no real-ephemeris mapping, or the
+// real computation itself throws): the original constant mean rate derived
+// from PLANET_PERIODS, unchanged from before — the documented offline
+// fallback.
+function planetSpeed(name, jd) {
+  if (window.Astronomy && REAL_EPHEMERIS_BODIES.has(name) && jd !== undefined) {
+    try {
+      return realPlanetSpeedDegPerDay(name, jd);
+    } catch (err) {
+      // fall through to the synthetic constant rate below
+    }
+  }
   const p = PLANET_PERIODS[name];
   if (!p || p === 0) return 0;
   return 360 / (p * 365.25);  // signed (NorthNode is negative)
@@ -493,7 +600,7 @@ function computeNatal(birth) {
       sign,
       degInSign,
       arcsec,
-      speed: planetSpeed(p),
+      speed: planetSpeed(p, jd),
       retrograde: isRetrograde(p, jd),
       house: birth.houseSystem === "whole"
         ? houseForSign(sign, ascSignIdx)
