@@ -31,7 +31,12 @@ const CORE = join(HERE, "..", "src", "core");
 //     suites so --quick can skip the 1,296,000-point sweep.
 const EXCLUDE = new Set(["no-float-core.test.js", "full-sweep.test.js"]);
 
-const discovered = readdirSync(HERE)
+// { recursive: true } (Node >=20.1) walks subdirectories too — e.g.
+// test/present/*.test.js (WP-22) — returning POSIX-style relative paths
+// ("present/astro-core.test.js"). Plain readdirSync(HERE) would silently
+// miss anything not directly in test/; verified empirically (a probe file
+// dropped in test/present/ was NOT discovered) before switching to this.
+const discovered = readdirSync(HERE, { recursive: true })
   .filter((f) => f.endsWith(".test.js") && !EXCLUDE.has(f))
   .sort();
 

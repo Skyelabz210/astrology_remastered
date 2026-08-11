@@ -4,6 +4,21 @@
 // astrology and that the Mayan CRT / CTM substrate is internally
 // consistent. Run by opening "Test Harness.html".
 //
+// ── WP-22: Node port is now canonical ───────────────────────────────────
+// Every suite below has been ported to CLI-reachable Node test files under
+// project/test/present/ (astro-core.test.js, astro-core-lots.test.js,
+// astro-chart.test.js, ctm-mayan.test.js), auto-discovered and run by
+// `cd project && npm test`. That Node port — not this file — is the
+// primary coverage mechanism from here on: it runs in CI, needs no browser,
+// and every assertion in it was checked line-for-line against this file's
+// `expect(...)` calls at port time. This file (tests.jsx) is demoted to a
+// live smoke/demo page — it stays wired into "Test Harness.html" so the
+// same battery can still be eyeballed running in a real browser against a
+// real DOM, but it is no longer where new astrology-logic assertions
+// should be added. Add new coverage to project/test/present/ instead (and
+// mirror it here only if the visual smoke-page demonstration is itself
+// valuable).
+//
 // Suites:
 //   1.  zodiac        — 12 signs, elements, modalities, rulers
 //   2.  dignities     — Ptolemaic domicile / exaltation / detriment / fall
