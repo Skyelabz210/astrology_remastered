@@ -35,31 +35,54 @@ import { mod } from "./residues.js";
 /** The canonical internal anchor: the parked lane. */
 export const SHELL_ANCHOR = PARK;               // 11
 
-/** r — the shell residue, over {2,3,5,7,13,17,19}. */
+/**
+ * r — the shell residue, over {2,3,5,7,13,17,19}.
+ * @param {bigint} x - a longitude (BigInt arcseconds) or any integer.
+ * @returns {bigint} x mod M_SHELL.
+ */
 export function parkedShellResidue(x) { return mod(x, M_SHELL); }
 
-/** s — the anchor residue, read straight off the parked lane. */
+/**
+ * s — the anchor residue, read straight off the parked lane.
+ * @param {bigint} x
+ * @returns {bigint} x mod 11.
+ */
 export function parkResidue(x) { return mod(x, PARK); }
 
 /**
  * K-Elimination on the parked split. Returns K only; the number is the pair
  * (r, K) and nothing here fuses them.
+ * @param {bigint} r - shell residue, x mod M_SHELL.
+ * @param {bigint} s - parked-lane residue, x mod 11.
+ * @returns {bigint} K mod 11.
  */
 export function recoverShellWinding(r, s) {
   return mod((s - r) * M_SHELL_INV_MOD_PARK, PARK);
 }
 
-/** The same, driven from the integer — for encoding and for tests. */
+/**
+ * The same, driven from the integer — for encoding and for tests.
+ * @param {bigint} x
+ * @returns {bigint} K mod 11, as `recoverShellWinding`.
+ */
 export function recoverShellWindingFrom(x) {
   return recoverShellWinding(parkedShellResidue(x), parkResidue(x));
 }
 
-/** The yield: the identity pair, uncoupled. */
+/**
+ * The yield: the identity pair, uncoupled.
+ * @param {bigint} x
+ * @returns {{r: bigint, K: bigint, shell: bigint, anchor: bigint}}
+ */
 export function shellIdentity(x) {
   const r = parkedShellResidue(x);
   return { r, K: recoverShellWinding(r, parkResidue(x)), shell: M_SHELL, anchor: PARK };
 }
 
+/**
+ * @param {bigint} x
+ * @returns {bigint} ⌊x / M_SHELL⌋ — the true (non-reduced) winding, for verification.
+ */
 export function actualShellWinding(x) { return x / M_SHELL; }
 
 // ── the winding is DERIVED, not carried ────────────────────────────
@@ -81,7 +104,11 @@ export function actualShellWinding(x) { return x / M_SHELL; }
 // mod 11^e for every e and the lift is plain K-Elimination throughout — no
 // Hensel division, no divide-by-11 anywhere.
 
-/** 11^e — the parked lane carried at depth e. */
+/**
+ * 11^e — the parked lane carried at depth e.
+ * @param {bigint} levels - the depth e.
+ * @returns {bigint} 11^levels.
+ */
 export function parkPower(levels) {
   let q = 1n;
   for (let i = 0n; i < levels; i++) q = q * PARK;
@@ -98,6 +125,12 @@ export function parkPower(levels) {
  *
  * Exact while K < 11^levels. Returns the base-11 digits alongside K so the
  * lift is auditable level by level.
+ * @param {bigint} r - shell residue, x mod M_SHELL.
+ * @param {bigint} s - parked-lane residue, x mod 11^levels.
+ * @param {bigint} [levels=2n] - the lift depth (2 = the "double lift").
+ * @returns {{K: bigint, digits: bigint[], phases: bigint[], levels: bigint,
+ *   depth: bigint, shell: bigint, anchor: bigint, corridor: bigint}}
+ * @throws {Error} "the lift needs at least one level" if levels < 1.
  */
 export function liftWinding(r, s, levels = 2n) {
   if (levels < 1n) throw new Error("the lift needs at least one level");
@@ -122,18 +155,32 @@ export function liftWinding(r, s, levels = 2n) {
   };
 }
 
-/** The double lift, named — two eliminations, K < 121. */
+/**
+ * The double lift, named — two eliminations, K < 121.
+ * @param {bigint} r - shell residue.
+ * @param {bigint} s - parked-lane residue mod 121.
+ * @returns {Object} `liftWinding(r, s, 2n)` result.
+ */
 export function doubleLiftWinding(r, s) { return liftWinding(r, s, 2n); }
 
 /**
  * Derive the winding straight from the tray at the given depth. The parked lane
  * is read at 11^levels; every other lane is untouched.
+ * @param {bigint} x - the source integer.
+ * @param {bigint} [levels=2n] - the lift depth.
+ * @returns {Object} `liftWinding(...)` result.
  */
 export function windingFromTray(x, levels = 2n) {
   return liftWinding(parkedShellResidue(x), mod(x, parkPower(levels)), levels);
 }
 
-/** Inverse mod a prime power, by extended Euclid. Defined because gcd(M,11)=1. */
+/**
+ * Inverse mod a prime power, by extended Euclid. Defined because gcd(M,11)=1.
+ * @param {bigint} a
+ * @param {bigint} m - a prime power modulus.
+ * @returns {bigint} a⁻¹ mod m.
+ * @throws {Error} "parked lane is not coprime to the shell" if gcd(a, m) ≠ 1.
+ */
 function inverseModPrimePower(a, m) {
   let [old_r, r] = [mod(a, m), m];
   let [old_s, s] = [1n, 0n];
@@ -149,6 +196,11 @@ function inverseModPrimePower(a, m) {
 /**
  * The register carried by the tray alone. There is no K field — `winding` is a
  * getter-shaped derivation, recomputed from r and s every time it is asked for.
+ * @param {bigint} x - the source integer.
+ * @param {bigint} [levels=2n] - the parked-lane depth to read s at.
+ * @returns {{kind: "PARKED_TRAY_V1", shell_lanes: string[], r: string,
+ *   parked_lane: string, parked_depth: string, s: string,
+ *   derive: function(): Object, carries_winding: false}}
  */
 export function trayRegister(x, levels = 2n) {
   const r = parkedShellResidue(x);
@@ -166,6 +218,12 @@ export function trayRegister(x, levels = 2n) {
   };
 }
 
+/**
+ * Self-check: does the parked-split K-Elimination recovery agree with the
+ * directly computed (unbounded) winding?
+ * @param {bigint} x
+ * @returns {{split: "parked", shell: string, anchor: string, recovered: string, actual: string, ok: boolean}}
+ */
 export function verifyShellWinding(x) {
   const recovered = recoverShellWindingFrom(x);
   const actual = actualShellWinding(x);
@@ -181,20 +239,35 @@ export function verifyShellWinding(x) {
 
 // ── legacy: gear split, retained and still exact ───────────────────
 
+/** Legacy shell modulus (= M6, 30,030). */
 export const LEGACY_SHELL = M6;
+/** Legacy anchor modulus (= GEAR_PRODUCT, 323). */
 export const LEGACY_ANCHOR = GEAR_PRODUCT;
 
+/** @param {bigint} x @returns {bigint} x mod M6. */
 export function shellResidue(x) { return mod(x, M6); }
+/** @param {bigint} x @returns {bigint} x mod GEAR_PRODUCT (323). */
 export function gearResidue(x) { return mod(x, GEAR_PRODUCT); }
 
+/**
+ * K-Elimination on the legacy gear split.
+ * @param {bigint} x
+ * @returns {bigint} K mod 323.
+ */
 export function recoverShellWindingFromGear(x) {
   const vM = shellResidue(x);
   const vA = gearResidue(x);
   return mod((vA - vM) * M6_INV_MOD_GEAR, GEAR_PRODUCT);
 }
 
+/** @param {bigint} x @returns {bigint} ⌊x / M6⌋. */
 export function actualLegacyWinding(x) { return x / M6; }
 
+/**
+ * Self-check for the legacy gear-split recovery.
+ * @param {bigint} x
+ * @returns {{split: "gear (legacy)", shell: string, anchor: string, recovered: string, actual: string, ok: boolean}}
+ */
 export function verifyLegacyShellWinding(x) {
   const recovered = recoverShellWindingFromGear(x);
   const actual = actualLegacyWinding(x);

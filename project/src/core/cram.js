@@ -50,25 +50,46 @@ import { B6, B8, M6, M8 } from "./basis.js";
 
 // ── basis hygiene: coprimality, not primality ──────────────────────
 
+/**
+ * Euclidean greatest common divisor.
+ * @param {bigint} a
+ * @param {bigint} b
+ * @returns {bigint} gcd(|a|, |b|), non-negative.
+ */
 export function gcd(a, b) {
   let x = a < 0n ? -a : a, y = b < 0n ? -b : b;
   while (y) { const t = mod(x, y); x = y; y = t; }
   return x;
 }
 
+/**
+ * Extended Euclidean algorithm.
+ * @param {bigint} a
+ * @param {bigint} b
+ * @returns {[bigint, bigint, bigint]} [g, x, y] with g = gcd(a,b) = a*x + b*y.
+ */
 export function egcd(a, b) {
   if (b === 0n) return [a, 1n, 0n];
   const [g, x, y] = egcd(b, mod(a, b));
   return [g, y, x - (a / b) * y];
 }
 
-/** Modular inverse, or null when a is not a unit mod m. */
+/**
+ * Modular inverse, or null when a is not a unit mod m.
+ * @param {bigint} a
+ * @param {bigint} m - the modulus.
+ * @returns {?bigint} a⁻¹ mod m, or null if gcd(a, m) ≠ 1.
+ */
 export function inverse(a, m) {
   const [g, x] = egcd(mod(a, m), m);
   return g === 1n ? mod(x, m) : null;
 }
 
-/** A safe basis is pairwise coprime. It is NOT required to be prime. */
+/**
+ * A safe basis is pairwise coprime. It is NOT required to be prime.
+ * @param {bigint[]} basis - candidate lane moduli.
+ * @returns {boolean} true iff every element is ≥ 2 and every pair is coprime.
+ */
 export function isSafeBasis(basis) {
   for (let i = 0; i < basis.length; i++) {
     if (basis[i] < 2n) return false;
@@ -77,9 +98,18 @@ export function isSafeBasis(basis) {
   return true;
 }
 
+/**
+ * The shell modulus of a basis: the product of its lanes.
+ * @param {bigint[]} basis
+ * @returns {bigint} ∏ basis.
+ */
 export function shellModulus(basis) { return basis.reduce((a, p) => a * p, 1n); }
 
-/** The canonical CRAM anchor: adjacent to the shell, coprime by construction. */
+/**
+ * The canonical CRAM anchor: adjacent to the shell, coprime by construction.
+ * @param {bigint} M - the shell modulus.
+ * @returns {bigint} M + 1.
+ */
 export function canonicalAnchor(M) { return M + 1n; }
 
 // ── K-Elimination ──────────────────────────────────────────────────
@@ -90,12 +120,21 @@ export function canonicalAnchor(M) { return M + 1n; }
  *     A = M + 1  ⟹  M ≡ −1 (mod A)  ⟹  M⁻¹ ≡ M ≡ −1  ⟹  K ≡ r − s (mod A)
  *
  * One subtraction and one reduction. Exact whenever 0 ≤ K < A.
+ * @param {bigint} r - shell residue, x mod M.
+ * @param {bigint} s - anchor residue, x mod (M+1).
+ * @param {bigint} M - the shell modulus.
+ * @returns {bigint} K = (r − s) mod (M+1).
  */
 export function adjacencyRecover(r, s, M) {
   return mod(r - s, M + 1n);
 }
 
-/** The same, from the integer, for testing and for encoding. */
+/**
+ * The same, from the integer, for testing and for encoding.
+ * @param {bigint} x - the source integer.
+ * @param {bigint} M - the shell modulus.
+ * @returns {bigint} K, as `adjacencyRecover`.
+ */
 export function adjacencyRecoverFrom(x, M) {
   return adjacencyRecover(mod(x, M), mod(x, M + 1n), M);
 }
@@ -103,7 +142,11 @@ export function adjacencyRecoverFrom(x, M) {
 /**
  * GENERAL K-ELIMINATION — any anchor A coprime to M.
  * Costs a subtract, a multiply by the precomputed M⁻¹ mod A, and a reduction.
- * Returns null when A is not coprime to M (use `gradientRecover` instead).
+ * @param {bigint} r - shell residue, x mod M.
+ * @param {bigint} s - anchor residue, x mod A.
+ * @param {bigint} M - the shell modulus.
+ * @param {bigint} A - the anchor modulus.
+ * @returns {?bigint} K mod A, or null when A is not coprime to M (use `gradientRecover` instead).
  */
 export function generalRecover(r, s, M, A) {
   const mi = inverse(M, A);
@@ -118,7 +161,12 @@ export function generalRecover(r, s, M, A) {
  *     K ≡ ((v − r)/d) · (M/d)⁻¹   (mod R)
  *
  * (M/d)⁻¹ mod R always exists because dividing out the full gcd leaves coprime
- * cofactors. Returns null when the residue pair is inconsistent.
+ * cofactors.
+ * @param {bigint} r - shell residue, x mod M.
+ * @param {bigint} v - anchor residue, x mod A.
+ * @param {bigint} M - the shell modulus.
+ * @param {bigint} A - the anchor modulus (need not be coprime to M).
+ * @returns {?bigint} K mod R (R = A/gcd(M,A)), or null when the residue pair is inconsistent.
  */
 export function gradientRecover(r, v, M, A) {
   const d = gcd(M, A);
@@ -130,7 +178,12 @@ export function gradientRecover(r, v, M, A) {
   return mod((diff / d) * mi, R);
 }
 
-/** The resolution a given (shell, anchor) pair achieves. */
+/**
+ * The resolution a given (shell, anchor) pair achieves.
+ * @param {bigint} M - the shell modulus.
+ * @param {bigint} A - the anchor modulus.
+ * @returns {{d: string, resolution: string, exact_when_K_below: string}} decimal-string fields.
+ */
 export function resolution(M, A) {
   const d = gcd(M, A);
   return { d: d.toString(), resolution: (A / d).toString(), exact_when_K_below: (A / d).toString() };
@@ -150,7 +203,14 @@ export function resolution(M, A) {
  *     K ≡ ((s − γ) / q) · (M′)⁻¹   (mod q^{e−1})
  *
  * For B8 with q = 11, e = 6 this pins K modulo 161,051 — a corridor of
- * M8 · 11⁵ ≈ 1.56 × 10¹². Returns null on an inconsistent pair.
+ * M8 · 11⁵ ≈ 1.56 × 10¹².
+ * @param {bigint} gamma - the CRT representative of the tray (see `gamma`/`gammaOf`).
+ * @param {bigint} s - the shadow-lane residue x mod q^e.
+ * @param {bigint} M - the shell modulus (which contains q as a factor).
+ * @param {bigint} q - the shadow prime.
+ * @param {bigint} e - the power q is carried at.
+ * @returns {?{K: bigint, modulus: bigint, corridor: bigint}} the lifted
+ *   winding and its modulus/corridor, or null on an inconsistent pair.
  */
 export function shadowLift(gamma, s, M, q, e) {
   let power = 1n;
@@ -192,6 +252,10 @@ export function shadowLift(gamma, s, M, q, e) {
 /**
  * The yield, adjacent anchor. One modular subtraction. Returns the identity
  * pair — r and K are NOT combined.
+ * @param {bigint} r - shell residue, x mod M.
+ * @param {bigint} s - anchor residue, x mod (M+1).
+ * @param {bigint} M - the shell modulus.
+ * @returns {{r: bigint, K: bigint, shell: bigint, anchor: bigint}}
  */
 export function yieldAdjacent(r, s, M) {
   return { r, K: mod(r - s, M + 1n), shell: M, anchor: M + 1n };
@@ -199,19 +263,31 @@ export function yieldAdjacent(r, s, M) {
 
 /**
  * The yield, any coprime anchor. K-Elimination only. Returns the identity pair.
- * Null when A is not coprime to M.
+ * @param {bigint} r - shell residue, x mod M.
+ * @param {bigint} s - anchor residue, x mod A.
+ * @param {bigint} M - the shell modulus.
+ * @param {bigint} A - the anchor modulus.
+ * @returns {?{r: bigint, K: bigint, shell: bigint, anchor: bigint}} null when A is not coprime to M.
  */
 export function yieldGeneral(r, s, M, A) {
   const K = generalRecover(r, s, M, A);
   return K === null ? null : { r, K, shell: M, anchor: A };
 }
 
-/** Equality on the identity pair. No composite is formed. */
+/**
+ * Equality on the identity pair. No composite is formed.
+ * @param {{r: bigint, K: bigint}} a
+ * @param {{r: bigint, K: bigint}} b
+ * @returns {boolean}
+ */
 export function identityEquals(a, b) { return a.r === b.r && a.K === b.K; }
 
 /**
  * Order on the identity pair: K orders the laps, r orders within a lap.
  * Reproduces integer order exactly, without forming either integer.
+ * @param {{r: bigint, K: bigint}} a
+ * @param {{r: bigint, K: bigint}} b
+ * @returns {-1|0|1}
  */
 export function identityCompare(a, b) {
   if (a.K !== b.K) return a.K < b.K ? -1 : 1;
@@ -223,12 +299,18 @@ export function identityCompare(a, b) {
  * BOUNDARY PROJECTION — this is the radix step. It couples r and K into a
  * base-M positional composite. Exact, but it is not the yield and must not be
  * treated as one. Two operations on top of the yield.
+ * @param {{r: bigint, K: bigint, shell: bigint}} id - an identity pair with its shell modulus.
+ * @returns {bigint} the reconstructed integer id.r + id.K * id.shell.
  */
 export function projectToInteger(id) { return id.r + id.K * id.shell; }
 
 /**
  * Costs, split so the coupling is visible rather than folded into a total.
  * `couples` is the field that matters.
+ * @param {"adjacent"|"general"|"projection"|"garner"} mode
+ * @param {bigint} [lanes=8n] - lane count, only used by the "garner" mode's cost.
+ * @returns {Object} an op-count breakdown for the given mode.
+ * @throws {Error} if `mode` is not one of the four recognized strings.
  */
 export function yieldCost(mode, lanes = 8n) {
   if (mode === "adjacent") {
@@ -256,6 +338,9 @@ export function yieldCost(mode, lanes = 8n) {
 /**
  * Op counts for one winding recovery, so the adjacency claim is auditable
  * rather than rhetorical. Counts are structural, not timed.
+ * @param {"adjacency"|"general"} mode
+ * @returns {Object} an op-count breakdown for the given mode.
+ * @throws {Error} if `mode` is neither "adjacency" nor "general".
  */
 export function recoveryCost(mode) {
   if (mode === "adjacency") {
@@ -281,6 +366,14 @@ export function recoveryCost(mode) {
  */
 export const STATE_FIELDS = ["basis", "r", "K", "sigma", "topology", "shadow", "lineage", "support"];
 
+/**
+ * Build a `CRAM_STATE_V1` from an integer and a basis.
+ * @param {bigint} x - the value to encode.
+ * @param {bigint[]} basis - the lane moduli (need not be prime, must be pairwise coprime for downstream use).
+ * @param {{sigma?: Object, topology?: string[], shadow?: *, lineage?: Array, support?: number[]}} [opts]
+ *   - optional extra state fields; each defaults per `STATE_FIELDS`.
+ * @returns {Object} a `CRAM_STATE_V1` object: `{kind, basis, r, K, sigma, topology, shadow, lineage, support}`.
+ */
 export function encode(x, basis, opts = {}) {
   const M = shellModulus(basis);
   return {
@@ -296,7 +389,11 @@ export function encode(x, basis, opts = {}) {
   };
 }
 
-/** Canonical CRT representative of the tray — the boundary touch, not the hot path. */
+/**
+ * Canonical CRT representative of the tray — the boundary touch, not the hot path.
+ * @param {{basis: bigint[], r: bigint[]}} state - a CRAM state (or any object with basis/r).
+ * @returns {bigint} the unique value in [0, shellModulus(state.basis)) with that residue tray.
+ */
 export function gamma(state) {
   const M = shellModulus(state.basis);
   let acc = 0n;
@@ -309,8 +406,21 @@ export function gamma(state) {
   return acc;
 }
 
+/**
+ * The full reconstructed integer of a state: gamma(state) + K·M — a boundary
+ * projection, not a hot-path operation.
+ * @param {{basis: bigint[], r: bigint[], K: bigint}} state
+ * @returns {bigint}
+ */
 export function value(state) { return gamma(state) + state.K * shellModulus(state.basis); }
 
+/**
+ * Structural well-formedness check for a `CRAM_STATE_V1`.
+ * @param {Object} state
+ * @returns {boolean} true iff `state` has the right kind tag, every
+ *   `STATE_FIELDS` key, a pairwise-coprime basis, residues in range for their
+ *   lanes, and a topology array matching the basis length.
+ */
 export function wellFormed(state) {
   return state.kind === "CRAM_STATE_V1"
     && STATE_FIELDS.every((f) => f in state)
@@ -357,7 +467,14 @@ export function wellFormed(state) {
 // two bases is therefore NOT required — sharing is a feature, and it is exactly
 // where the phase lock lives.
 
-/** CRT idempotents of a basis. They exist iff the basis is unbroken. */
+/**
+ * CRT idempotents of a basis. They exist iff the basis is unbroken.
+ * @param {bigint[]} basis - a pairwise-coprime, no-repeated-modulus basis.
+ * @returns {bigint[]} one idempotent e_i per lane, with e_i ≡ 1 (mod basis[i])
+ *   and e_i ≡ 0 (mod basis[j]) for j ≠ i.
+ * @throws {Error} "broken basis: idempotent does not exist" if any lane
+ *   shares a factor with the shell built from the others.
+ */
 export function idempotents(basis) {
   const M = shellModulus(basis);
   return basis.map((a) => {
@@ -380,6 +497,10 @@ export function idempotents(basis) {
  * the first tray and rides along.
  *
  * Disjointness is not required either; the shared lanes are where the lock is.
+ * @param {bigint[]} A - the source basis.
+ * @param {bigint[]} B - the target basis.
+ * @returns {Object} `TRANSDUCTION_CERTIFICATE_V2` — source/target unbroken
+ *   flags, shared lanes, and `admissible` (true iff the source is unbroken).
  */
 export function certifyTransduction(A, B) {
   const repeated = (b) => new Set(b.map(String)).size !== b.length;
@@ -441,6 +562,24 @@ export function certifyTransduction(A, B) {
  * `phiBound` survives as an OPTIONAL strengthening: supplied, it proves
  * containment outright and the lineage says so. It is no longer required, and
  * its absence no longer refuses anything.
+ * @param {Object} state - a `CRAM_STATE_V1` (from `encode`), source of the bridge.
+ * @param {bigint[]} targetBasis - the basis to transduce into.
+ * @param {{theta?: function, pi?: function, omega?: ("recompute"|"preserve"|"project"|"bound"|"lift"),
+ *   phiLane?: function(bigint, bigint): bigint, phiBound?: function(bigint): bigint,
+ *   phiMagnitude?: function(bigint): bigint, depth?: bigint, anchors?: bigint[]}} [opts]
+ *   - `theta` maps sigma forward; `pi` maps topology forward; `omega` selects
+ *   the winding policy (default "recompute"); `phiLane` is an optional
+ *   lane-wise value map; `depth` (default 2n) sets the default single-anchor
+ *   lift depth when `opts.anchors` is not supplied; `anchors` overrides the
+ *   anchor set used for K-Elimination.
+ * @returns {Object} a new `CRAM_STATE_V1` over `targetBasis`, with an extended `lineage`.
+ * @throws {Error} "transduction refused: basis is broken" if the source basis
+ *   is not an unbroken safe basis; "transduction refused: the target winding
+ *   wrapped the corridor" under `omega:"recompute"` when the winding exceeds
+ *   the anchor set's certified corridor; "transduction refused: omega:'lift'
+ *   past the certified corridor needs phiMagnitude" when lifting past the
+ *   corridor under a non-trivial Φ without `opts.phiMagnitude`; "unknown
+ *   winding policy" for an unrecognized `omega`.
  */
 export function transduce(state, targetBasis, opts = {}) {
   const cert = certifyTransduction(state.basis, targetBasis);
@@ -609,7 +748,12 @@ export function transduce(state, targetBasis, opts = {}) {
   };
 }
 
-/** Canonical representative of a tray over a basis. */
+/**
+ * Canonical representative of a tray over a basis.
+ * @param {bigint[]} r - the residue tray, one entry per basis lane.
+ * @param {bigint[]} basis - the lane moduli.
+ * @returns {bigint} the unique value in [0, shellModulus(basis)) with that tray.
+ */
 export function gammaOf(r, basis) {
   const M = shellModulus(basis);
   const e = idempotents(basis);
@@ -627,11 +771,17 @@ export function gammaOf(r, basis) {
  */
 export const WINDING_POLICIES = ["preserve", "recompute", "project", "bound"];
 
+/**
+ * @param {string} omega - a winding policy (see `WINDING_POLICIES`, plus "lift").
+ * @returns {boolean} true iff `omega` is "recompute", "preserve", or "lift".
+ */
 export function isReversiblePolicy(omega) {
   return omega === "recompute" || omega === "preserve" || omega === "lift";
 }
 
 // ── project defaults ───────────────────────────────────────────────
 
+/** Legacy six-lane shell descriptor: `{basis: B6, M: M6, anchor: M6+1}`. */
 export const SHELL_6 = { basis: B6, M: M6, anchor: M6 + 1n };
+/** Full eight-lane shell descriptor: `{basis: B8, M: M8, anchor: M8+1}`. */
 export const SHELL_8 = { basis: B8, M: M8, anchor: M8 + 1n };

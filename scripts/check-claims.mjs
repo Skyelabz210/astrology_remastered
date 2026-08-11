@@ -34,6 +34,7 @@ const ROOT = join(HERE, "..");
 const RUN_JS = join(ROOT, "project", "test", "run.js");
 const CORE_DIR = join(ROOT, "project", "src", "core");
 const README = join(ROOT, "README.md");
+const INPUTS_OUTPUTS = join(ROOT, "project", "docs", "INPUTS_OUTPUTS.md");
 
 const fix = process.argv.includes("--fix");
 
@@ -113,6 +114,68 @@ function readBanner(readmeText) {
 }
 
 // ---------------------------------------------------------------------------
+// 2b. WP-27: every exported name from project/src/core/*.js must appear
+// somewhere in project/docs/INPUTS_OUTPUTS.md.
+//
+// This is a plain name-presence (substring) check, not a JSDoc-vs-doc
+// cross-reference: it exists to catch the case of a new core export shipping
+// with zero documentation, not to grade the quality of the prose next to it.
+// There is deliberately no --fix for this — "write the missing docs" isn't
+// automatable — so CHECK mode is the only mode that runs it.
+
+/** Extract every top-level exported identifier from one core module's source. */
+function extractExportedNames(source) {
+  const names = new Set();
+  const declPatterns = [
+    /^export\s+(?:async\s+)?function\s*\*?\s+([A-Za-z_$][A-Za-z0-9_$]*)/gm,
+    /^export\s+const\s+([A-Za-z_$][A-Za-z0-9_$]*)/gm,
+    /^export\s+let\s+([A-Za-z_$][A-Za-z0-9_$]*)/gm,
+    /^export\s+class\s+([A-Za-z_$][A-Za-z0-9_$]*)/gm,
+  ];
+  for (const re of declPatterns) {
+    for (const m of source.matchAll(re)) names.add(m[1]);
+  }
+  // export { a, b as c, ... };  — the exported (right-hand, post-`as`) name
+  // is what a consumer imports, so that's what must be documented.
+  for (const m of source.matchAll(/^export\s*\{([^}]+)\}/gm)) {
+    for (const rawPart of m[1].split(",")) {
+      const part = rawPart.trim();
+      if (!part) continue;
+      const asMatch = /^[A-Za-z_$][A-Za-z0-9_$]*\s+as\s+([A-Za-z_$][A-Za-z0-9_$]*)$/.exec(part);
+      names.add(asMatch ? asMatch[1] : part.split(/\s+/)[0]);
+    }
+  }
+  return names;
+}
+
+/**
+ * @returns {{error: string}|{missing: string[]}} either a fatal error (the
+ *   doc file is missing entirely) or the list of "file.js: exportName"
+ *   entries whose export name does not appear anywhere in the doc's text.
+ */
+function findUndocumentedCoreExports() {
+  let docsText;
+  try {
+    docsText = readFileSync(INPUTS_OUTPUTS, "utf8");
+  } catch {
+    return {
+      error:
+        `project/docs/INPUTS_OUTPUTS.md not found (expected at ${INPUTS_OUTPUTS}) — ` +
+        "every project/src/core/*.js export must be documented there (WP-27).",
+    };
+  }
+  const files = readdirSync(CORE_DIR).filter((f) => f.endsWith(".js")).sort();
+  const missing = [];
+  for (const file of files) {
+    const source = readFileSync(join(CORE_DIR, file), "utf8");
+    for (const name of extractExportedNames(source)) {
+      if (!docsText.includes(name)) missing.push(`${file}: ${name}`);
+    }
+  }
+  return { missing };
+}
+
+// ---------------------------------------------------------------------------
 // 3. Compare and report.
 
 const { stdout, ok: suiteOk } = runFullSuite();
@@ -169,6 +232,18 @@ if (modulesMismatch) {
     "README banner core-module count is stale:\n" +
       `    README says : ${banner.modulesA}/${banner.modulesB}\n` +
       `    live value  : ${liveModules}/${liveModules}`,
+  );
+}
+
+const docCoverage = findUndocumentedCoreExports();
+if (docCoverage.error) {
+  problems.push(docCoverage.error);
+} else if (docCoverage.missing.length > 0) {
+  problems.push(
+    `${docCoverage.missing.length} exported name(s) from project/src/core/*.js do not appear ` +
+      "anywhere in project/docs/INPUTS_OUTPUTS.md:\n" +
+      docCoverage.missing.map((m) => `    - ${m}`).join("\n") +
+      "\n  Add each one to the reference doc (see WP-27's brief) — there is no --fix for this.",
   );
 }
 

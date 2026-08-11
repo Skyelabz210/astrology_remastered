@@ -25,19 +25,31 @@
 import { factorise } from "./ring.js";
 import { isShadowPrime } from "./safe-basis.js";
 
-/** ω(n) — the count of distinct prime factors. */
+/**
+ * ω(n) — the count of distinct prime factors.
+ * @param {bigint} n
+ * @returns {bigint}
+ */
 export function omega(n) {
   return BigInt(factorise(n).length);
 }
 
-/** q(n) — the largest shadow (inert, p ≡ 3 mod 4) prime factor; 0n when none. */
+/**
+ * q(n) — the largest shadow (inert, p ≡ 3 mod 4) prime factor; 0n when none.
+ * @param {bigint} n
+ * @returns {bigint}
+ */
 export function largestShadowFactor(n) {
   let q = 0n;
   for (const [p] of factorise(n)) if (isShadowPrime(p) && p > q) q = p;
   return q;
 }
 
-/** δ(n) — the shadow step: 0 for q ≤ 7, 1 at the anchor 11, 2 from 19 up. */
+/**
+ * δ(n) — the shadow step: 0 for q ≤ 7, 1 at the anchor 11, 2 from 19 up.
+ * @param {bigint} n
+ * @returns {bigint} 0n, 1n, or 2n.
+ */
 export function delta(n) {
   const q = largestShadowFactor(n);
   if (q >= 19n) return 2n;
@@ -45,7 +57,11 @@ export function delta(n) {
   return 0n;
 }
 
-/** ρ(n) = ω(n) + δ(n). */
+/**
+ * ρ(n) = ω(n) + δ(n).
+ * @param {bigint} n
+ * @returns {bigint}
+ */
 export function rho(n) {
   return omega(n) + delta(n);
 }
@@ -57,12 +73,21 @@ export const BANDS = [
   { id: "chaotic", label: "Chaotic", min: 9n, max: null, note: "effectively unpredictable" },
 ];
 
+/**
+ * @param {bigint} r - a ρ value.
+ * @returns {Object} the `BANDS` entry containing r.
+ * @throws {Error} "ρ outside every band" — structurally unreachable since BANDS is exhaustive.
+ */
 export function band(r) {
   for (const b of BANDS) if (r >= b.min && (b.max === null || r <= b.max)) return b;
   throw new Error("ρ outside every band");
 }
 
-/** Full ρ report for one integer. All numeric fields are decimal strings. */
+/**
+ * Full ρ report for one integer. All numeric fields are decimal strings.
+ * @param {bigint} n
+ * @returns {Object} factorisation, omega, shadow_factors, q, delta, rho, band, band_label, band_note.
+ */
 export function rhoReport(n) {
   const f = factorise(n);
   const q = largestShadowFactor(n);

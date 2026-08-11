@@ -34,14 +34,22 @@ export const RING_RADICAL = 30n;
  */
 export const OFF_RING_PRIMES = [7n, 11n, 13n, 17n, 19n];
 
-/** Exact integer power. */
+/**
+ * Exact integer power.
+ * @param {bigint} base
+ * @param {bigint} exp - exponent, ≥ 0.
+ * @returns {bigint} base^exp.
+ */
 export function ipow(base, exp) {
   let out = 1n;
   for (let i = 0n; i < exp; i++) out = out * base;
   return out;
 }
 
-/** Recompute R from its factorisation — a self-check, not an assumption. */
+/**
+ * Recompute R from its factorisation — a self-check, not an assumption.
+ * @returns {bigint} should equal RING (1,296,000).
+ */
 export function ringFromFactors() {
   let out = 1n;
   for (let i = 0; i < RING_PRIMES.length; i++) {
@@ -52,8 +60,11 @@ export function ringFromFactors() {
 
 /**
  * Trial-division factorisation of a positive integer.
- * Returns [[p, e], ...] with p ascending. Exact; used only on the small
+ * Exact; used only on the small
  * divisors that astrological traditions actually name (n ≤ a few thousand).
+ * @param {bigint} n - a positive integer.
+ * @returns {[bigint, bigint][]} [[p, e], ...] with p ascending, n = ∏ p^e.
+ * @throws {Error} "factorise expects a positive integer" if n < 1.
  */
 export function factorise(n) {
   if (n < 1n) throw new Error("factorise expects a positive integer");
@@ -69,7 +80,11 @@ export function factorise(n) {
   return out;
 }
 
-/** True iff every prime factor of n lies in {2,3,5}. */
+/**
+ * True iff every prime factor of n lies in {2,3,5}.
+ * @param {bigint} n
+ * @returns {boolean}
+ */
 export function isRingSmooth(n) {
   let m = n;
   for (const p of RING_PRIMES) while (mod(m, p) === 0n) m = m / p;
@@ -83,12 +98,18 @@ export function isRingSmooth(n) {
  *
  * Ring-smoothness alone is necessary but not sufficient: 2^8 = 256 is smooth
  * yet exceeds the ring's exponent on 2, so it does not divide R.
+ * @param {bigint} n - the division divisor (in arcseconds).
+ * @returns {boolean} true iff n | R.
  */
 export function closes(n) {
   return mod(RING, n) === 0n;
 }
 
-/** Step size in arcseconds when the division closes; null when it does not. */
+/**
+ * Step size in arcseconds when the division closes; null when it does not.
+ * @param {bigint} n - the division divisor.
+ * @returns {?bigint} R/n, or null if `closes(n)` is false.
+ */
 export function stepArcsec(n) {
   return closes(n) ? RING / n : null;
 }
@@ -97,6 +118,8 @@ export function stepArcsec(n) {
  * The residue defect of a division: R mod n. Zero exactly when the division
  * closes. For a prime p this is the ring's own residue in lane p, which is why
  * the spine primes are precisely the lanes where the ring itself is nonzero.
+ * @param {bigint} n
+ * @returns {bigint} R mod n.
  */
 export function defect(n) {
   return mod(RING, n);
@@ -105,6 +128,8 @@ export function defect(n) {
 /**
  * The prime factors of n that the ring cannot absorb — the reason a division
  * fails to close, named. Empty array ⟺ the division closes (given exponents fit).
+ * @param {bigint} n
+ * @returns {bigint[]} n's prime factors that do not divide RING.
  */
 export function offRingPrimes(n) {
   return factorise(n).map(([p]) => p).filter((p) => mod(RING, p) !== 0n);
@@ -113,6 +138,9 @@ export function offRingPrimes(n) {
 /**
  * Full exact report on one division of the zodiac.
  * All numeric fields are decimal strings so the report is JSON-safe.
+ * @param {bigint} n - the division divisor.
+ * @returns {Object} n, closes, step_arcsec, defect_arcsec, ring_smooth,
+ *   off_ring_primes, exponent_overflow, factorisation.
  */
 export function divisionReport(n) {
   const off = offRingPrimes(n);
@@ -131,7 +159,11 @@ export function divisionReport(n) {
   };
 }
 
-/** Per-prime defect table for the Safe-basis lanes: R mod p for each p. */
+/**
+ * Per-prime defect table for the Safe-basis lanes: R mod p for each p.
+ * @param {bigint[]} primes - the lanes to report.
+ * @returns {Object<string, string>} `{ mod_<p>: "<R mod p>", ... }`.
+ */
 export function laneDefects(primes) {
   const out = {};
   for (const p of primes) out[`mod_${p.toString()}`] = mod(RING, p).toString();
@@ -142,6 +174,9 @@ export function laneDefects(primes) {
  * Count of x in [0, RING) with x ≡ target (mod m), in closed form.
  * Used to certify swept event censuses against arithmetic rather than against
  * a hardcoded number.
+ * @param {bigint} m - the modulus.
+ * @param {bigint} target - the target residue class.
+ * @returns {bigint} the count, or 0n if the reduced target is ≥ RING.
  */
 export function residueClassCount(m, target) {
   const t = mod(target, m);
