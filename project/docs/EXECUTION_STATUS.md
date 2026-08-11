@@ -1,7 +1,8 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Update this file as
-packages land. Last updated: 2026-08-11 (Batch H complete, verified, committed).
+packages land. Last updated: 2026-08-11 (Batch I complete, verified, committed —
+28 of 29 work packages done; only WP-28 remains).
 
 ## Done (verified, committed)
 
@@ -227,13 +228,56 @@ packages land. Last updated: 2026-08-11 (Batch H complete, verified, committed).
       Chromium render.
       **Privacy finding — flagged for owner decision, not silently fixed
       or hidden (see "Flagged for owner decision" below).**
+- [x] **WP-26** CI final assembly — `.github/workflows/ci.yml` activated
+      into its final form: `core-tests`/`claims`/`lint`/`accuracy`/
+      `schema-validate` all blocking, `bench` non-blocking with artifact
+      upload. `ui-logic` and `swiss-crosscheck` deliberately NOT made
+      separate jobs — both reasoned through and documented inline in
+      `ci.yml` rather than silently dropped (WP-22's port made `ui-logic`
+      redundant with `core-tests`; the pyswisseph cross-check's results are
+      already baked into `accuracy`'s committed assertions, so a live
+      Python job would add fragile toolchain risk for zero new coverage).
+      New `project/tools/validate-ledgers.mjs` for the `schema-validate`
+      job. Every blocking job's exact command reproduced locally.
+- [x] **WP-27** Inputs/outputs documentation + JSDoc —
+      `project/docs/INPUTS_OUTPUTS.md`: every exported function across all
+      20 core modules plus the ledger/producer/houses/timescale layers,
+      organized around the one distinction that matters (BigInt arcsec vs.
+      float degrees, stated explicitly per entry). JSDoc added to all 20
+      `src/core/*.js` files — **verified line-by-line that every changed
+      line is a comment**, no-float audit reconfirmed 20/20 independently
+      of the subagent's own report. `check-claims.mjs` gained a new,
+      un-fixable CHECK that every core export is named somewhere in the
+      doc; verified with a real negative test (planted a fake export,
+      confirmed it's caught and named precisely, reverted, reconfirmed
+      pass). **Process note:** an orchestrator error during review
+      (`git checkout --` used to revert a deliberate test-only change)
+      accidentally reverted this package's own legitimate JSDoc on
+      `residues.js` along with it — caught immediately by checking the
+      file's diff was empty when it shouldn't have been, and the missing
+      documentation was rewritten to match the same convention used
+      elsewhere before committing. Worth remembering: `git checkout --
+      <path>` discards the *entire* working-tree diff for that path, not
+      just the change you're trying to undo — prefer reverting a specific
+      hunk, or re-applying just the intended change, when a file has other
+      legitimate uncommitted work on it.
+- [x] **WP-29** Interpretation engine improvements — `readings.jsx` now
+      surfaces sect/triplicity/term/face statements astro.jsx already
+      computed but never showed; every statement is `{text, sourceTag}`
+      naming its actual method (including honest non-classical tags for
+      this app's own mod-11/13 substrate aspects, not a false classical
+      label). `chart.timeUnknown` now genuinely suppresses house/Ascendant
+      language (statements are absent, not caveated) since astro.jsx
+      assigns a house number even with an assumed birth time. Phrasing
+      softened per the audit's anti-overclaiming guidance. `card.jsx`
+      (the only other consumer) updated for the new statement shape.
 
-**Assertion count: 493/493 → 4385/4385** (+13 timescale, +169 producer, +794
+**Assertion count: 493/493 → 4404/4404** (+13 timescale, +169 producer, +794
 houses total, +1727 fixtures, +67 astro-ephemeris, +212 accuracy, +258
 retrograde, +277 house-cusp-ledger, +24 tzresolve, +49 validate, +155
-tests.jsx-port, +44 a11y/contrast; WP-03/05/06/15/04/25/21/24 were
-doc/tooling/CI/refactor/bench packages, no new assertions). README banner is
-machine-checked by `scripts/check-claims.mjs`; `npm run lint` is clean.
+tests.jsx-port, +44 a11y/contrast, +19 readings; WP-03/05/06/15/04/25/21/24/26/27
+were doc/tooling/CI/refactor/bench packages, no new assertions). README banner
+is machine-checked by `scripts/check-claims.mjs`; `npm run lint` is clean.
 **Process notes:**
 (1) WP-07's PR (#4) shipped with a stale README banner because
 `check-claims.mjs --fix` wasn't re-run after adding tests — CI caught it
@@ -292,17 +336,12 @@ doing this.
 
 ## Remaining (per plan order; briefs in EXECUTION_PLAN.md)
 
-- [ ] **WP-26** CI final assembly — needs WP-10 (done), WP-13 (done), WP-22
-      (done), WP-24 (done, unblocked)
-- [ ] **WP-27** Inputs/outputs documentation + JSDoc — needs WP-08 (done),
-      WP-13 (done, unblocked)
-- [ ] **WP-28** README rewrite + CONTRIBUTING — needs WP-27
-- [ ] **WP-29** Interpretation engine improvements — needs WP-18 (done),
-      WP-21 (done, unblocked)
+- [ ] **WP-28** README rewrite + CONTRIBUTING — needs WP-27 (done, unblocked).
+      **The last work package in the plan.**
 
 ## Standing conventions for whoever resumes
 
-1. `cd project && npm test` must stay green; count only grows (baseline now 4385).
+1. `cd project && npm test` must stay green; count only grows (baseline now 4404).
 2. Mandate A1: no float constructs under `src/core/` — the audit + self-test enforce.
 3. New test suites: drop `test/<name>.test.js` exporting `run()`; no runner edit.
 4. New core modules: add to `CORE_MANIFEST` in `test/no-float-audit.js` (the
