@@ -128,4 +128,31 @@ export default [
       globals: { ...ES_GLOBALS, window: "readonly" },
     },
   },
+  {
+    // project/src/present/astro-core.js (WP-21) is, like core-shim.js
+    // above, a dual-environment ES module whose bottom guard
+    // (`if (typeof window !== "undefined")`) publishes onto `window` for
+    // the browser side of the bridge — it needs `window` declared as a
+    // global for the same reason core-shim.js does.
+    files: ["project/src/present/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: { ...ES_GLOBALS, window: "readonly" },
+    },
+  },
+  {
+    // project/tools/ephemeris/houses.js (WP-19) gains the same
+    // dual-environment `if (typeof window !== "undefined") window.X = ...`
+    // publish tzresolve.js/core-shim.js/astro-core.js use — this file is
+    // otherwise plain Node-importable (produce-ledger.mjs, its own test
+    // suite), so only it (not the whole tools/ephemeris/**) needs `window`
+    // declared as a global.
+    files: ["project/tools/ephemeris/houses.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: { ...NODE_GLOBALS, window: "readonly" },
+    },
+  },
 ];

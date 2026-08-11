@@ -817,3 +817,21 @@ export const POLAR_FALLBACK_POLICY = {
   meridian: { validLatRange: [-90, 90], enforced: "none", fallback: "WholeSign" },
   morinus: { validLatRange: [-90, 90], enforced: "none", fallback: "WholeSign" },
 };
+
+// ---------------------------------------------------------------------------
+// WP-19: publish POLAR_FALLBACK_POLICY to the browser presentation layer.
+// This module's `export`s already serve Node (produce-ledger.mjs, this
+// file's own test suite); classic <script> pages (landing.jsx/app.jsx,
+// which are Babel-standalone scripts, not ES modules, and cannot `import`)
+// need the same dual-environment publish tzresolve.js uses for
+// window.TzResolve — load this file as
+// `<script type="module" src="tools/ephemeris/houses.js"></script>` before
+// any `.jsx` script that reads `window.HousesPolicy`. Only the policy
+// table is published (not the cusp functions themselves, which the browser
+// build does not currently compute quadrant houses for) — see
+// project/docs/ux-validation-checklist.md scenario 4 for the honest
+// caveat on how far this reaches in the current UI.
+// ---------------------------------------------------------------------------
+if (typeof window !== "undefined") {
+  window.HousesPolicy = { POLAR_FALLBACK_POLICY };
+}
