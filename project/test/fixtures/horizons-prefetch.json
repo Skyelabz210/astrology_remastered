@@ -1,0 +1,1016 @@
+{
+  "meta": {
+    "source": "JPL Horizons API",
+    "retrieved": "2026-08-10",
+    "ephemeris": "DE441",
+    "quantities": "31 (ObsEcLon, ObsEcLat)",
+    "center": "500@399 geocentric",
+    "calendar_note": "Calendar mode: Mixed Julian/Gregorian (earliest instant 1700 is Gregorian-era, so plain dates are fine)",
+    "frame_note": "ObsEcLon/ObsEcLat are observer-centered IAU76/80 ecliptic-of-date apparent positions (light-time, gravitational deflection, stellar aberration); airless (Atmos refraction: NO)",
+    "coverage_note": "Horizons planet-center ephemerides begin 1749-12-30 (Saturn 699), 1800-01-01 (Neptune 899), 1800-01-02 (Pluto 999); for points 1 and 2 those bodies use the system barycenter (COMMAND 6/8/9) instead, marked with a per-body note."
+  },
+  "points": [
+    {
+      "id": 1,
+      "utc": "1700-03-20T12:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 359.8989965,
+          "ecl_lat_deg": -2.34e-05
+        },
+        "Moon": {
+          "ecl_lon_deg": 357.621552,
+          "ecl_lat_deg": -1.2589638
+        },
+        "Mercury": {
+          "ecl_lon_deg": 353.9687161,
+          "ecl_lat_deg": -1.7912708
+        },
+        "Venus": {
+          "ecl_lon_deg": 29.804578,
+          "ecl_lat_deg": -0.0159016
+        },
+        "Mars": {
+          "ecl_lon_deg": 234.4094905,
+          "ecl_lat_deg": 1.4699492
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 296.8310885,
+          "ecl_lat_deg": -0.2042469
+        },
+        "Saturn": {
+          "ecl_lon_deg": 337.7696194,
+          "ecl_lat_deg": -1.6016861,
+          "note": "planet-center ephemeris unavailable in Horizons before 1749-12-30; value is Saturn Barycenter (6), raw file 01_saturn_barycenter.txt (offset from planet center is negligible at this distance, <0.1 arcsec)"
+        },
+        "Uranus": {
+          "ecl_lon_deg": 96.7563254,
+          "ecl_lat_deg": 0.3574833
+        },
+        "Neptune": {
+          "ecl_lon_deg": 4.9885026,
+          "ecl_lat_deg": -1.4541984,
+          "note": "planet-center ephemeris unavailable in Horizons before 1800-01-01; value is Neptune Barycenter (8), raw file 01_neptune_barycenter.txt (offset from planet center is negligible at this distance, <0.1 arcsec)"
+        },
+        "Pluto": {
+          "ecl_lon_deg": 129.0976492,
+          "ecl_lat_deg": 7.2973647,
+          "note": "planet-center ephemeris unavailable in Horizons before 1800-01-02; value is Pluto Barycenter (9), raw file 01_pluto_barycenter.txt (offset from planet center is negligible at this distance, <0.1 arcsec)"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "utc": "1800-01-01T00:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 280.4292031,
+          "ecl_lat_deg": 2.94e-05
+        },
+        "Moon": {
+          "ecl_lon_deg": 348.4673787,
+          "ecl_lat_deg": -3.6399288
+        },
+        "Mercury": {
+          "ecl_lon_deg": 268.3433929,
+          "ecl_lat_deg": 3.2203941
+        },
+        "Venus": {
+          "ecl_lon_deg": 233.627114,
+          "ecl_lat_deg": 3.272244
+        },
+        "Mars": {
+          "ecl_lon_deg": 244.3356919,
+          "ecl_lat_deg": 0.1228242
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 84.5269169,
+          "ecl_lat_deg": -0.3033285
+        },
+        "Saturn": {
+          "ecl_lon_deg": 128.7991616,
+          "ecl_lat_deg": 0.6628655
+        },
+        "Uranus": {
+          "ecl_lon_deg": 177.1264876,
+          "ecl_lat_deg": 0.7689898
+        },
+        "Neptune": {
+          "ecl_lon_deg": 226.6211895,
+          "ecl_lat_deg": 1.7471415,
+          "note": "planet-center ephemeris unavailable in Horizons before 1800-01-01; value is Neptune Barycenter (8), raw file 02_neptune_barycenter.txt (offset from planet center is negligible at this distance, <0.1 arcsec)"
+        },
+        "Pluto": {
+          "ecl_lon_deg": 331.4112897,
+          "ecl_lat_deg": -12.1116294,
+          "note": "planet-center ephemeris unavailable in Horizons before 1800-01-02; value is Pluto Barycenter (9), raw file 02_pluto_barycenter.txt (offset from planet center is negligible at this distance, <0.1 arcsec)"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "utc": "1900-02-28T23:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 339.9313017,
+          "ecl_lat_deg": 0.0002053
+        },
+        "Moon": {
+          "ecl_lon_deg": 332.501114,
+          "ecl_lat_deg": 4.8605989
+        },
+        "Mercury": {
+          "ecl_lon_deg": 355.4265867,
+          "ecl_lat_deg": 0.222734
+        },
+        "Venus": {
+          "ecl_lon_deg": 18.4437481,
+          "ecl_lat_deg": 0.0603901
+        },
+        "Mars": {
+          "ecl_lon_deg": 330.0244209,
+          "ecl_lat_deg": -1.0868416
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 249.7590155,
+          "ecl_lat_deg": 0.8626648
+        },
+        "Saturn": {
+          "ecl_lon_deg": 273.4673128,
+          "ecl_lat_deg": 0.9987759
+        },
+        "Uranus": {
+          "ecl_lon_deg": 252.3559491,
+          "ecl_lat_deg": 0.0566533
+        },
+        "Neptune": {
+          "ecl_lon_deg": 84.216789,
+          "ecl_lat_deg": -1.2614727
+        },
+        "Pluto": {
+          "ecl_lon_deg": 74.6959843,
+          "ecl_lat_deg": -9.5715509
+        }
+      }
+    },
+    {
+      "id": 4,
+      "utc": "1912-04-15T05:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 24.8607511,
+          "ecl_lat_deg": -0.0001404
+        },
+        "Moon": {
+          "ecl_lon_deg": 357.1989149,
+          "ecl_lat_deg": -2.1832094
+        },
+        "Mercury": {
+          "ecl_lon_deg": 25.3915903,
+          "ecl_lat_deg": 2.0212663
+        },
+        "Venus": {
+          "ecl_lon_deg": 3.1781669,
+          "ecl_lat_deg": -1.5417663
+        },
+        "Mars": {
+          "ecl_lon_deg": 95.3115298,
+          "ecl_lat_deg": 1.7885177
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 255.1055109,
+          "ecl_lat_deg": 0.8143296
+        },
+        "Saturn": {
+          "ecl_lon_deg": 49.7838569,
+          "ecl_lat_deg": -1.9737632
+        },
+        "Uranus": {
+          "ecl_lon_deg": 303.2387954,
+          "ecl_lat_deg": -0.5592509
+        },
+        "Neptune": {
+          "ecl_lon_deg": 111.040103,
+          "ecl_lat_deg": -0.5448908
+        },
+        "Pluto": {
+          "ecl_lon_deg": 87.1687307,
+          "ecl_lat_deg": -6.1936145
+        }
+      }
+    },
+    {
+      "id": 5,
+      "utc": "1941-12-07T18:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 255.2566806,
+          "ecl_lat_deg": -0.0001766
+        },
+        "Moon": {
+          "ecl_lon_deg": 118.1016092,
+          "ecl_lat_deg": -3.8385025
+        },
+        "Mercury": {
+          "ecl_lon_deg": 247.3847597,
+          "ecl_lat_deg": -0.098287
+        },
+        "Venus": {
+          "ecl_lon_deg": 301.604729,
+          "ecl_lat_deg": -2.5141826
+        },
+        "Mars": {
+          "ecl_lon_deg": 15.5394923,
+          "ecl_lat_deg": 0.1073605
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 76.5140672,
+          "ecl_lat_deg": -0.6503691
+        },
+        "Saturn": {
+          "ecl_lon_deg": 53.4980066,
+          "ecl_lat_deg": -2.3305742
+        },
+        "Uranus": {
+          "ecl_lon_deg": 57.6502649,
+          "ecl_lat_deg": -0.2136851
+        },
+        "Neptune": {
+          "ecl_lon_deg": 179.7052114,
+          "ecl_lat_deg": 1.2835914
+        },
+        "Pluto": {
+          "ecl_lon_deg": 125.5802581,
+          "ecl_lat_deg": 4.618874
+        }
+      }
+    },
+    {
+      "id": 6,
+      "utc": "1955-06-15T12:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 83.613149,
+          "ecl_lat_deg": 0.000128
+        },
+        "Moon": {
+          "ecl_lon_deg": 18.7992122,
+          "ecl_lat_deg": 4.8983038
+        },
+        "Mercury": {
+          "ecl_lon_deg": 84.7820726,
+          "ecl_lat_deg": -3.3536198
+        },
+        "Venus": {
+          "ecl_lon_deg": 62.5978699,
+          "ecl_lat_deg": -1.0836009
+        },
+        "Mars": {
+          "ecl_lon_deg": 103.3267369,
+          "ecl_lat_deg": 1.0820857
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 120.488661,
+          "ecl_lat_deg": 0.518874
+        },
+        "Saturn": {
+          "ecl_lon_deg": 225.3917674,
+          "ecl_lat_deg": 2.4431503
+        },
+        "Uranus": {
+          "ecl_lon_deg": 115.8586525,
+          "ecl_lat_deg": 0.5108888
+        },
+        "Neptune": {
+          "ecl_lon_deg": 205.5944218,
+          "ecl_lat_deg": 1.7529099
+        },
+        "Pluto": {
+          "ecl_lon_deg": 144.6699978,
+          "ecl_lat_deg": 10.2420849
+        }
+      }
+    },
+    {
+      "id": 7,
+      "utc": "1969-07-20T20:17:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 117.9107302,
+          "ecl_lat_deg": -0.0001002
+        },
+        "Moon": {
+          "ecl_lon_deg": 187.8737519,
+          "ecl_lat_deg": -1.3631482
+        },
+        "Mercury": {
+          "ecl_lon_deg": 115.8428987,
+          "ecl_lat_deg": 1.4588006
+        },
+        "Venus": {
+          "ecl_lon_deg": 75.0374087,
+          "ecl_lat_deg": -2.4542347
+        },
+        "Mars": {
+          "ecl_lon_deg": 242.7732832,
+          "ecl_lat_deg": -3.3930191
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 180.7462243,
+          "ecl_lat_deg": 1.2191714
+        },
+        "Saturn": {
+          "ecl_lon_deg": 38.0979955,
+          "ecl_lat_deg": -2.4284393
+        },
+        "Uranus": {
+          "ecl_lon_deg": 180.6900011,
+          "ecl_lat_deg": 0.7107021
+        },
+        "Neptune": {
+          "ecl_lon_deg": 236.0229075,
+          "ecl_lat_deg": 1.72992
+        },
+        "Pluto": {
+          "ecl_lon_deg": 173.0071871,
+          "ecl_lat_deg": 15.3060847
+        }
+      }
+    },
+    {
+      "id": 8,
+      "utc": "1972-06-30T23:59:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 99.2509203,
+          "ecl_lat_deg": 6.49e-05
+        },
+        "Moon": {
+          "ecl_lon_deg": 329.2667801,
+          "ecl_lat_deg": 2.8896803
+        },
+        "Mercury": {
+          "ecl_lon_deg": 123.3249912,
+          "ecl_lat_deg": 1.2392014
+        },
+        "Venus": {
+          "ecl_lon_deg": 79.5526448,
+          "ecl_lat_deg": -4.0551848
+        },
+        "Mars": {
+          "ecl_lon_deg": 121.4733962,
+          "ecl_lat_deg": 1.1966578
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 272.6650702,
+          "ecl_lat_deg": 0.1758963
+        },
+        "Saturn": {
+          "ecl_lon_deg": 73.8584177,
+          "ecl_lat_deg": -1.5241162
+        },
+        "Uranus": {
+          "ecl_lon_deg": 194.2312058,
+          "ecl_lat_deg": 0.6486801
+        },
+        "Neptune": {
+          "ecl_lon_deg": 242.9697247,
+          "ecl_lat_deg": 1.681939
+        },
+        "Pluto": {
+          "ecl_lon_deg": 179.4401629,
+          "ecl_lat_deg": 16.2172277
+        }
+      }
+    },
+    {
+      "id": 9,
+      "utc": "1987-04-10T19:21:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 20.3916215,
+          "ecl_lat_deg": 5.37e-05
+        },
+        "Moon": {
+          "ecl_lon_deg": 160.3452189,
+          "ecl_lat_deg": 2.7379365
+        },
+        "Mercury": {
+          "ecl_lon_deg": 356.8743553,
+          "ecl_lat_deg": -2.5282249
+        },
+        "Venus": {
+          "ecl_lon_deg": 345.7224448,
+          "ecl_lat_deg": -1.1816577
+        },
+        "Mars": {
+          "ecl_lon_deg": 63.4225954,
+          "ecl_lat_deg": 0.8667175
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 9.393109,
+          "ecl_lat_deg": -1.0879809
+        },
+        "Saturn": {
+          "ecl_lon_deg": 261.0703202,
+          "ecl_lat_deg": 1.5976859
+        },
+        "Uranus": {
+          "ecl_lon_deg": 266.6881724,
+          "ecl_lat_deg": -0.136786
+        },
+        "Neptune": {
+          "ecl_lon_deg": 278.0026169,
+          "ecl_lat_deg": 1.0364761
+        },
+        "Pluto": {
+          "ecl_lon_deg": 219.099022,
+          "ecl_lat_deg": 16.8523789
+        }
+      }
+    },
+    {
+      "id": 10,
+      "utc": "1996-02-29T12:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 340.1900228,
+          "ecl_lat_deg": -9.54e-05
+        },
+        "Moon": {
+          "ecl_lon_deg": 105.7250478,
+          "ecl_lat_deg": -5.1669576
+        },
+        "Mercury": {
+          "ecl_lon_deg": 319.1424607,
+          "ecl_lat_deg": -1.7364182
+        },
+        "Venus": {
+          "ecl_lon_deg": 23.7096515,
+          "ecl_lat_deg": 0.8239683
+        },
+        "Mars": {
+          "ecl_lon_deg": 341.0666044,
+          "ecl_lat_deg": -0.997949
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 281.6569407,
+          "ecl_lat_deg": 0.1682382
+        },
+        "Saturn": {
+          "ecl_lon_deg": 355.3428671,
+          "ecl_lat_deg": -2.0196968
+        },
+        "Uranus": {
+          "ecl_lon_deg": 302.714817,
+          "ecl_lat_deg": -0.5432092
+        },
+        "Neptune": {
+          "ecl_lon_deg": 296.8076423,
+          "ecl_lat_deg": 0.4830916
+        },
+        "Pluto": {
+          "ecl_lon_deg": 243.1071336,
+          "ecl_lat_deg": 13.1785843
+        }
+      }
+    },
+    {
+      "id": 11,
+      "utc": "2000-01-01T12:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 280.3689092,
+          "ecl_lat_deg": 0.0002381
+        },
+        "Moon": {
+          "ecl_lon_deg": 223.323786,
+          "ecl_lat_deg": 5.1707422
+        },
+        "Mercury": {
+          "ecl_lon_deg": 271.8892699,
+          "ecl_lat_deg": -0.994819
+        },
+        "Venus": {
+          "ecl_lon_deg": 241.5657794,
+          "ecl_lat_deg": 2.0663548
+        },
+        "Mars": {
+          "ecl_lon_deg": 327.9632921,
+          "ecl_lat_deg": -1.0677752
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 25.2530685,
+          "ecl_lat_deg": -1.2621868
+        },
+        "Saturn": {
+          "ecl_lon_deg": 40.3956366,
+          "ecl_lat_deg": -2.4448533
+        },
+        "Uranus": {
+          "ecl_lon_deg": 314.809168,
+          "ecl_lat_deg": -0.658324
+        },
+        "Neptune": {
+          "ecl_lon_deg": 303.1930007,
+          "ecl_lat_deg": 0.2350026
+        },
+        "Pluto": {
+          "ecl_lon_deg": 251.4547644,
+          "ecl_lat_deg": 10.8552605
+        }
+      }
+    },
+    {
+      "id": 12,
+      "utc": "2000-02-29T06:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 339.9547849,
+          "ecl_lat_deg": 5.08e-05
+        },
+        "Moon": {
+          "ecl_lon_deg": 272.5823265,
+          "ecl_lat_deg": 2.6589755
+        },
+        "Mercury": {
+          "ecl_lon_deg": 342.756577,
+          "ecl_lat_deg": 3.7058939
+        },
+        "Venus": {
+          "ecl_lon_deg": 313.6476751,
+          "ecl_lat_deg": -0.5711542
+        },
+        "Mars": {
+          "ecl_lon_deg": 13.0335598,
+          "ecl_lat_deg": -0.3079336
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 32.5298522,
+          "ecl_lat_deg": -1.0074244
+        },
+        "Saturn": {
+          "ecl_lon_deg": 42.3454389,
+          "ecl_lat_deg": -2.1686079
+        },
+        "Uranus": {
+          "ecl_lon_deg": 318.1091845,
+          "ecl_lat_deg": -0.6584948
+        },
+        "Neptune": {
+          "ecl_lon_deg": 305.3420725,
+          "ecl_lat_deg": 0.2252455
+        },
+        "Pluto": {
+          "ecl_lon_deg": 252.8357646,
+          "ecl_lat_deg": 11.0609881
+        }
+      }
+    },
+    {
+      "id": 13,
+      "utc": "2004-06-08T08:20:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 77.8737555,
+          "ecl_lat_deg": -0.0001666
+        },
+        "Moon": {
+          "ecl_lon_deg": 329.249828,
+          "ecl_lat_deg": -4.921332
+        },
+        "Mercury": {
+          "ecl_lon_deg": 65.476783,
+          "ecl_lat_deg": -0.7695611
+        },
+        "Venus": {
+          "ecl_lon_deg": 77.8991813,
+          "ecl_lat_deg": -0.1724368
+        },
+        "Mars": {
+          "ecl_lon_deg": 110.2187546,
+          "ecl_lat_deg": 1.2434497
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 160.6171971,
+          "ecl_lat_deg": 1.2231956
+        },
+        "Saturn": {
+          "ecl_lon_deg": 102.9715093,
+          "ecl_lat_deg": -0.3132348
+        },
+        "Uranus": {
+          "ecl_lon_deg": 336.7937787,
+          "ecl_lat_deg": -0.7687281
+        },
+        "Neptune": {
+          "ecl_lon_deg": 315.2676083,
+          "ecl_lat_deg": -0.0568069
+        },
+        "Pluto": {
+          "ecl_lon_deg": 260.9890104,
+          "ecl_lat_deg": 8.920485
+        }
+      }
+    },
+    {
+      "id": 14,
+      "utc": "2015-06-30T23:59:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 98.8753103,
+          "ecl_lat_deg": 0.0002549
+        },
+        "Moon": {
+          "ecl_lon_deg": 264.7431452,
+          "ecl_lat_deg": 4.9316904
+        },
+        "Mercury": {
+          "ecl_lon_deg": 77.7924717,
+          "ecl_lat_deg": -2.2818192
+        },
+        "Venus": {
+          "ecl_lon_deg": 141.4038516,
+          "ecl_lat_deg": 0.5561905
+        },
+        "Mars": {
+          "ecl_lon_deg": 94.326403,
+          "ecl_lat_deg": 0.7492975
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 141.5640756,
+          "ecl_lat_deg": 0.8605437
+        },
+        "Saturn": {
+          "ecl_lon_deg": 239.0888344,
+          "ecl_lat_deg": 2.10001
+        },
+        "Uranus": {
+          "ecl_lon_deg": 20.2410268,
+          "ecl_lat_deg": -0.6396117
+        },
+        "Neptune": {
+          "ecl_lon_deg": 339.7251416,
+          "ecl_lat_deg": -0.790706
+        },
+        "Pluto": {
+          "ecl_lon_deg": 284.402959,
+          "ecl_lat_deg": 1.993504
+        }
+      }
+    },
+    {
+      "id": 15,
+      "utc": "2021-03-14T07:30:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 353.9385071,
+          "ecl_lat_deg": -7.8e-05
+        },
+        "Moon": {
+          "ecl_lon_deg": 4.0006672,
+          "ecl_lat_deg": -4.7122093
+        },
+        "Mercury": {
+          "ecl_lon_deg": 327.8812841,
+          "ecl_lat_deg": -1.5377312
+        },
+        "Venus": {
+          "ecl_lon_deg": 350.9280781,
+          "ecl_lat_deg": -1.4369931
+        },
+        "Mars": {
+          "ecl_lon_deg": 65.9398925,
+          "ecl_lat_deg": 1.4706254
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 319.5718322,
+          "ecl_lat_deg": -0.6062987
+        },
+        "Saturn": {
+          "ecl_lon_deg": 309.8249849,
+          "ecl_lat_deg": -0.4842718
+        },
+        "Uranus": {
+          "ecl_lon_deg": 38.1454801,
+          "ecl_lat_deg": -0.4166282
+        },
+        "Neptune": {
+          "ecl_lon_deg": 350.7581915,
+          "ecl_lat_deg": -1.0691344
+        },
+        "Pluto": {
+          "ecl_lon_deg": 296.3364436,
+          "ecl_lat_deg": -1.3174322
+        }
+      }
+    },
+    {
+      "id": 16,
+      "utc": "2021-11-07T05:30:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 225.0217627,
+          "ecl_lat_deg": -0.0001298
+        },
+        "Moon": {
+          "ecl_lon_deg": 257.9087492,
+          "ecl_lat_deg": -1.4739227
+        },
+        "Mercury": {
+          "ecl_lon_deg": 212.0532299,
+          "ecl_lat_deg": 1.662267
+        },
+        "Venus": {
+          "ecl_lon_deg": 271.6822873,
+          "ecl_lat_deg": -3.8137886
+        },
+        "Mars": {
+          "ecl_lon_deg": 215.1391623,
+          "ecl_lat_deg": 0.4071196
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 322.9930634,
+          "ecl_lat_deg": -1.1004676
+        },
+        "Saturn": {
+          "ecl_lon_deg": 307.4917566,
+          "ecl_lat_deg": -0.8165039
+        },
+        "Uranus": {
+          "ecl_lon_deg": 42.6915505,
+          "ecl_lat_deg": -0.422697
+        },
+        "Neptune": {
+          "ecl_lon_deg": 350.5667055,
+          "ecl_lat_deg": -1.161813
+        },
+        "Pluto": {
+          "ecl_lon_deg": 294.5564964,
+          "ecl_lat_deg": -1.6778018
+        }
+      }
+    },
+    {
+      "id": 17,
+      "utc": "2023-04-21T00:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 30.6420287,
+          "ecl_lat_deg": 2.1e-06
+        },
+        "Moon": {
+          "ecl_lon_deg": 41.0841017,
+          "ecl_lat_deg": 0.6518778
+        },
+        "Mercury": {
+          "ecl_lon_deg": 45.6150345,
+          "ecl_lat_deg": 2.8510982
+        },
+        "Venus": {
+          "ecl_lon_deg": 71.3359224,
+          "ecl_lat_deg": 2.0094631
+        },
+        "Mars": {
+          "ecl_lon_deg": 103.5698605,
+          "ecl_lat_deg": 1.8627872
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 23.9418933,
+          "ecl_lat_deg": -1.0613551
+        },
+        "Saturn": {
+          "ecl_lon_deg": 334.6182774,
+          "ecl_lat_deg": -1.3830546
+        },
+        "Uranus": {
+          "ecl_lon_deg": 47.8576841,
+          "ecl_lat_deg": -0.3160561
+        },
+        "Neptune": {
+          "ecl_lon_deg": 356.4192542,
+          "ecl_lat_deg": -1.1801618
+        },
+        "Pluto": {
+          "ecl_lon_deg": 300.3362837,
+          "ecl_lat_deg": -2.474147
+        }
+      }
+    },
+    {
+      "id": 18,
+      "utc": "2022-10-30T13:26:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 217.1021017,
+          "ecl_lat_deg": -0.0001196
+        },
+        "Moon": {
+          "ecl_lon_deg": 284.3704698,
+          "ecl_lat_deg": -4.6216308
+        },
+        "Mercury": {
+          "ecl_lon_deg": 211.2594977,
+          "ecl_lat_deg": 1.0925928
+        },
+        "Venus": {
+          "ecl_lon_deg": 219.0627407,
+          "ecl_lat_deg": 0.8242594
+        },
+        "Mars": {
+          "ecl_lon_deg": 85.6139511,
+          "ecl_lat_deg": 0.4430307
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 359.8044467,
+          "ecl_lat_deg": -1.5601653
+        },
+        "Saturn": {
+          "ecl_lon_deg": 318.6356406,
+          "ecl_lat_deg": -1.2925395
+        },
+        "Uranus": {
+          "ecl_lon_deg": 47.3126744,
+          "ecl_lat_deg": -0.3732976
+        },
+        "Neptune": {
+          "ecl_lon_deg": 352.9675202,
+          "ecl_lat_deg": -1.218596
+        },
+        "Pluto": {
+          "ecl_lon_deg": 296.2308957,
+          "ecl_lat_deg": -2.2107452
+        }
+      }
+    },
+    {
+      "id": 19,
+      "utc": "2023-07-22T01:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 119.0116858,
+          "ecl_lat_deg": 0.0001718
+        },
+        "Moon": {
+          "ecl_lon_deg": 165.673371,
+          "ecl_lat_deg": 3.4591403
+        },
+        "Mercury": {
+          "ecl_lon_deg": 139.5591758,
+          "ecl_lat_deg": 1.2375884
+        },
+        "Venus": {
+          "ecl_lon_deg": 148.5831485,
+          "ecl_lat_deg": -3.2617887
+        },
+        "Mars": {
+          "ecl_lon_deg": 157.0706651,
+          "ecl_lat_deg": 1.01119
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 42.5045639,
+          "ecl_lat_deg": -1.1887402
+        },
+        "Saturn": {
+          "ecl_lon_deg": 336.2836075,
+          "ecl_lat_deg": -1.7020242
+        },
+        "Uranus": {
+          "ecl_lon_deg": 52.4838831,
+          "ecl_lat_deg": -0.3126865
+        },
+        "Neptune": {
+          "ecl_lon_deg": 357.567973,
+          "ecl_lat_deg": -1.2477809
+        },
+        "Pluto": {
+          "ecl_lon_deg": 299.1288542,
+          "ecl_lat_deg": -2.6845314
+        }
+      }
+    },
+    {
+      "id": 20,
+      "utc": "2050-01-01T00:00:00Z",
+      "bodies": {
+        "Sun": {
+          "ecl_lon_deg": 280.7483816,
+          "ecl_lat_deg": 0.0001127
+        },
+        "Moon": {
+          "ecl_lon_deg": 18.6755962,
+          "ecl_lat_deg": 3.3912133
+        },
+        "Mercury": {
+          "ecl_lon_deg": 270.0594877,
+          "ecl_lat_deg": 3.1357631
+        },
+        "Venus": {
+          "ecl_lon_deg": 281.2480373,
+          "ecl_lat_deg": -0.6060626
+        },
+        "Mars": {
+          "ecl_lon_deg": 227.714693,
+          "ecl_lat_deg": 0.7726782
+        },
+        "Jupiter": {
+          "ecl_lon_deg": 121.6915476,
+          "ecl_lat_deg": 0.4580707
+        },
+        "Saturn": {
+          "ecl_lon_deg": 297.5742795,
+          "ecl_lat_deg": -0.2035839
+        },
+        "Uranus": {
+          "ecl_lon_deg": 170.7326095,
+          "ecl_lat_deg": 0.7867256
+        },
+        "Neptune": {
+          "ecl_lon_deg": 53.6034205,
+          "ecl_lat_deg": -1.7627912
+        },
+        "Pluto": {
+          "ecl_lon_deg": 337.5330669,
+          "ecl_lat_deg": -12.6913738
+        }
+      }
+    }
+  ],
+  "stations": {
+    "Mercury": {
+      "range_utc": [
+        "2023-04-14",
+        "2023-05-22"
+      ],
+      "step": "1 d",
+      "sign_changes": [
+        {
+          "between": [
+            "2023-04-21",
+            "2023-04-22"
+          ],
+          "kind": "prograde->retrograde (retrograde station)",
+          "delta_before_deg_per_day": 0.0849509,
+          "delta_after_deg_per_day": -0.0137213
+        },
+        {
+          "between": [
+            "2023-05-15",
+            "2023-05-16"
+          ],
+          "kind": "retrograde->prograde (direct station)",
+          "delta_before_deg_per_day": -0.0489277,
+          "delta_after_deg_per_day": 0.0279834
+        }
+      ],
+      "n_days": 39
+    },
+    "Mars": {
+      "range_utc": [
+        "2022-10-23",
+        "2023-01-19"
+      ],
+      "step": "1 d",
+      "sign_changes": [
+        {
+          "between": [
+            "2022-10-31",
+            "2022-11-01"
+          ],
+          "kind": "prograde->retrograde (retrograde station)",
+          "delta_before_deg_per_day": 0.0008504,
+          "delta_after_deg_per_day": -0.013545
+        },
+        {
+          "between": [
+            "2023-01-13",
+            "2023-01-14"
+          ],
+          "kind": "retrograde->prograde (direct station)",
+          "delta_before_deg_per_day": -0.0047911,
+          "delta_after_deg_per_day": 0.0080121
+        }
+      ],
+      "n_days": 89
+    },
+    "Venus": {
+      "range_utc": [
+        "2023-07-15",
+        "2023-07-29"
+      ],
+      "step": "1 d",
+      "sign_changes": [
+        {
+          "between": [
+            "2023-07-23",
+            "2023-07-24"
+          ],
+          "kind": "prograde->retrograde (retrograde station)",
+          "delta_before_deg_per_day": 0.0216971,
+          "delta_after_deg_per_day": -0.0169262
+        }
+      ],
+      "n_days": 15
+    }
+  }
+}

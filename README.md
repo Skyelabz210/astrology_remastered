@@ -10,7 +10,7 @@ of 1,296,000; every lane is a BigInt residue; every claim is either exhaustively
 swept or explicitly marked open.
 
 ```
-441/441 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 17/17 core modules float-free
+596/596 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 20/20 core modules float-free
 ```
 
 ---
