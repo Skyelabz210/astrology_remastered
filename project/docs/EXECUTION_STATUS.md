@@ -1,7 +1,7 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Update this file as
-packages land. Last updated: 2026-08-11 (Batch C complete, verified, committed).
+packages land. Last updated: 2026-08-11 (Batch D complete, verified, committed).
 
 ## Done (verified, committed)
 
@@ -61,10 +61,36 @@ packages land. Last updated: 2026-08-11 (Batch C complete, verified, committed).
       because the Espenak-Meeus 2005–2050 predictive fit itself overshoots
       IERS-observed ΔT by ~2.2s at 2020 (a property of the published
       formula, cited in both the module and its test).
+- [x] **WP-08** Ledger producer CLI — `project/tools/ephemeris/produce-ledger.mjs`:
+      given `--time/--lat/--lng`, computes geocentric apparent ecliptic-of-date
+      longitude (aberration on) for the 10 classical bodies via astronomy-engine's
+      `GeoVector`+`Ecliptic`, speed by 12h central difference, emits
+      `IMPORTED_INTEGER_LEDGER` entries. Every entry round-trips through
+      `import-ledger.js`'s `validateLedgerEntry`/`admitForCore` without
+      throwing — the ledger contract now has its first real producer.
+      `ephemeris-ledger-schema.json` gained an additive `meta` block
+      (`jd_tt`/`delta_t_seconds`/`speed_arcsec_per_day`/`retrograde`).
+      Sun @ J2000 ≈ 280.369° (~5″ from the ~280.37° textbook figure).
+- [x] **WP-11** ASC/MC + Placidus — `project/tools/ephemeris/houses.js`:
+      `ascMc()` and `placidusCusps()`, superseding `astro.jsx`'s self-disclaimed
+      "not a real solver" ascendant. The Ascendant's quadrant-ambiguous ratio
+      formula was resolved by deriving the correct `atan2` branch from an
+      exact equator closed form rather than trusting memory — this caught a
+      real 180°-off bug before it shipped. `PolarLatitudeError` at
+      |lat| > 66.56°. **Known gap:** Placidus is verified against an
+      independent exact closed form at the equator and internal consistency
+      checks (cusp1/4/7/10 vs. `ascMc`, opposite-cusp symmetry), but **not**
+      yet against an external reference (e.g. `swetest`) at nonzero latitude
+      — no such access was available. Close this before WP-13 feeds house
+      cusps into the accuracy gate.
 
-**Assertion count: 493/493 → 609/609** (+13 from WP-07's timescale suite;
-WP-03/05/06/15/04 were doc/tooling/CI packages, no new assertions). README
-banner is machine-checked by `scripts/check-claims.mjs`; `npm run lint` is clean.
+**Assertion count: 493/493 → 818/818** (+13 timescale, +169 producer, +40
+houses; WP-03/05/06/15/04 were doc/tooling/CI packages, no new assertions).
+README banner is machine-checked by `scripts/check-claims.mjs`; `npm run lint`
+is clean. **Process note:** WP-07's PR (#4) shipped with a stale README banner
+because `check-claims.mjs --fix` wasn't re-run after adding tests — CI caught
+it before merge. Every package since has run `--fix` + verify as a mandatory
+last step; keep doing this.
 
 ## Prefetched assets (do not re-fetch)
 
@@ -79,12 +105,15 @@ banner is machine-checked by `scripts/check-claims.mjs`; `npm run lint` is clean
 
 ## Remaining (per plan order; briefs in EXECUTION_PLAN.md)
 
-- [ ] **WP-08** Ledger producer CLI — needs WP-07 (done, unblocked)
-- [ ] **WP-09** Reference vectors — needs WP-08; **consume horizons-prefetch.json**
+- [ ] **WP-09** Reference vectors — needs WP-08 (done, unblocked); **consume
+      horizons-prefetch.json**
 - [ ] **WP-10** Accuracy gate + retrograde/station tests — needs WP-09
-- [ ] **WP-11** ASC/MC + Placidus — needs WP-07 (done, unblocked)
-- [ ] **WP-12** Remaining quadrant systems + registry `"OPEN"` → `"LEDGER"` — needs WP-11
-- [ ] **WP-13** House cusps into the ledger (schema v1.1) — needs WP-08, WP-12
+- [ ] **WP-12** Remaining quadrant systems + registry `"OPEN"` → `"LEDGER"` — needs
+      WP-11 (done, unblocked). Also a natural place to close WP-11's Placidus
+      external-reference gap (see above) — consider sourcing `swetest`-class
+      reference cusps for the newly-added systems AND retrofitting WP-11's tests.
+- [ ] **WP-13** House cusps into the ledger (schema v1.1) — needs WP-08 (done),
+      WP-12
 - [ ] **WP-17** Real ephemeris in the browser (vendored astronomy-engine) — needs WP-06 (done, unblocked)
 - [ ] **WP-18** DST-correct time + unknown-time flag — needs WP-17
 - [ ] **WP-19** Input validation & visible errors — needs WP-18

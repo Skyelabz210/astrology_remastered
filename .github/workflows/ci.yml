@@ -30,6 +30,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: project/package-lock.json
+      # check-claims.mjs shells out to `node project/test/run.js`, which now
+      # transitively imports astronomy-engine (via test/producer.test.js ->
+      # tools/ephemeris/produce-ledger.mjs, landed in WP-08) — node_modules
+      # must exist for the full suite to run, not just for core-tests.
+      - run: npm ci
+        working-directory: project
       - run: node scripts/check-claims.mjs
 
   # ---------------------------------------------------------------------

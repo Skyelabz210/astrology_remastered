@@ -24,6 +24,16 @@
         "status": { "enum": ["SYNTHETIC_DEMO", "IMPORTED_INTEGER_LEDGER", "CERTIFIED_EXACT_LEDGER"] },
         "notes": { "type": "string" }
       }
+    },
+    "meta": {
+      "type": "object",
+      "description": "Optional producer diagnostics (WP-08 addition, additive/backward-compatible — entries without `meta` remain valid). Not consumed by validateLedgerEntry/admitForCore; carried for downstream tooling (accuracy/retrograde tests, later packages) that wants speed/timescale context without recomputing it.",
+      "properties": {
+        "jd_tt": { "type": "number", "description": "Julian Day, Terrestrial Time, at the requested instant." },
+        "delta_t_seconds": { "type": "number", "description": "TT - UT1 (approximated as TT - UTC) at the requested instant, seconds." },
+        "speed_arcsec_per_day": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)$", "description": "Signed decimal-integer string: ecliptic-longitude rate of change, rounded to the nearest arcsecond/day, via central difference (+/-6h)." },
+        "retrograde": { "type": "boolean", "description": "True iff the underlying (unrounded) speed is negative." }
+      }
     }
   }
 }
