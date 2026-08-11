@@ -1,0 +1,109 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  core-tests:
+    name: core-tests (node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: project
+    strategy:
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: project/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  claims:
+    name: claims
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-claims.mjs
+
+  # ---------------------------------------------------------------------
+  # Placeholder jobs — to be filled in by WP-26 (CI final assembly) once
+  # the corresponding suites/scripts exist. Left as comments (not active
+  # YAML) so this workflow stays valid without them.
+  #
+  # accuracy:
+  #   name: accuracy
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: project
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #         cache: npm
+  #         cache-dependency-path: project/package-lock.json
+  #     - run: npm ci
+  #     - run: npm run test:accuracy
+  #
+  # ui-logic:
+  #   name: ui-logic
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: project
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #         cache: npm
+  #         cache-dependency-path: project/package-lock.json
+  #     - run: npm ci
+  #     - run: npm test -- --ui-logic  # exact invocation TBD by WP-22/26
+  #
+  # bench:
+  #   name: bench (non-blocking)
+  #   runs-on: ubuntu-latest
+  #   continue-on-error: true
+  #   defaults:
+  #     run:
+  #       working-directory: project
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #         cache: npm
+  #         cache-dependency-path: project/package-lock.json
+  #     - run: npm ci
+  #     - run: npm run bench -- --assert
+  #     # - uses: actions/upload-artifact@v4
+  #     #   with:
+  #     #     name: bench-results
+  #     #     path: project/bench/*.json
+  #
+  # schema-validate:
+  #   name: schema-validate
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       working-directory: project
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #         cache: npm
+  #         cache-dependency-path: project/package-lock.json
+  #     - run: npm ci
+  #     - run: node tools/validate-ledgers.mjs  # runs importLedger over every
+  #                                              # *.ledger.json + JSON-parses
+  #                                              # the schema; script TBD by WP-26
