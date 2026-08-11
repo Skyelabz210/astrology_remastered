@@ -386,7 +386,7 @@ export function certifyTransduction(A, B) {
   const aOk = isSafeBasis(A) && !repeated(A);
   const bOk = isSafeBasis(B) && !repeated(B);
   const shared = A.filter((p) => B.some((q) => q === p));
-  let idem = false;
+  let idem;
   try { idempotents(A); idem = true; } catch { idem = false; }
   return {
     kind: "TRANSDUCTION_CERTIFICATE_V2",

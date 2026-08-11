@@ -22,7 +22,6 @@
 //
 // BigInt only. No floats, no Date.
 
-import { mod } from "./residues.js";
 import { factorise } from "./ring.js";
 import { isShadowPrime } from "./safe-basis.js";
 

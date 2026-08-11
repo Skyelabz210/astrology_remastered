@@ -13,6 +13,15 @@ swept or explicitly marked open.
 596/596 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 20/20 core modules float-free
 ```
 
+**Before taking any claim below at face value, read:**
+[`project/CLAIM_BOUNDARY.md`](project/CLAIM_BOUNDARY.md) (every claim in this
+repo, tagged PROVEN / MEASURED / ARGUED / OPEN / REJECTED, with the
+counter-computation where one applies), [`project/STATUS.md`](project/STATUS.md)
+(current classification per layer/module), and
+[`project/REMEDIATION_LEDGER.md`](project/REMEDIATION_LEDGER.md) (the
+corrective-pass history, P1–P28, including what was wrong and how it was found).
+The banner above is machine-checked by [`scripts/check-claims.mjs`](scripts/check-claims.mjs).
+
 ---
 
 ## If you know residue number systems, read this first
@@ -307,6 +316,9 @@ project/
   src/core/            the exact core — BigInt only, no UI, no prose
     basis.js             S8, both splits, the parked constants
     shell-kelim.js       K-Elimination, the lift, the tray register
+    residues.js          pure integer residue helpers (mod), shared primitive
+    gear-class.js        gear-pair classification on (r17, r19)
+    validators.js        admit only exact integer arcseconds — no Number/round
     carry.js             the hidden carry — signed winding, shadow, C = Σw²
     hcrm-core.js         HCRM_REGISTER_V2
     cram.js              adjacency, gradient, state tuple, transduction χ
@@ -319,12 +331,15 @@ project/
     shadow-spine.js      shadow and closure axes, event classes
     arrow.js             the (r,K) identity, lap saturation, shadow entropy
     operators.js         lane-operator atlas, enumerated not asserted
+    tower-recover.js     T-COMP-1 — winding recovery from an anchor SET
+    identity.js          identity of a number, ID_p(x)=(r,w) — D-030
+    tray.js              the two-tray architecture — fixture + phase lock
   test/
     run.js               headless runner  →  npm test
     *.test.js            the suites the browser gate also runs
   Core Test Harness.html the gate — same modules, in a browser
   CLAIM_BOUNDARY.md      every claim, tagged, with counter-computations
-  REMEDIATION_LEDGER.md  the corrective passes, P1–P23
+  REMEDIATION_LEDGER.md  the corrective passes, P1–P28
   STATUS.md              current classification per module
 ```
 
