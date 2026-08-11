@@ -87,8 +87,14 @@ function circDiffDeg(a, b) {
 }
 
 // Generated from pyswisseph 2.10.03 via swe.houses(jd_ut, lat, lon, hsys).
-// See the block comment above for exact regeneration steps.
-const SWISSEPH_REFERENCE = {
+// See the block comment above for exact regeneration steps. Exported (WP-13)
+// so test/accuracy.test.js can reuse this same genuine external reference
+// data for its ledger-wiring cusp rows instead of embedding a second copy —
+// see that file's own comment for why (it's testing produce-ledger.mjs's
+// rounding/conversion/schema wiring against houses.js's already-verified
+// math, not re-verifying the math itself, so the same reference numbers
+// apply to both concerns).
+export const SWISSEPH_REFERENCE = {
   nyc_2000: {
     iso: "2000-01-01T12:00:00Z", latDeg: 40.7128, lngDeg: -74.006,
     systems: {
