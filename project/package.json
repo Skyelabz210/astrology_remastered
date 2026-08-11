@@ -9,6 +9,7 @@
   "scripts": {
     "test": "node test/run.js",
     "test:quick": "node test/run.js --quick",
+    "test:accuracy": "node test/accuracy.test.js",
     "lint": "cd .. && eslint --config eslint.config.mjs --no-error-on-unmatched-pattern project 'scripts/**/*.{js,mjs}'"
   },
   "devDependencies": {

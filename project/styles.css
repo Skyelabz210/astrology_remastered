@@ -767,6 +767,18 @@ body::before {
   letter-spacing: 0.04em;
   margin: 8px 0 0 0;
 }
+.lf-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.lf-check input[type="checkbox"] { accent-color: var(--ink); cursor: pointer; }
 .lf-submit {
   margin-top: 8px;
   display: inline-flex;

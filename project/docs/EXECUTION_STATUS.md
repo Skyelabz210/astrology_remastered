@@ -1,7 +1,7 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Update this file as
-packages land. Last updated: 2026-08-11 (Batch E complete, verified, committed).
+packages land. Last updated: 2026-08-11 (Batch F complete, verified, committed).
 
 ## Done (verified, committed)
 
@@ -108,16 +108,61 @@ packages land. Last updated: 2026-08-11 (Batch E complete, verified, committed).
       inconsistency**. Synthetic fallback verified byte-for-byte unchanged
       for offline/unmodeled bodies (NorthNode/Chiron/Lilith).
       `window.EPHEMERIS_MODE` set unconditionally for WP-19's future badge.
+- [x] **WP-10** Accuracy gate + retrograde/station tests — `project/test/
+      accuracy.test.js` (212 assertions): 200 circular-difference comparisons
+      (20 JPL Horizons fixture points × 10 bodies) between `produce-ledger.mjs`
+      and independent reference data, 60″ tolerance (120″ Moon, documented
+      astronomy-engine-vs-DE441 lunar-theory divergence). **Observed:** worst
+      mean error Neptune ~10.4″, worst single-point error Pluto ~29.5″ — both
+      well inside tolerance and inside the audit's own "few arcminutes" bar by
+      an order of magnitude. `project/test/retrograde.test.js` (258
+      assertions): station sign-flips within ±36h for all 5 published
+      stations, retro-flag ≡ (speed<0) across all 200 fixtures, Sun/Moon never
+      retrograde. Corruption-discriminator check confirmed the tolerance
+      actually catches a >5′ error.
+- [x] **WP-13** House cusps into the ledger — schema v1.1 (additive:
+      `body` documents ASC/MC/CUSP_1..12, optional `house_system` field;
+      confirmed backward compatible against WP-16's `ledger.test.js`
+      unmodified). `produce-ledger.mjs` gains `--houses <systems>` and
+      exported `produceHouseLedgerEntries()`; sample run emits 24 entries
+      (10 planets + 14 house points), all independently re-validated through
+      the real `admitForCore()` gate. `accuracy.test.js` gains a house-cusp
+      block reusing `houses.test.js`'s proven Swiss Ephemeris reference data.
+      **Process note:** this package ran concurrently with WP-18 in the same
+      working tree; its true isolated assertion count (4113) was computed in
+      a throwaway `git worktree` to avoid the README banner claiming a count
+      that included WP-18's not-yet-committed assertions — see that commit's
+      message for the mechanics if this pattern recurs.
+- [x] **WP-18** DST-correct time + unknown-time flag — `project/tzresolve.js`:
+      dependency-free local-civil-time → UTC-instant resolver (guess-and-
+      correct against `Intl`'s tzdata), correctly classifying spring-forward
+      gaps (`kind:"nonexistent"`) and fall-back overlaps
+      (`kind:"ambiguous"`) rather than silently picking a wrong instant.
+      `cities.jsx`'s 339 entries gain a verified IANA `tz` field (0
+      Jan/Jul-offset mismatches against the legacy `off` field). `landing.jsx`
+      gains a "Time unknown" checkbox; `chart.timeUnknown` threads through to
+      `computeNatal()` for a future package (WP-19/29) to suppress ASC/MC
+      precision claims. Verified: NY spring-forward/fall-back, London 1970
+      permanent-BST (actually verified against Node's ICU, not assumed),
+      Sydney southern DST.
 
-**Assertion count: 493/493 → 3366/3366** (+13 timescale, +169 producer, +794
-houses total, +1727 fixtures, +67 astro-ephemeris; WP-03/05/06/15/04 were
+**Assertion count: 493/493 → 4137/4137** (+13 timescale, +169 producer, +794
+houses total, +1727 fixtures, +67 astro-ephemeris, +212 accuracy, +258
+retrograde, +277 house-cusp-ledger, +24 tzresolve; WP-03/05/06/15/04 were
 doc/tooling/CI packages, no new assertions). README banner is machine-checked
-by `scripts/check-claims.mjs`; `npm run lint` is clean. **Process note:**
-WP-07's PR (#4) shipped with a stale README banner because `check-claims.mjs
---fix` wasn't re-run after adding tests — CI caught it before merge; the
-`claims` CI job itself was also missing `npm ci` and broke on PR #5 the same
-way, once the suite gained a real dependency. Every package since has run
-`--fix` + verify as a mandatory last step; keep doing this.
+by `scripts/check-claims.mjs`; `npm run lint` is clean. **Process notes:**
+(1) WP-07's PR (#4) shipped with a stale README banner because
+`check-claims.mjs --fix` wasn't re-run after adding tests — CI caught it
+before merge; the `claims` CI job itself was also missing `npm ci` and broke
+on PR #5 the same way, once the suite gained a real dependency. (2) When two
+packages run concurrently in the same working tree and one extends a file the
+other creates (WP-10→WP-13) or both add test suites simultaneously
+(WP-13/WP-18), the shared tree's live `npm test` count is contaminated by
+whichever sibling's files are also sitting uncommitted — verify a package's
+*own* isolated count via a throwaway `git worktree` (`git worktree add
+--detach <path> HEAD`, apply just that package's diff, test, discard) before
+trusting its README banner. Every package has run `--fix` + verify as a
+mandatory last step since; keep doing this.
 
 ## Prefetched assets (do not re-fetch)
 
@@ -132,13 +177,7 @@ way, once the suite gained a real dependency. Every package since has run
 
 ## Remaining (per plan order; briefs in EXECUTION_PLAN.md)
 
-- [ ] **WP-10** Accuracy gate + retrograde/station tests — needs WP-09 (done,
-      unblocked)
-- [ ] **WP-13** House cusps into the ledger (schema v1.1) — needs WP-08 (done),
-      WP-12 (done, unblocked)
-- [ ] **WP-18** DST-correct time + unknown-time flag — needs WP-17 (done,
-      unblocked)
-- [ ] **WP-19** Input validation & visible errors — needs WP-18
+- [ ] **WP-19** Input validation & visible errors — needs WP-18 (done, unblocked)
 - [ ] **WP-20** Accessibility & privacy — needs WP-19
 - [ ] **WP-21** Extract presentation logic to `src/present/astro-core.js` — needs WP-17
 - [ ] **WP-22** Port `tests.jsx` suites to CLI — needs WP-21
@@ -151,7 +190,7 @@ way, once the suite gained a real dependency. Every package since has run
 
 ## Standing conventions for whoever resumes
 
-1. `cd project && npm test` must stay green; count only grows (baseline now 596).
+1. `cd project && npm test` must stay green; count only grows (baseline now 4137).
 2. Mandate A1: no float constructs under `src/core/` — the audit + self-test enforce.
 3. New test suites: drop `test/<name>.test.js` exporting `run()`; no runner edit.
 4. New core modules: add to `CORE_MANIFEST` in `test/no-float-audit.js` (the

@@ -76,11 +76,74 @@
 // function of longitude_arcsec itself — it changes if the emitted value is
 // tampered with after the fact, without requiring a canonical-JSON
 // serialization step (which the ledger schema does not otherwise specify).
+//
+// ── House cusps (WP-13) ────────────────────────────────────────────────
+// `--houses <system1,system2,...>` additionally emits ASC/MC/CUSP_1..
+// CUSP_12 entries per requested house system id (the "LEDGER"-status ids
+// in src/core/variants.js's HOUSE_SYSTEMS: placidus, koch, regiomontanus,
+// campanus, alcabitius, topocentric, morinus, meridian). Unlike the planet
+// path above, house cusps need GAST and mean obliquity at the requested
+// instant, which is exactly what tools/ephemeris/timescale.js's
+// julianDayUTC()/ttFromUtc() supply to houses.js's ascMc()/*Cusps()
+// functions (this is the "houses.js needs GAST ... timescale.js is the
+// right tool" case flagged in the header note above) — so, unlike the
+// planet path, this one *does* import timescale.js. astronomy-engine is
+// not involved in the house-cusp computation at all.
+//
+// ASC/MC are system-independent (ascMc() is called once per requested
+// instant/observer) but are still emitted ONCE PER REQUESTED SYSTEM, each
+// copy tagged with that system's `house_system` id — so filtering the
+// ledger by a single house_system id yields a complete, self-contained
+// 14-entry chart (ASC, MC, CUSP_1..12) for that system without needing to
+// also fetch a separate untagged ASC/MC pair. The tradeoff (documented
+// here, not hidden) is duplicate ASC/MC longitude values across systems
+// when `--houses` names more than one system; this was chosen over a
+// single untagged ASC/MC pair because "one system id → one complete,
+// independently-filterable chart" is a simpler contract for downstream
+// consumers than "look up ASC/MC separately, without a house_system tag,
+// then join it against whichever *Cusps entries you also fetched."
+//
+// checksumFor()'s payload (see above) is body/longitude-keyed but has no
+// house_system slot, so house entries use a parallel checksumForHouse()
+// that folds house_system into the payload too — otherwise e.g.
+// placidus's ASC entry and koch's ASC entry (same isoTime/lat/lng/body
+// "ASC"/longitude_arcsec, since ASC is system-independent) would hash to
+// the *same* checksum despite being two distinct ledger entries
+// (different event_id, different house_system) — a correct but confusing
+// coincidence this avoids by construction.
+//
+// PolarLatitudeError handling: if a requested system's cusp function
+// throws at the given latitude (Placidus/Koch/Alcabitius, |lat| >
+// 66.56°), that system is SKIPPED with a console.error warning and the
+// run continues with the remaining requested systems, rather than failing
+// the whole CLI invocation. Rationale: this CLI is meant to be usable as
+// a batch producer over many charts/systems in one run (see WP-08's own
+// header on this file's role); one polar chart failing one iterative
+// system it mathematically cannot support (a real, documented domain
+// limit — see houses.js's PolarLatitudeError class comment — not a bug)
+// should not discard every other system's valid output for that same
+// chart, nor abort a batch's remaining charts. Callers who need
+// fail-fast-on-any-gap semantics can inspect stderr (each skip is logged
+// there) or re-request just that system to observe the throw directly via
+// produceHouseLedgerEntries()/houses.js.
 
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import * as Astronomy from "astronomy-engine";
+import {
+  ascMc,
+  placidusCusps,
+  kochCusps,
+  regiomontanusCusps,
+  campanusCusps,
+  alcabitiusCusps,
+  topocentricCusps,
+  morinusCusps,
+  meridianCusps,
+  PolarLatitudeError,
+} from "./houses.js";
+import { julianDayUTC, ttFromUtc } from "./timescale.js";
 
 export const DEFAULT_BODIES = [
   "Sun", "Moon", "Mercury", "Venus", "Mars",
@@ -127,6 +190,141 @@ function eclipticLongitudeDeg(bodyEnum, astroTime) {
 function checksumFor({ isoTime, lat, lng, body, longitudeArcsecStr }) {
   const payload = `${ASTRONOMY_ENGINE_VERSION}|${isoTime}|${lat}|${lng}|${body}|${longitudeArcsecStr}`;
   return createHash("sha256").update(payload, "utf8").digest("hex");
+}
+
+// ── house cusps (WP-13) ───────────────────────────────────────────────
+
+// The "LEDGER"-status quadrant systems from src/core/variants.js's
+// HOUSE_SYSTEMS registry (ids matched exactly — snake_case where the
+// registry uses it, none of these eight happen to need it). The five
+// "exact"/"PROVEN" systems in that registry (whole_sign, equal_asc,
+// equal_mc, vehlow, porphyry) are computed directly by the exact integer
+// core and are deliberately NOT offered here — this CLI's job is only the
+// systems that are *not* computable by the exact core and so must reach
+// it through the ledger contract (see variants.js's comment on why those
+// eight are ledger-gated).
+const HOUSE_SYSTEM_FNS = {
+  placidus: placidusCusps,
+  koch: kochCusps,
+  regiomontanus: regiomontanusCusps,
+  campanus: campanusCusps,
+  alcabitius: alcabitiusCusps,
+  topocentric: topocentricCusps,
+  morinus: morinusCusps,
+  meridian: meridianCusps,
+};
+
+const HOUSES_SOURCE_KIND = "hcrm-house-solver";
+// Not a third-party pinned dependency (unlike astronomy-engine), so there
+// is no upstream version number to pin — this names the two in-repo
+// modules that jointly determine the computed value instead.
+const HOUSES_SOURCE_NAME = "houses.js+timescale.js";
+
+function cuspBodyName(i) {
+  return `CUSP_${i + 1}`;
+}
+
+// See the "House cusps (WP-13)" header note above for why this payload
+// includes houseSystem (checksumFor()'s planet-path payload does not).
+function checksumForHouse({ isoTime, lat, lng, houseSystem, body, longitudeArcsecStr }) {
+  const payload = `${HOUSES_SOURCE_NAME}|${isoTime}|${lat}|${lng}|${houseSystem}|${body}|${longitudeArcsecStr}`;
+  return createHash("sha256").update(payload, "utf8").digest("hex");
+}
+
+/**
+ * Compute schema-conformant ASC/MC/CUSP_1..CUSP_12 ledger entries for the
+ * given instant/observer, for each requested house system.
+ *
+ * @param {object} opts
+ * @param {string|Date} opts.time - ISO-8601 UTC instant (or a Date).
+ * @param {number|string} opts.lat - observer latitude, degrees, [-90, 90].
+ * @param {number|string} opts.lng - observer longitude, degrees, [-180, 180].
+ * @param {string[]} opts.systems - house system ids, keys of HOUSE_SYSTEM_FNS
+ *   (e.g. "placidus"). Non-empty; unknown ids throw.
+ * @returns {object[]} array of ledger entries — see file header for shape
+ *   and the "House cusps (WP-13)" note for the one-copy-per-system,
+ *   house_system-tagged ASC/MC convention. A system whose cusp function
+ *   throws PolarLatitudeError at this latitude is skipped (console.error
+ *   warning, run continues) rather than aborting the whole call.
+ */
+export function produceHouseLedgerEntries({ time, lat, lng, systems }) {
+  if (time === undefined || time === null || time === "")
+    throw new Error("produce-ledger: --time is required (ISO-8601 UTC instant)");
+  if (!Array.isArray(systems) || systems.length === 0)
+    throw new Error("produce-ledger: --houses must name at least one house system");
+
+  const latNum = requireFiniteNumber(lat, "lat", -90, 90);
+  const lngNum = requireFiniteNumber(lng, "lng", -180, 180);
+
+  for (const sys of systems) {
+    if (!Object.prototype.hasOwnProperty.call(HOUSE_SYSTEM_FNS, sys))
+      throw new Error(
+        `produce-ledger: unknown house system "${sys}" (known: ${Object.keys(HOUSE_SYSTEM_FNS).join(", ")})`
+      );
+  }
+
+  let t0;
+  try {
+    t0 = Astronomy.MakeTime(new Date(time));
+  } catch (err) {
+    throw new Error(`produce-ledger: could not parse --time "${time}": ${err.message}`, { cause: err });
+  }
+  if (Number.isNaN(t0.ut)) throw new Error(`produce-ledger: --time "${time}" is not a valid timestamp`);
+  const isoTime = t0.date.toISOString();
+
+  const jdUt1 = julianDayUTC(isoTime);
+  const jdTt = ttFromUtc(jdUt1);
+  const deltaTSeconds = (jdTt - jdUt1) * 86400;
+
+  const { ascDeg, mcDeg } = ascMc(jdUt1, jdTt, latNum, lngNum);
+
+  const entries = [];
+  for (const sys of systems) {
+    const fn = HOUSE_SYSTEM_FNS[sys];
+    let cusps;
+    try {
+      cusps = fn(jdUt1, jdTt, latNum, lngNum);
+    } catch (err) {
+      if (err instanceof PolarLatitudeError) {
+        console.error(`produce-ledger: skipping house system "${sys}" at lat=${latNum} — ${err.message}`);
+        continue;
+      }
+      throw err;
+    }
+
+    const points = [["ASC", ascDeg], ["MC", mcDeg]];
+    for (let i = 0; i < 12; i++) points.push([cuspBodyName(i), cusps[i]]);
+
+    for (const [body, deg] of points) {
+      const arcsec = normalizeArcsec(roundHalfAwayFromZero(deg * ARCSEC_PER_DEG));
+      const longitudeArcsecStr = String(arcsec);
+      const checksum = checksumForHouse({ isoTime, lat: latNum, lng: lngNum, houseSystem: sys, body, longitudeArcsecStr });
+
+      entries.push({
+        ledger_version: "hcrm-ephemeris-ledger-v1",
+        event_id: `${isoTime}#${sys}#${body}`,
+        body,
+        house_system: sys,
+        longitude_arcsec: longitudeArcsecStr,
+        source: {
+          kind: HOUSES_SOURCE_KIND,
+          name: HOUSES_SOURCE_NAME,
+          checksum,
+        },
+        certificate: {
+          status: "IMPORTED_INTEGER_LEDGER",
+          notes:
+            `${sys} house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST ` +
+            `timescale from timescale.js); observer lat=${latNum} lng=${lngNum}`,
+        },
+        meta: {
+          jd_tt: jdTt,
+          delta_t_seconds: deltaTSeconds,
+        },
+      });
+    }
+  }
+  return entries;
 }
 
 // ── core function — importable directly by tests, no subprocess needed ───
@@ -217,7 +415,7 @@ export function produceLedgerEntries({ time, lat, lng, bodies = DEFAULT_BODIES }
 // ── CLI wrapper ────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const args = { time: undefined, lat: undefined, lng: undefined, bodies: DEFAULT_BODIES.slice(), out: null };
+  const args = { time: undefined, lat: undefined, lng: undefined, bodies: DEFAULT_BODIES.slice(), houses: [], out: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     switch (a) {
@@ -226,6 +424,9 @@ function parseArgs(argv) {
       case "--lng": args.lng = argv[++i]; break;
       case "--bodies":
         args.bodies = String(argv[++i] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+        break;
+      case "--houses":
+        args.houses = String(argv[++i] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
         break;
       case "--out": args.out = argv[++i]; break;
       default:
@@ -241,6 +442,9 @@ function parseArgs(argv) {
 export function main(argv) {
   const args = parseArgs(argv);
   const entries = produceLedgerEntries(args);
+  if (args.houses.length > 0) {
+    entries.push(...produceHouseLedgerEntries({ time: args.time, lat: args.lat, lng: args.lng, systems: args.houses }));
+  }
   const json = JSON.stringify(entries, null, 2);
   if (args.out) {
     writeFileSync(args.out, `${json}\n`, "utf8");

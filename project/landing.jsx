@@ -137,6 +137,7 @@ function Landing({ initial, onCast, mode, onBack }) {
   const [meridiem, setMeridiem] = React.useState(initial?.meridiem ?? "PM");
   const [place,    setPlace]    = React.useState(initial?.place    ?? DEFAULT_CITY_KEY);
   const [subjectName, setSubjectName] = React.useState(initial?.subjectName ?? (isPartner ? "" : "You"));
+  const [timeUnknown, setTimeUnknown] = React.useState(initial?.timeUnknown ?? false);
   const [hoverKey, setHoverKey] = React.useState(null);
 
   const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -167,14 +168,56 @@ function Landing({ initial, onCast, mode, onBack }) {
     const h24 = meridiem === "AM"
       ? (hour12 === 12 ? 0  : hour12)
       : (hour12 === 12 ? 12 : hour12 + 12);
-    const dateISO = buildBirthISO({ year, month, day, hour: h24, minute, off: city.off });
+
+    // WP-18: unknown birth time still computes planetary positions using
+    // local noon (12:00), same as the pre-WP-18 "use 12:00 PM if unknown"
+    // hint below — but now that fact is carried on the payload as
+    // `timeUnknown` so the resulting chart can flag itself
+    // (`chart.timeUnknown`) for downstream ASC/MC/house-precision
+    // suppression (WP-19/WP-29 own the actual suppression UI).
+    const effHour   = timeUnknown ? 12 : h24;
+    const effMinute = timeUnknown ? 0  : minute;
+
+    // WP-18: resolve the actual UTC instant via tzresolve.js's DST-aware
+    // offset search (city.tz), falling back to the legacy fixed `off`
+    // offset only if tzresolve.js didn't load (offline / not yet wired
+    // into this page's <script> tags) or a city is missing `tz`.
+    const resolver = (typeof window !== "undefined" && window.TzResolve)
+      ? window.TzResolve.resolveUtcInstant
+      : null;
+    let dateISO, dstNote = null;
+    if (resolver && city.tz) {
+      const r = resolver({ year, month, day, hour: effHour, minute: effMinute }, city.tz);
+      if (r.kind === "ok") {
+        dateISO = r.instant;
+      } else if (r.kind === "nonexistent") {
+        // Spring-forward gap: the entered wall-clock time never occurred
+        // that day. Defensible default (documented in tzresolve.js's
+        // JSDoc): fall back to the first valid instant AFTER the gap —
+        // the conventional "spring forward" resolution — and leave a
+        // note; WP-19 owns actually surfacing this to the user instead
+        // of silently swallowing it.
+        dateISO = r.nearestValid[1];
+        dstNote = `${pad(effHour)}:${pad(effMinute)} did not exist that day at ${city.name} (spring-forward) — used the nearest valid time after the jump.`;
+      } else { // r.kind === "ambiguous"
+        // Fall-back repeat: two valid UTC instants, exactly 1h apart.
+        // Deterministic default: the earlier (pre-transition) one.
+        dateISO = r.instants[0];
+        dstNote = `${pad(effHour)}:${pad(effMinute)} occurred twice that day at ${city.name} (fall-back) — used the earlier of the two.`;
+      }
+    } else {
+      dateISO = buildBirthISO({ year, month, day, hour: effHour, minute: effMinute, off: city.off });
+    }
+
     onCast({
       dateISO,
       lat: city.lat,
       lng: city.lng,
       placeLabel: `${city.name} · ${city.region}`,
       subjectName: (subjectName || "").trim() || (isPartner ? "Them" : "You"),
-      formState: { year, month, day, hour12, minute, meridiem, place, subjectName },
+      timeUnknown,
+      dstNote,
+      formState: { year, month, day, hour12, minute, meridiem, place, subjectName, timeUnknown },
     });
   };
 
@@ -231,7 +274,7 @@ function Landing({ initial, onCast, mode, onBack }) {
 
             <fieldset className="lf-set">
               <legend className="lf-leg">Time of birth</legend>
-              <div className="lf-row">
+              <div className="lf-row" style={timeUnknown ? { opacity: 0.45, pointerEvents: "none" } : undefined}>
                 <Picker
                   label="Hour" value={hour12}
                   options={hours.map((h) => ({ value: h, label: String(h) }))}
@@ -248,7 +291,19 @@ function Landing({ initial, onCast, mode, onBack }) {
                   onChange={setMeridiem}
                 />
               </div>
-              <p className="lf-hint">Local time at place of birth. Use 12:00 PM if unknown.</p>
+              <label className="lf-check">
+                <input
+                  type="checkbox"
+                  checked={timeUnknown}
+                  onChange={(e) => setTimeUnknown(e.target.checked)}
+                />
+                <span>Time unknown — compute at 12:00 PM local, flag chart as time-unknown</span>
+              </label>
+              <p className="lf-hint">
+                {timeUnknown
+                  ? "ASC, MC, houses, and Moon-degree precision will be marked unreliable on an unknown-time chart."
+                  : "Local time at place of birth, DST-corrected for the exact date."}
+              </p>
             </fieldset>
 
             <fieldset className="lf-set">

@@ -7,6 +7,7 @@ const DEFAULT_SETTINGS = /*EDITMODE-BEGIN*/{
   "lat":         29.4241,
   "lng":         -98.4936,
   "placeLabel":  "San Antonio · TX",
+  "timeUnknown": false,
   "houseSystem": "whole",
   "sect":        "auto",
   "tilt":        14,
@@ -61,10 +62,11 @@ function App() {
 
   const onCast = (payload) => {
     setTweak({
-      dateISO:    payload.dateISO,
-      lat:        payload.lat,
-      lng:        payload.lng,
-      placeLabel: payload.placeLabel,
+      dateISO:     payload.dateISO,
+      lat:         payload.lat,
+      lng:         payload.lng,
+      placeLabel:  payload.placeLabel,
+      timeUnknown: !!payload.timeUnknown,
     });
     setLandingState(payload.formState);
     setScreen("session");
@@ -135,9 +137,10 @@ function SynastryScreen({ settings, partner, onBack }) {
         dateISO: settings.dateISO, lat: settings.lat, lng: settings.lng,
         houseSystem: settings.houseSystem, sect: settings.sect,
         placeLabel: settings.placeLabel, subjectName: "You",
+        timeUnknown: !!settings.timeUnknown,
       });
     } catch (e) { console.error(e); return null; }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel]);
+  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown]);
 
   const chartB = $useMemo(() => {
     if (!partner) return null;
@@ -146,6 +149,7 @@ function SynastryScreen({ settings, partner, onBack }) {
         dateISO: partner.dateISO, lat: partner.lat, lng: partner.lng,
         houseSystem: settings.houseSystem, sect: settings.sect,
         placeLabel: partner.placeLabel, subjectName: partner.subjectName || "Them",
+        timeUnknown: !!partner.timeUnknown,
       });
     } catch (e) { console.error(e); return null; }
   }, [partner, settings.houseSystem, settings.sect]);
@@ -172,9 +176,10 @@ function SessionScreen({ settings, setTweak, onBack, onOpenSpread, onOpenSynastr
         houseSystem: settings.houseSystem,
         sect: settings.sect,
         placeLabel: settings.placeLabel,
+        timeUnknown: !!settings.timeUnknown,
       });
     } catch (e) { console.error(e); return null; }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel]);
+  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown]);
 
   if (!chart) {
     return (
@@ -199,12 +204,13 @@ function Spread({ settings, setTweak, t, onBack }) {
         houseSystem: settings.houseSystem,
         sect: settings.sect,
         placeLabel: settings.placeLabel,
+        timeUnknown: !!settings.timeUnknown,
       });
     } catch (e) {
       console.error(e);
       return null;
     }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel]);
+  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown]);
 
   const cards = $useMemo(() => {
     if (!chart) return [];

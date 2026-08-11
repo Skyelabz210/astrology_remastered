@@ -1,13 +1,21 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Schema version 1.1 (WP-13, additive/backward-compatible over the WP-08 v1 shape): adds the optional `house_system` property and documents that `body` now also carries house-cusp point names (ASC, MC, CUSP_1..CUSP_12) alongside planet names. `body` was already an unrestricted string (no enum) in v1, so no existing validation rule changed — every entry that validated under v1 still validates unchanged here; this is a documentation-only widening plus one new optional field. See project/tools/ephemeris/produce-ledger.mjs's `--houses` flag (WP-13) for the producer, and project/src/core/variants.js's HOUSE_SYSTEMS registry for the canonical house_system id spellings (e.g. \"placidus\", \"koch\", \"whole_sign\" — snake_case, matched exactly).",
   "title": "HCRM Exact Ephemeris Ledger Entry",
   "type": "object",
   "required": ["ledger_version", "event_id", "body", "longitude_arcsec", "source", "certificate"],
   "properties": {
     "ledger_version": { "const": "hcrm-ephemeris-ledger-v1" },
     "event_id": { "type": "string" },
-    "body": { "type": "string" },
+    "body": {
+      "type": "string",
+      "description": "A planet/point name (e.g. \"Sun\", \"Moon\", ...) or, as of WP-13, a house-cusp point name: \"ASC\", \"MC\", or \"CUSP_1\"..\"CUSP_12\". Deliberately left as an open string (no enum) rather than a closed list, consistent with v1 — this keeps the schema additive."
+    },
     "longitude_arcsec": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
+    "house_system": {
+      "type": "string",
+      "description": "Optional (WP-13 addition). Present only on ASC/MC/CUSP_1..CUSP_12 entries produced by a specific quadrant house system; absent on planet entries and on entries without a computed house_system. Value is the house system's `id` string from project/src/core/variants.js's HOUSE_SYSTEMS registry (e.g. \"placidus\", \"koch\", \"regiomontanus\", \"campanus\", \"alcabitius\", \"topocentric\", \"morinus\", \"meridian\") — matched exactly, including its underscore/hyphen convention (this registry uses snake_case, e.g. \"whole_sign\", never \"whole-sign\"). Omitting this field is valid (backward compatible with every v1 entry, none of which have it)."
+    },
     "source": {
       "type": "object",
       "required": ["kind", "name", "checksum"],
