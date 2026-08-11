@@ -19,6 +19,19 @@
 // Each body becomes a register address; the shadow-prime overlay turns the
 // whole chart into a residue map of the human. The payload is the TABLE,
 // not the prose.
+//
+// WP-15: the CRT / K-Elimination arithmetic below is no longer a local
+// Number-based reimplementation. It is routed through `window.HCRM_CORE`
+// (core-shim.js, BigInt only — see project/src/core/shell-kelim.js), with
+// conversion at the boundary: `BigInt(arcsecString)` in, `Number(...)` back
+// out only for cosmetic display (this file is presentation layer, not
+// `project/src/core/` — Mandate A1 does not reach here, but the certified
+// core is the single source of truth for the winding arithmetic regardless).
+// Pages must load `<script type="module" src="core-shim.js"></script>`
+// BEFORE this file (module scripts run before DOMContentLoaded; Babel-
+// standalone only transforms/runs text/babel tags on DOMContentLoaded, so
+// window.HCRM_CORE is guaranteed present by the time any function below is
+// actually invoked).
 
 const HCRM_BASIS = [2, 3, 5, 7, 11, 13, 17, 19];
 const ARCSEC_CIRCLE = 1296000;
@@ -31,35 +44,17 @@ const ARCSEC_SIGN   = 108000;
 // projection of residue space, exactly as CRAM states.
 const M_SAFE8 = HCRM_BASIS.reduce((a, p) => a * p, 1); // 9,699,690
 
-// modular inverse of a mod p (extended Euclid; p prime, a not ≡ 0)
-function modInverse(a, p) {
-  a = ((a % p) + p) % p;
-  let [old_r, r] = [a, p];
-  let [old_s, s] = [1, 0];
-  while (r !== 0) {
-    const q = Math.floor(old_r / r);
-    [old_r, r] = [r, old_r - q * r];
-    [old_s, s] = [s, old_s - q * s];
+// window.HCRM_CORE accessor. Throws loudly (rather than silently falling
+// back to Number arithmetic) when core-shim.js has not run yet — that is a
+// page wiring bug, not a state this module should paper over.
+function requireCore() {
+  if (typeof window === "undefined" || !window.HCRM_CORE) {
+    throw new Error(
+      "hcrm.jsx requires window.HCRM_CORE — load core-shim.js as a "
+      + "type=module script before hcrm.jsx, and serve the page over HTTP "
+      + "(ES module imports are blocked on file://).");
   }
-  return ((old_s % p) + p) % p;
-}
-
-// CRT reconstruction γ̃_B(r): canonical representative in [0, M_B) from the
-// residue tray. This is the Fixed-Basis Identity map Φ_B inverse, value side.
-function crtReconstruct(res, basis = HCRM_BASIS, M = M_SAFE8) {
-  let x = 0;
-  for (const p of basis) {
-    const Mi = M / p;                       // ∏ of the other primes
-    const inv = modInverse(Mi % p, p);      // (Mi)^-1 mod p
-    const idem = (Mi % M) * inv % M;        // CRT idempotent e_i
-    x = (x + (res["r" + p] % p) * idem) % M;
-  }
-  return ((x % M) + M) % M;
-}
-
-// Full CRAM value projection Val_B(S) = γ̃_B(r) + K·M_B
-function cramValue(res, K = 0, basis = HCRM_BASIS, M = M_SAFE8) {
-  return crtReconstruct(res, basis, M) + K * M;
+  return window.HCRM_CORE;
 }
 
 // ── CRAM odometer: residue-native counting with certified winding ──
@@ -67,11 +62,14 @@ function cramValue(res, K = 0, basis = HCRM_BASIS, M = M_SAFE8) {
 // zero tray, the winding K increments. For a step s, the certified carry is
 //   δ = ⌊(γ̃ + s) / M_B⌋,   γ̃ ← (γ̃ + s) mod M_B,   K ← K + δ.
 // The integer x = γ̃ + K·M_B is the boundary projection, not the workspace.
+// The reduction itself is window.HCRM_CORE.mod (BigInt); Number in/out only.
 function cramStep(gamma, K, step, M = M_SAFE8) {
-  const raw = gamma + step;
-  const delta = Math.floor(raw / M);          // certified product-block carry
-  const newGamma = ((raw % M) + M) % M;
-  return { gamma: newGamma, K: K + delta, carried: delta };
+  const HC = requireCore();
+  const g = BigInt(gamma), s = BigInt(step), m = BigInt(M);
+  const raw = g + s;
+  const newGamma = HC.mod(raw, m);
+  const delta = (raw - newGamma) / m;          // exact BigInt division — no Math.floor
+  return { gamma: Number(newGamma), K: K + Number(delta), carried: Number(delta) };
 }
 
 // ── K-Elimination: recover the winding from residue anchors alone ──
@@ -89,26 +87,43 @@ const SHELL6      = [2, 3, 5, 7, 11, 13];
 const M_SHELL6    = 30030;
 const GEAR_ANCHORS = [17, 19];
 
-function crtPair(r1, m1, r2, m2) {
-  const M = m1 * m2;
-  const inv = modInverse(m1 % m2, m2);
-  const k = (((r2 - r1) % m2) + m2) % m2 * inv % m2;
-  return ((r1 + m1 * k) % M + M) % M;
-}
+// Quoted from src/core/basis.js: M6_INV_MOD_GEAR = 287 (≡ 30030⁻¹ mod 323).
+// 323 = 17·19 and 287·M6 ≡ 1 (mod 323), so by CRT 287 mod 17 ≡ M6⁻¹ mod 17
+// and 287 mod 19 ≡ M6⁻¹ mod 19 directly — this REDUCES the core's published
+// constant for the worked-certificate display, it does not re-derive it.
+const LEGACY_GEAR_INV_MOD = { 17: 287 % 17, 19: 287 % 19 }; // { 17: 15, 19: 2 }
 
+// K-Elimination on the legacy gear split (src/core/shell-kelim.js: shell
+// M6 = 30,030 over {2,3,5,7,11,13}, anchor 17·19 = 323). The certified
+// recovery — one BigInt subtract + a precomputed-inverse multiply, no
+// per-lane inverse search — is window.HCRM_CORE.recoverShellWindingFromGear.
+// The per-anchor {17, 19} breakdown below is the worked-certificate DISPLAY:
+// it reduces that one certified BigInt result (Khat = Krecovered mod A), it
+// never recomputes or verifies K itself by another route.
 function kElimWinding(arcsec) {
-  const a = arcsec;
-  const rM = a % M_SHELL6;                 // canonical shell residue
-  const Ktrue = Math.floor(a / M_SHELL6);  // ground-truth winding (for checking)
+  const HC = requireCore();
+  const a = BigInt(arcsec);
+  const rMBig = HC.shellResidue(a);                       // a mod M6, certified
+  const KtrueBig = HC.actualLegacyWinding(a);              // a / M6, exact BigInt division
+  const KrecoveredBig = HC.recoverShellWindingFromGear(a); // certified K, single anchor 323
+
   const anchors = GEAR_ANCHORS.map(A => {
-    const aA = a % A;
-    const inv = modInverse(M_SHELL6 % A, A);
-    const Khat = ((((aA - rM) % A) + A) % A) * inv % A;
-    const KtrueModA = Ktrue % A;
-    return { A, aA, rMmodA: rM % A, inv, Khat, KtrueModA, verified: Khat === KtrueModA };
+    const Abig = BigInt(A);
+    const aA = HC.mod(a, Abig);
+    const rMmodA = HC.mod(rMBig, Abig);
+    const Khat = HC.mod(KrecoveredBig, Abig);
+    const KtrueModA = HC.mod(KtrueBig, Abig);
+    return {
+      A, aA: Number(aA), rMmodA: Number(rMmodA), inv: LEGACY_GEAR_INV_MOD[A],
+      Khat: Number(Khat), KtrueModA: Number(KtrueModA), verified: Khat === KtrueModA,
+    };
   });
-  const Krecovered = crtPair(anchors[0].Khat, GEAR_ANCHORS[0], anchors[1].Khat, GEAR_ANCHORS[1]);
-  return { rM, Ktrue, anchors, Krecovered, recovered: Krecovered === Ktrue, M6: M_SHELL6 };
+
+  return {
+    rM: Number(rMBig), Ktrue: Number(KtrueBig), anchors,
+    Krecovered: Number(KrecoveredBig), recovered: KrecoveredBig === KtrueBig,
+    M6: Number(HC.LEGACY_SHELL),
+  };
 }
 
 // Star-number test (L₋₁ sub-residue structure): f⋆(n) = 6n(n−1)+1.
@@ -130,9 +145,50 @@ function factorizeSmall(n) {
   return f;
 }
 
-// integer arcsecond longitude from a degree float
+// ── SYNTHETIC quantization step, explicitly labeled ──────────────────
+// toArcsec rounds a floating-point synthetic-ephemeris degree (astro.jsx —
+// synthetic orbital periods + Date arithmetic, see src/demo/SYNTHETIC_DEMO.js)
+// to an integer arcsecond. That rounding makes the result presentation-only:
+// it is NOT an exact integer ephemeris fact and must never be shown as one.
+// Every call site below wraps its output in a SYNTHETIC_DEMO ledger entry
+// (syntheticCertificate) and runs it through window.HCRM_CORE.admitForCore,
+// whose sole admission gate refuses SYNTHETIC_DEMO unconditionally
+// (src/ledger/import-ledger.js) — the rejection is what the console badges.
 function toArcsec(lonDeg) {
   return ((Math.round(lonDeg * 3600) % ARCSEC_CIRCLE) + ARCSEC_CIRCLE) % ARCSEC_CIRCLE;
+}
+
+// Wrap a toArcsec() output as a schema-conformant ledger entry
+// (src/ledger/ephemeris-ledger-schema.json) certified SYNTHETIC_DEMO, and
+// attempt admission through the core's real gate. The core is expected to
+// refuse it — that refusal, captured here rather than swallowed, is what the
+// console renders as the provenance badge instead of presenting the rounded
+// float as exact register data.
+function syntheticCertificate(arcsec, bodyName) {
+  const HC = requireCore();
+  const entry = {
+    ledger_version: "hcrm-ephemeris-ledger-v1",
+    event_id: `hcrm-synthetic-${bodyName || "chart"}`,
+    body: bodyName || "chart",
+    longitude_arcsec: String(arcsec),
+    source: {
+      kind: "synthetic-demo",
+      name: "hcrm.jsx toArcsec() — Math.round(lonDeg*3600) quantization of an astro.jsx synthetic longitude",
+      checksum: "",
+    },
+    certificate: {
+      status: "SYNTHETIC_DEMO",
+      notes: "Rounded from a floating-point synthetic-ephemeris degree; not an exact integer arcsecond ledger fact.",
+    },
+  };
+  try {
+    HC.admitForCore(entry);
+    // Should be unreachable — SYNTHETIC_DEMO is refused unconditionally by
+    // the core's admission gate. Surface it loudly if that ever changes.
+    return { entry, admitted: true, rejected: false, message: "admitted (unexpected — SYNTHETIC_DEMO should always be refused)" };
+  } catch (e) {
+    return { entry, admitted: false, rejected: true, message: e && e.message || String(e) };
+  }
 }
 
 // reduce an integer through the full 8-prime basis
@@ -224,14 +280,27 @@ function registerRow(body) {
   const signDegArcsec = a % ARCSEC_SIGN;
   const led = BODY_LEDGER[body.name] || {};
   // CRAM state: the residue tray is primary; the arcsec value is its
-  // boundary projection. Winding K = ⌊a / M_B⌋ = 0 here (a < M_B), so the
-  // tray reconstructs the longitude exactly — drift-free identity.
-  const gamma = crtReconstruct(res);          // γ̃_B(r)
-  const K = Math.floor(a / M_SAFE8);          // winding (0 within one ring)
-  const val = gamma + K * M_SAFE8;            // Val_B(S)
-  const roundtrip = val === a;                // Fixed-Basis Identity check
+  // boundary projection. γ̃ is the CRT reconstruction over the parked shell
+  // {2,3,5,7,13,17,19} = 881,790, and K is recovered from the shadow lane 11
+  // alone by genuine K-Elimination — window.HCRM_CORE.shellIdentity /
+  // verifyShellWinding (src/core/shell-kelim.js), BigInt, certified. The
+  // boundary projection val = γ̃ + K·shell is formed here only for cosmetic
+  // display (hcrm.jsx is not under src/core); roundtrip compares BigInt.
+  const HC = requireCore();
+  const aBig = BigInt(a);
+  const identity = HC.shellIdentity(aBig);            // { r, K, shell, anchor }
+  const verify = HC.verifyShellWinding(aBig);          // { recovered, actual, ok, ... }
+  const valBig = identity.r + identity.K * identity.shell;
+  const gamma = Number(identity.r);           // γ̃_B(r)
+  const K = Number(identity.K);               // winding (0 or 1 within one ring)
+  const val = Number(valBig);                 // Val_B(S)
+  const roundtrip = verify.ok && valBig === aBig; // Fixed-Basis Identity check
   // shadow anchor family residues {11, 13, 17, 19}
   const shadowFamily = { r11: res.r11, r13: res.r13, r17: res.r17, r19: res.r19 };
+  // Provenance certificate for the synthetic quantization above (toArcsec):
+  // wrapped as a SYNTHETIC_DEMO ledger entry and refused by admitForCore —
+  // the console badges this instead of presenting `a` as exact register data.
+  const synthetic = syntheticCertificate(a, body.name);
 
   // ── Heterogeneous lane-wise carry propagation (not bound to the discrete) ──
   // The body moves continuously at `speed` (deg/day → arcsec/day). Each lane p
@@ -274,6 +343,8 @@ function registerRow(body) {
     dignityScore: body.dignity ? body.dignity.score : 0,
     res,
     gamma, winding: K, val, roundtrip, shadowFamily, carry,
+    shell: Number(identity.shell), anchor: Number(identity.anchor),
+    synthetic,
     speedArcsecDay,
     kElim: kElimWinding(a),
     starIdx: starIndex(a % M_SHELL6),
@@ -427,10 +498,21 @@ function computeHCRM(chart) {
       shadowHit: residues8(a).r11 === 0,
     };
   });
+  // Chart-level provenance badge: every row carries an identical certificate
+  // shape (SYNTHETIC_DEMO is refused unconditionally, regardless of body),
+  // so the first row's is representative; fall back to a fresh certificate
+  // when the chart has no bodies at all.
+  const synthetic = rows.length ? rows[0].synthetic : syntheticCertificate(0, "chart");
   return {
     chart, rows, edges, clusters, signature, angles,
     basis: HCRM_BASIS,
     mSafe8: M_SAFE8,
+    // parked-shell CRT split actually used for per-row gamma/K/val (see
+    // registerRow) — distinct from mSafe8, which is the odometer's own
+    // full-basis modulus and is unrelated to this per-row identity check.
+    mShell: rows.length ? rows[0].shell : null,
+    parkAnchor: rows.length ? rows[0].anchor : null,
+    synthetic,
     cramVerified: rows.every(r => r.roundtrip),
     kElimVerified: rows.every(r => r.kElim.recovered),
     // distinct body-level and edge-level counters — never collapse them
@@ -455,8 +537,8 @@ function computeHCRM(chart) {
 
 Object.assign(window, {
   HCRM_BASIS, ARCSEC_CIRCLE, ARCSEC_SIGN, M_SAFE8, PRIME_ROLE, BODY_LEDGER, SIGN_BODY,
-  toArcsec, residues8, modInverse, crtReconstruct, cramValue, cramStep,
-  SHELL6, M_SHELL6, GEAR_ANCHORS, crtPair, kElimWinding, starIndex, factorizeSmall, gearClass,
+  toArcsec, syntheticCertificate, residues8, cramStep,
+  SHELL6, M_SHELL6, GEAR_ANCHORS, kElimWinding, starIndex, factorizeSmall, gearClass,
   operatorClass, registerRow, edgeResiduePreservation,
   buildEdges, shadowClusters, chartSignature, computeHCRM,
 });

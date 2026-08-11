@@ -22,6 +22,7 @@ function HCRMConsole({ chart, birthLabel, onBack }) {
           <div>
             <div className="hc-title">HCRM · Human-Celestial Register Map</div>
             <div className="hc-sub">{birthLabel} · integer arcseconds · basis 2·3·5·7·11·13·17·19</div>
+            <SyntheticBadge cert={hcrm.synthetic} />
           </div>
         </div>
         <div className="hc-hdr-r">
@@ -69,6 +70,27 @@ function HCRMConsole({ chart, birthLabel, onBack }) {
         {tab === "cram"     && <CramState hcrm={hcrm} />}
         {tab === "signature"&& <Signature hcrm={hcrm} />}
       </main>
+    </div>
+  );
+}
+
+// Provenance badge (WP-15): every register value on this page is quantized
+// from a floating-point synthetic-ephemeris degree (toArcsec, hcrm.jsx). That
+// rounding is wrapped as a SYNTHETIC_DEMO ledger entry and run through
+// window.HCRM_CORE.admitForCore — the core's sole admission gate — which
+// refuses SYNTHETIC_DEMO unconditionally (src/ledger/import-ledger.js). This
+// badge surfaces that refusal so the ledger below is never mistaken for
+// exact, core-admissible register data.
+function SyntheticBadge({ cert }) {
+  if (!cert) return null;
+  return (
+    <div
+      className={`hc-synthetic-badge ${cert.rejected ? "is-rejected" : "is-admitted"}`}
+      title={cert.message}
+    >
+      {cert.rejected
+        ? "⚠ SYNTHETIC — not admissible to core"
+        : "⚠ SYNTHETIC_DEMO admitted (unexpected)"}
     </div>
   );
 }
@@ -637,10 +659,12 @@ function CramState({ hcrm }) {
     <div className="hc-cram">
       <div className="hc-edges-note">
         Each body is a CRAM state <b>S = (B, r, K, …)</b>. The residue tray <b>r</b> is primary;
-        the integer longitude is the boundary projection <b>Val<sub>B</sub>(S) = γ̃<sub>B</sub>(r) + K·M<sub>B</sub></b>.
-        With M<sub>B</sub> = {hcrm.mSafe8.toLocaleString()} &gt; 1,296,000 (the full ring in arcsec),
-        every longitude has a unique tray and zero winding — the eight residues alone reconstruct
-        the exact arcsecond, drift-free. Round-trip verified: {hcrm.cramVerified
+        the integer longitude is the boundary projection <b>Val<sub>B</sub>(S) = γ̃<sub>B</sub>(r) + K·shell</b>,
+        certified by <code>window.HCRM_CORE.shellIdentity</code> / <code>verifyShellWinding</code>
+        (BigInt K-Elimination). γ̃ is the CRT reconstruction over the parked shell
+        {" "}{hcrm.mShell ? hcrm.mShell.toLocaleString() : "—"} = 2·3·5·7·13·17·19, and K is
+        recovered from the shadow lane {hcrm.parkAnchor || 11} alone — 0 or 1 within one ring
+        (K &lt; 2, since shell·2 &gt; 1,296,000). Round-trip verified: {hcrm.cramVerified
           ? <span className="hc-verified">✓ all bodies exact</span>
           : <span className="hc-failed">✕ mismatch</span>}.
       </div>
