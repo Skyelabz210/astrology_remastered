@@ -1,4 +1,4 @@
-# Remediation Ledger
+# Remediation Ledger — P1–P28
 
 Tracks the HCRM evidence-boundary remediation. Flat-file project (no git):
 `git mv` steps in the source plan are realized as file creation under `src/`,
@@ -28,6 +28,13 @@ leaving the existing browser apps working against the demo layer.
 | P19 | A3 withdrawn as a premise; O(1) yield; P17 overclaim amended | DONE — 367/367 |
 | P20 | Yield uncoupled — `r + K·M` named as a radix boundary projection, not the yield | DONE — 368/368 |
 | P21 | Core RE-BASED on the parked shell — 881,790 / lane 11 | DONE — 386/386 |
+| P22 | Certificate review — Φ magnitude bound (source vs. transformed) and off-basis-prime admissibility, both fixed | DONE — 391/391 |
+| P23 | Winding DERIVED not carried — K-Elimination lift on the phase-locked parked lane; headless `test/run.js` added | DONE — 416/416 |
+| P24 | P22 remedy WITHDRAWN — magnitude derived by K-Elimination against a lifted anchor, not declared by the caller | DONE — 418/418 |
+| P25 | The hidden carry — signed winding, anchor reads the carry negated, discarded shadow now captured (`carry.js`) | DONE — 441/441 |
+| P26 | T-COMP-1 — corridor grown by EXTENDING THE ANCHOR SET, not raising one anchor to a power (`tower-recover.js`) | DONE — 455/455 |
+| P27 | Identity of a number, D-030 — compound state (r,w); second-order K-Elimination corrects P23/P24 (`identity.js`) | DONE — 471/471 |
+| P28 | Two-tray architecture — only the SOURCE tray must be unbroken, the target inherits (`tray.js`, cert V2) | DONE — 493/493 |
 
 ## Acceptance evidence
 
