@@ -185,7 +185,7 @@ export function laneClosesUnderComposition(p) {
  */
 export function sqrtDiagnostics(basis = B8) {
   const lanes = basis.map((p) => {
-    let squares = 0n;
+    let squares;
     const seen = new Set();
     for (let y = 0n; y < p; y++) seen.add(mod(y * y, p).toString());
     squares = BigInt(seen.size);

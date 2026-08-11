@@ -13,7 +13,7 @@ import {
   COLONY, SHELL, ROLES, role, gaussianClass, isShadowPrime, sumOfTwoSquares,
   SHADOW_SPINE, SPLIT_PRIMES, SHADOW_ANCHOR, SHADOW_ESCALATION,
   familyPartners, isSophieGermain, isSafePrime,
-  basisGaps, primeProfile, basisProfile, saturationReport, isqrt, isPrime,
+  basisGaps, basisProfile, saturationReport, isqrt, isPrime,
   S_R, RAMANUJAN_CONGRUENCE, hasRamanujanCongruence, partitionNumbers,
   T_FABRIC, T_MEASUREMENT, T_BOUNDARY, tierOf, providesStructure,
   fibonacci, FIBONACCI_ENTRY, bootGates, SD11_ANCHOR, SD11_REJECT,

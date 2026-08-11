@@ -6,20 +6,19 @@
 // it, so the internal gear anchor is canonical after all. See
 // test/anchor.test.js — the assertions below are restated on that footing.
 
-import { B6, B8, M6, M8, GEAR_PRODUCT, M6_INV_MOD_GEAR, ARCSEC_CIRCLE } from "../src/core/basis.js";
+import { B8, M6, M8, GEAR_PRODUCT, M6_INV_MOD_GEAR, ARCSEC_CIRCLE } from "../src/core/basis.js";
 import { mod } from "../src/core/residues.js";
 import {
   gcd, inverse, isSafeBasis, shellModulus, canonicalAnchor,
-  adjacencyRecover, adjacencyRecoverFrom, generalRecover, gradientRecover, resolution,
+  adjacencyRecoverFrom, generalRecover, gradientRecover, resolution,
   shadowLift, recoveryCost, encode, gamma, value, wellFormed, STATE_FIELDS,
   transduce, isReversiblePolicy, SHELL_6, SHELL_8,
-  certifyTransduction, idempotents, gammaOf,
+  certifyTransduction,
 } from "../src/core/cram.js";
 
 export function run() {
   const R = [];
   const t = (name, ok, detail) => R.push({ name, ok: !!ok, detail: detail || "" });
-  const throws = (f) => { try { f(); return false; } catch { return true; } };
 
   // ── the anchor ───────────────────────────────────────────────────
   t("the adjacent modulus is coprime for free: gcd(M, M+1) = 1 always",

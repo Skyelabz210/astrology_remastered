@@ -31,11 +31,10 @@ export function emitSyntheticBanner(label) {
     `%c SYNTHETIC_DEMO %c ${label || "chart"} — presentation only. ` +
     `Longitudes are synthetic (floating point); not exact, not evidence-grade.`;
   try {
-    // eslint-disable-next-line no-console
     console.warn(msg,
       "background:#b07a2a;color:#000;font-weight:bold;padding:2px 4px;border-radius:3px",
       "color:#b8b0a0");
-  } catch (_) { /* no console */ }
+  } catch { /* no console */ }
 }
 
 // Guard: throws if synthetic data is handed to a core/evidence sink.

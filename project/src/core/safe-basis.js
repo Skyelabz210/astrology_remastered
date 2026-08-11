@@ -271,7 +271,6 @@ export function primeProfile(p) {
   return {
     prime: p.toString(),
     role: r.role,
-    tier: r.tier,
     note: r.note,
     gaussian_class: gaussianClass(p),
     mod_4: mod(p, 4n).toString(),

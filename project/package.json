@@ -8,6 +8,15 @@
   },
   "scripts": {
     "test": "node test/run.js",
-    "test:quick": "node test/run.js --quick"
+    "test:quick": "node test/run.js --quick",
+    "lint": "cd .. && eslint --config eslint.config.mjs --no-error-on-unmatched-pattern project 'scripts/**/*.{js,mjs}'"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.8.1",
+    "globals": "17.9.0"
+  },
+  "dependencies": {
+    "astronomy-engine": "2.1.19"
   }
 }

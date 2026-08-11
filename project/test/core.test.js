@@ -2,17 +2,17 @@
 // BigInt only. Returns a list of {name, ok, detail} results.
 
 import {
-  B6, B8, GEAR, M6, M8, GEAR_PRODUCT, ARCSEC_CIRCLE, M6_MOD_GEAR, M6_INV_MOD_GEAR,
+  B6, B8, M6, M8, GEAR_PRODUCT, ARCSEC_CIRCLE, M6_MOD_GEAR, M6_INV_MOD_GEAR,
   PARK, SHELL_LANES, M_SHELL, M_SHELL_MOD_PARK, M_SHELL_INV_MOD_PARK,
   K_MAX_PARKED, K_MAX_LEGACY,
 } from "../src/core/basis.js";
 import { mod, residues, residueObject } from "../src/core/residues.js";
 import { gearClass } from "../src/core/gear-class.js";
 import {
-  shellResidue, gearResidue, recoverShellWindingFromGear, verifyLegacyShellWinding,
+  verifyLegacyShellWinding,
   parkedShellResidue, parkResidue, recoverShellWinding, recoverShellWindingFrom,
-  shellIdentity, actualShellWinding, verifyShellWinding, SHELL_ANCHOR,
-  liftWinding, doubleLiftWinding, windingFromTray, trayRegister, parkPower,
+  shellIdentity, verifyShellWinding, SHELL_ANCHOR,
+  liftWinding, windingFromTray, trayRegister,
 } from "../src/core/shell-kelim.js";
 import { parseArcsecString, assertIntegerString } from "../src/core/validators.js";
 import { computeHcrmRegister } from "../src/core/hcrm-core.js";
