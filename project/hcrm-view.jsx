@@ -18,7 +18,7 @@ function HCRMConsole({ chart, birthLabel, onBack }) {
     <div className="hc">
       <header className="hc-hdr">
         <div className="hc-hdr-l">
-          {onBack && <button className="hc-back" onClick={onBack}>←</button>}
+          {onBack && <button className="hc-back" onClick={onBack} aria-label="Back">←</button>}
           <div>
             <div className="hc-title">HCRM · Human-Celestial Register Map</div>
             <div className="hc-sub">{birthLabel} · integer arcseconds · basis 2·3·5·7·11·13·17·19</div>
@@ -191,7 +191,15 @@ function Ledger({ hcrm, selRow, setSelRow }) {
           {hcrm.rows.map((r, i) => (
             <tr key={r.bodyId}
                 className={`${selRow === i ? "is-sel" : ""} ${r.shadowHit ? "has-shadow" : ""}`}
-                onClick={() => setSelRow(selRow === i ? null : i)}>
+                onClick={() => setSelRow(selRow === i ? null : i)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+                    e.preventDefault();
+                    setSelRow(selRow === i ? null : i);
+                  }
+                }}
+                tabIndex={0}
+                aria-expanded={selRow === i}>
               <td className="hc-body"><span className="hc-gl">{r.glyph}</span> {r.bodyId}</td>
               <td className="num">{r.arcsec.toLocaleString()}</td>
               <td>{r.signName}</td>
@@ -312,7 +320,15 @@ function ShadowWheel({ hcrm }) {
   };
   return (
     <div className="hc-wheel-wrap">
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="hc-wheel">
+      {/* WP-20: this is the register map's natal-chart wheel — bodies
+          placed by zodiacal degree around the 1,296,000″ ring, with
+          shadow-lane (mod 11) preserving edges bolded. The same rows are
+          available as plain text in the "Register ledger" tab's table, but
+          this view is data-carrying (not decorative), hence role="img" +
+          a real label rather than aria-hidden. */}
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="hc-wheel"
+           role="img"
+           aria-label={`Shadow-lane ring: natal chart wheel placing ${hcrm.rows.length} bodies by zodiacal degree, with ${hcrm.edges.filter(e => e.shadowPreserved).length} shadow-preserving aspect edges (shared mod-11 residue) shown bold. See the Register ledger tab for the same placements as a table.`}>
         <circle cx={C} cy={C} r={R} fill="none" stroke="oklch(0.93 0.008 80 / 0.18)" />
         <circle cx={C} cy={C} r={R-40} fill="none" stroke="oklch(0.93 0.008 80 / 0.08)" />
         {/* 12 sign divisions */}
@@ -459,7 +475,7 @@ function PhaseRing({ phase, p, hit }) {
   const R = 16, C = 21, circ = 2 * Math.PI * R;
   const dash = circ * phase;
   return (
-    <svg viewBox="0 0 42 42" className="hc-phase">
+    <svg viewBox="0 0 42 42" className="hc-phase" role="img" aria-label={`mod ${p} carry phase: ${Math.round(phase * p)} of ${p}${hit ? ", at shadow closure" : ""}`}>
       <circle cx={C} cy={C} r={R} fill="none" stroke="oklch(0.30 0.01 60)" strokeWidth="3" />
       <circle cx={C} cy={C} r={R} fill="none"
               stroke={hit ? "oklch(0.88 0.12 300)" : "oklch(0.82 0.03 80)"} strokeWidth="3"
@@ -572,8 +588,11 @@ function DialRing({ value, p }) {
   const R = 26, C = 32, circ = 2 * Math.PI * R;
   const phase = value / p;
   const dash = circ * phase;
+  // WP-20: decorative — the same dial value is already shown as plain
+  // text in the "tray r" readout above (hc-odo-tray), so this is
+  // aria-hidden rather than duplicating it as a second announcement.
   return (
-    <svg viewBox="0 0 64 64" className="hc-odo-ring">
+    <svg viewBox="0 0 64 64" className="hc-odo-ring" aria-hidden="true">
       <circle cx={C} cy={C} r={R} fill="none" stroke="oklch(0.28 0.01 60)" strokeWidth="4" />
       <circle cx={C} cy={C} r={R} fill="none" stroke="oklch(0.85 0.03 80)" strokeWidth="4"
               strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
@@ -735,7 +754,9 @@ function Signature({ hcrm }) {
       </div>
       <div className="hc-sig-right">
         <h4 className="hc-sig-h">Gear-pair trajectory (r17, r19)</h4>
-        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="hc-gear">
+        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="hc-gear"
+             role="img"
+             aria-label="Scatter plot of each body's r17 and r19 residues; bodies near the origin sit in the gear-lock corner. The same r17/r19 values are listed per body in the Register ledger tab.">
           {/* grid */}
           <rect x={C-R} y={C-R} width={R*2} height={R*2} fill="none" stroke="oklch(0.93 0.008 80 / 0.12)" />
           {gearPoints.map((g, i) => {

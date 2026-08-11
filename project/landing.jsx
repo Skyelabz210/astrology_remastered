@@ -1,13 +1,15 @@
 // landing.jsx — Astrology Remastered landing screen.
 // Strict pickers (native selects, no free text). Default: San Antonio · TX.
 
-function Picker({ label, value, options, onChange, wide }) {
+function Picker({ label, value, options, onChange, wide, disabled }) {
   return (
     <label className={`pk ${wide ? "pk-wide" : ""}`}>
       <span className="pk-lbl">{label}</span>
       <span className="pk-wrap">
         <select
           className="pk-sel"
+          aria-label={label}
+          disabled={disabled}
           value={String(value)}
           onChange={(e) => {
             const v = e.target.value;
@@ -19,7 +21,7 @@ function Picker({ label, value, options, onChange, wide }) {
             <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
           ))}
         </select>
-        <span className="pk-chev">▾</span>
+        <span className="pk-chev" aria-hidden="true">▾</span>
       </span>
     </label>
   );
@@ -80,6 +82,12 @@ function SearchablePicker({ label, value, options, onChange, placeholder }) {
     else if (e.key === "Escape") { setOpen(false); setQuery(""); }
   };
 
+  // WP-20: full keyboard operability was already present — ArrowUp/Down
+  // move focusIdx, Enter commits filtered[focusIdx], Escape closes — this
+  // just adds the ARIA combobox/listbox roles so a screen reader announces
+  // the same state a sighted keyboard user already relies on (expanded
+  // state, option count, which option is active).
+  const listboxId = React.useId ? React.useId() : "pk-list";
   return (
     <label className="pk pk-wide pk-search" ref={wrapRef}>
       <span className="pk-lbl">{label}</span>
@@ -88,6 +96,11 @@ function SearchablePicker({ label, value, options, onChange, placeholder }) {
           ref={inputRef}
           className="pk-sel pk-input"
           type="text"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={open && filtered[focusIdx] ? `${listboxId}-opt-${focusIdx}` : undefined}
           value={open ? query : (selected ? selected.label : "")}
           placeholder={placeholder || "type to search…"}
           onFocus={() => { setOpen(true); setQuery(""); setFocusIdx(0); }}
@@ -96,15 +109,18 @@ function SearchablePicker({ label, value, options, onChange, placeholder }) {
           autoComplete="off"
           spellCheck="false"
         />
-        <span className="pk-chev">▾</span>
+        <span className="pk-chev" aria-hidden="true">▾</span>
         {open && (
-          <div className="pk-list" ref={listRef}>
+          <div className="pk-list" ref={listRef} role="listbox" id={listboxId} aria-label={`${label} results`}>
             {filtered.length === 0 && (
               <div className="pk-empty">no match. only listed places can be selected.</div>
             )}
             {filtered.slice(0, 80).map((o, i) => (
               <div
                 key={String(o.value)}
+                id={`${listboxId}-opt-${i}`}
+                role="option"
+                aria-selected={o.value === value}
                 className={`pk-opt ${i === focusIdx ? "is-focus" : ""} ${o.value === value ? "is-sel" : ""}`}
                 onMouseEnter={() => setFocusIdx(i)}
                 onMouseDown={(e) => { e.preventDefault(); commit(o); }}
@@ -242,7 +258,7 @@ function Landing({ initial, onCast, mode, onBack }) {
       <div className="landing-grid">
         <section className="landing-left">
           <div className="landing-brand">
-            {isPartner && <button type="button" className="hdr-back landing-back" onClick={onBack}>←</button>}
+            {isPartner && <button type="button" className="hdr-back landing-back" onClick={onBack} aria-label="Back to your chart">←</button>}
             <span className="landing-mark">✦</span>
             <span className="landing-brand-text">Resonance{isPartner ? " · Synastry" : isHcrm ? " · HCRM" : ""}</span>
           </div>
@@ -291,19 +307,24 @@ function Landing({ initial, onCast, mode, onBack }) {
 
             <fieldset className="lf-set">
               <legend className="lf-leg">Time of birth</legend>
+              {/* WP-20: `disabled` (not just the dimmed/pointerEvents-none
+                  styling) so a keyboard user tabbing through the form skips
+                  these three selects while time is marked unknown, instead
+                  of landing on controls that look inert but still accept
+                  focus and Enter/Arrow input. */}
               <div className="lf-row" style={timeUnknown ? { opacity: 0.45, pointerEvents: "none" } : undefined}>
                 <Picker
-                  label="Hour" value={hour12}
+                  label="Hour" value={hour12} disabled={timeUnknown}
                   options={hours.map((h) => ({ value: h, label: String(h) }))}
                   onChange={setHour12}
                 />
                 <Picker
-                  label="Minute" value={minute}
+                  label="Minute" value={minute} disabled={timeUnknown}
                   options={minutes.map((m) => ({ value: m, label: pad(m) }))}
                   onChange={setMinute}
                 />
                 <Picker
-                  label="AM/PM" value={meridiem}
+                  label="AM/PM" value={meridiem} disabled={timeUnknown}
                   options={[{ value: "AM", label: "AM" }, { value: "PM", label: "PM" }]}
                   onChange={setMeridiem}
                 />
@@ -344,6 +365,33 @@ function Landing({ initial, onCast, mode, onBack }) {
               <span>{isPartner ? "Read the relationship" : isHcrm ? "Build the register map" : "Cast the spread"}</span>
               <span className="lf-arrow">→</span>
             </button>
+
+            {/* WP-20 privacy note — wording audited against the actual code,
+                not aspirational. Verified by `grep -rn "fetch(\|XMLHttpRequest\|sendBeacon"
+                project/*.jsx`: zero hits anywhere in the app, so chart math
+                itself never makes a network call. The one genuine egress
+                path is agent.jsx's `window.claude.complete(prompt)` — used
+                by the "Agent interpreter" narrative reading, which is ON BY
+                DEFAULT (DEFAULT_SETTINGS.agentOn = true in app.jsx) and,
+                for the natal chart-level reading, fires automatically the
+                moment a chart resolves (no extra click) — i.e. right after
+                this form is submitted. Its prompt (agent.jsx
+                buildChartPrompt) includes the raw birth date, latitude and
+                longitude verbatim.
+                A code-level `agentOn` toggle exists (tweaks-panel.jsx's
+                SubstrateTweaks), but tweaks-panel.jsx's panel only opens on
+                a `__activate_edit_mode` postMessage from a *host* frame
+                (see its own header comment) — there is no in-page control,
+                keybinding, or button that opens it. On a standalone
+                deployment of this page (no such host present, e.g. `npx
+                serve project`) that toggle is therefore unreachable by the
+                person using the page, so the note below says so plainly
+                instead of pointing at a switch nobody can actually find. */}
+            <p className="lf-privacy">
+              {isHcrm
+                ? "Every register value on this console — positions, residues, houses — is computed entirely in your browser; nothing about your birth data is sent anywhere. The register map does not use the AI \"Agent interpreter\" feature at all."
+                : "Chart math — positions, houses, aspects, dignities — is computed entirely in your browser; none of it is sent anywhere. Separately, right after you submit this form, this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "your birth date, time, and location") + " to Claude (Anthropic) to generate the spoken-style \"Agent interpreter\" reading — there is currently no on-page control to turn that off."}
+            </p>
           </form>
         </section>
 

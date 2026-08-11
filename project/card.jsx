@@ -56,6 +56,20 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
   const rigorous = settings.rigorous;
   const p = card.principal;
 
+  // WP-20: this div is the whole card's flip control — historically
+  // mouse-only (onClick on a bare <div>, no way to reach it from the
+  // keyboard at all). tabIndex + role="button" + an Enter/Space handler
+  // make it a real, Tab-reachable, screen-reader-announced control; the
+  // label mirrors what the visible face already shows (principal body,
+  // sign/house, flip state) rather than a generic "card".
+  const onKeyDown = (e) => {
+    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+      onFlip(card.idx);
+    }
+  };
+  const cardLabel = `${p.name} in ${card.name}, house ${card.house}. ${isFlipped ? "Showing reading — press to flip back." : "Press to flip for the reading."}`;
+
   return (
     <div
       ref={wrap}
@@ -65,6 +79,11 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={onLeave}
       onClick={() => onFlip(card.idx)}
+      onKeyDown={onKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-pressed={isFlipped}
+      aria-label={cardLabel}
     >
       <div className="zc-tilt" ref={inner}>
         <div className="zc-face zc-front">

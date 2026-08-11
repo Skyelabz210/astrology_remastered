@@ -26,7 +26,7 @@ function SynastryView({ chartA, chartB, settings, onBack }) {
   return (
     <div className="synastry">
       <header className="syn-hdr">
-        <button className="hdr-back" onClick={onBack}>←</button>
+        <button className="hdr-back" onClick={onBack} aria-label="Back">←</button>
         <div className="syn-hdr-title">
           <span className="syn-hdr-mark">✦</span>
           <span>Synastry · {A} & {B}</span>
@@ -198,7 +198,9 @@ function CompatibilityDial({ score, ctm }) {
   const harmArc = C * score.ratio;
   return (
     <div className="syn-dial">
-      <svg viewBox="0 0 140 140" className="syn-dial-svg">
+      <svg viewBox="0 0 140 140" className="syn-dial-svg"
+           role="img"
+           aria-label={`Compatibility dial: ${pct} percent harmony. Ease ${Math.round(score.harmony)}, friction ${Math.round(score.friction)}, intensity ${Math.round(score.intensity * 100)} percent.`}>
         <circle cx="70" cy="70" r={R} fill="none" stroke="oklch(0.30 0.01 60)" strokeWidth="8" />
         <circle
           cx="70" cy="70" r={R} fill="none"
