@@ -113,7 +113,9 @@ export default [
     },
   },
   {
-    files: ["project/tools/**/*.{js,mjs}", "scripts/**/*.{js,mjs}"],
+    // project/bench/** (WP-24) is a Node CLI benchmark script, same shape
+    // as project/tools/** and scripts/** — process/console as globals.
+    files: ["project/tools/**/*.{js,mjs}", "project/bench/**/*.{js,mjs}", "scripts/**/*.{js,mjs}"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
