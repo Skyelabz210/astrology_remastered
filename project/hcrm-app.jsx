@@ -9,6 +9,7 @@ const HCRM_DEFAULTS = /*EDITMODE-BEGIN*/{
   "lat":         35.1408,
   "lng":         -79.0058,
   "placeLabel":  "Fort Liberty (Bragg) · NC",
+  "timeUnknown": false,
   "houseSystem": "whole",
   "sect":        "auto"
 }/*EDITMODE-END*/;
@@ -37,6 +38,7 @@ function HCRMApp() {
     setBirth({
       dateISO: payload.dateISO, lat: payload.lat, lng: payload.lng,
       placeLabel: payload.placeLabel, houseSystem: birth.houseSystem, sect: birth.sect,
+      timeUnknown: !!payload.timeUnknown,
     });
     setFormState(payload.formState);
     setScreen("console");
@@ -48,6 +50,7 @@ function HCRMApp() {
       return computeNatal({
         dateISO: birth.dateISO, lat: birth.lat, lng: birth.lng,
         houseSystem: birth.houseSystem, sect: birth.sect, placeLabel: birth.placeLabel,
+        timeUnknown: !!birth.timeUnknown,
       });
     } catch (e) { console.error(e); return null; }
   }, [screen, birth]);

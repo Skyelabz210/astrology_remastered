@@ -859,6 +859,15 @@ function computeNatal(birth) {
     outOfBounds,
     voidOfCourse,
     birth,
+    // WP-18: an unknown birth time still computes every planetary
+    // position at local noon (unchanged), but ASC/MC/houses and the
+    // Moon's exact degree are only as precise as the assumed clock time
+    // — up to ~1° of ASC drift per 4 minutes of real error, worst case
+    // near the equator. This flag lets downstream consumers (WP-19's
+    // chart display, WP-29's interpretation engine) suppress or caveat
+    // those specific precision claims without this module needing to
+    // know anything about how they're presented.
+    timeUnknown: !!birth.timeUnknown,
   };
 }
 
