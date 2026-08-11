@@ -13,9 +13,14 @@
     "lint": "cd .. && eslint --config eslint.config.mjs --no-error-on-unmatched-pattern project 'scripts/**/*.{js,mjs}'"
   },
   "devDependencies": {
+    "@babel/core": "^8.0.1",
+    "@babel/preset-react": "^8.0.1",
     "@eslint/js": "10.0.1",
+    "esbuild": "^0.28.2",
     "eslint": "10.8.1",
-    "globals": "17.9.0"
+    "globals": "17.9.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "dependencies": {
     "astronomy-engine": "2.1.19"
