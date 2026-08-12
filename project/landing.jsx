@@ -139,7 +139,7 @@ function SearchablePicker({ label, value, options, onChange, placeholder }) {
   );
 }
 
-function Landing({ initial, onCast, mode, onBack }) {
+function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
   const isPartner = mode === "partner";
   const isHcrm = mode === "hcrm";
   const pad = (n) => String(n).padStart(2, "0");
@@ -371,26 +371,42 @@ function Landing({ initial, onCast, mode, onBack }) {
                 project/*.jsx`: zero hits anywhere in the app, so chart math
                 itself never makes a network call. The one genuine egress
                 path is agent.jsx's `window.claude.complete(prompt)` — used
-                by the "Agent interpreter" narrative reading, which is ON BY
-                DEFAULT (DEFAULT_SETTINGS.agentOn = true in app.jsx) and,
-                for the natal chart-level reading, fires automatically the
+                by the "Agent interpreter" narrative reading, which defaults
+                to on (DEFAULT_SETTINGS.agentOn = true in app.jsx) and, for
+                the natal chart-level reading, fires automatically the
                 moment a chart resolves (no extra click) — i.e. right after
                 this form is submitted. Its prompt (agent.jsx
                 buildChartPrompt) includes the raw birth date, latitude and
                 longitude verbatim.
-                A code-level `agentOn` toggle exists (tweaks-panel.jsx's
-                SubstrateTweaks), but tweaks-panel.jsx's panel only opens on
-                a `__activate_edit_mode` postMessage from a *host* frame
-                (see its own header comment) — there is no in-page control,
-                keybinding, or button that opens it. On a standalone
-                deployment of this page (no such host present, e.g. `npx
-                serve project`) that toggle is therefore unreachable by the
-                person using the page, so the note below says so plainly
-                instead of pointing at a switch nobody can actually find. */}
+                Originally the only in-repo `agentOn` toggle lived inside
+                tweaks-panel.jsx's host-only edit-mode panel, unreachable in
+                a standalone deployment (`npx serve project`, no host
+                frame) — see project/docs/EXECUTION_STATUS.md's "Flagged
+                for owner decision" for that history. The checkbox below is
+                the fix: a real, always-reachable control, checked here
+                *before* the automatic call this note warns about, wired to
+                the same `agentOn` setting and threaded through so every
+                screen that calls the agent (session, full spread,
+                synastry) honors it — not just this form. */}
+            {!isHcrm && (
+              <label className="lf-check">
+                <input
+                  type="checkbox"
+                  checked={agentOn !== false}
+                  onChange={(e) => onToggleAgent && onToggleAgent(e.target.checked)}
+                />
+                <span>
+                  Send my birth data to the AI "Agent interpreter" for a spoken-style reading
+                  (unchecking uses the local, non-AI reading instead — nothing leaves your browser)
+                </span>
+              </label>
+            )}
             <p className="lf-privacy">
               {isHcrm
                 ? "Every register value on this console — positions, residues, houses — is computed entirely in your browser; nothing about your birth data is sent anywhere. The register map does not use the AI \"Agent interpreter\" feature at all."
-                : "Chart math — positions, houses, aspects, dignities — is computed entirely in your browser; none of it is sent anywhere. Separately, right after you submit this form, this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "your birth date, time, and location") + " to Claude (Anthropic) to generate the spoken-style \"Agent interpreter\" reading — there is currently no on-page control to turn that off."}
+                : "Chart math — positions, houses, aspects, dignities — is computed entirely in your browser; none of it is sent anywhere. " + (agentOn !== false
+                    ? "Because the checkbox above is on, right after you submit this form, this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "your birth date, time, and location") + " to Claude (Anthropic) to generate the spoken-style \"Agent interpreter\" reading — uncheck it above to keep everything local."
+                    : "The checkbox above is off, so nothing is sent to Claude (Anthropic) — every reading uses the local, non-AI text instead.")}
             </p>
           </form>
         </section>
