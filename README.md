@@ -132,13 +132,15 @@ ledger — that path is specific to the exact-register demo); otherwise it
 falls back to a synthetic orbital model and sets `window.EPHEMERIS_MODE =
 "SYNTHETIC"` so the UI can badge it honestly.
 
-One presentation-layer behavior is a **disclosed, unresolved item for the
-repo owner**, not something this package (or any package in the plan) tries
-to resolve: `agent.jsx`'s optional LLM chart-interpretation feature is
-on by default and sends raw birth data to it, with no reachable
-off-switch in a standalone deployment. Full detail, options, and why it was
-left as a disclosed finding rather than silently changed: see
-["Flagged for owner decision" in `project/docs/EXECUTION_STATUS.md`](project/docs/EXECUTION_STATUS.md#flagged-for-owner-decision).
+`agent.jsx`'s optional LLM chart-interpretation feature defaults to on and
+sends raw birth data to it (`window.claude.complete()`). This was originally
+shipped as a disclosed, unresolved finding — no reachable off-switch existed
+in a standalone deployment, and (found while fixing it) some screens ignored
+the in-repo toggle entirely. Both gaps are now fixed: a real checkbox on the
+landing form and an `agent` toggle pill on every reading screen turn it off,
+and every agent call site now honors that setting, falling back to the
+existing local, non-AI reading. Full history: see ["Resolved: agent.jsx
+opt-out" in `project/docs/EXECUTION_STATUS.md`](project/docs/EXECUTION_STATUS.md#resolved-agentjsx-opt-out-owner-requested-2026-08-12).
 
 ---
 

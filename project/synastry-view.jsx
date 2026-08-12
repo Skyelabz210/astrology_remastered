@@ -6,9 +6,10 @@
 
 const { useState: $synUseState, useMemo: $synUseMemo, useEffect: $synUseEffect } = React;
 
-function SynastryView({ chartA, chartB, settings, onBack }) {
+function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
   const syn = $synUseMemo(() => computeSynastry(chartA, chartB), [chartA, chartB]);
-  const reading = useSynastryReading(syn, settings.agentOn !== false);
+  const agentOn = settings.agentOn !== false;
+  const reading = useSynastryReading(syn, agentOn);
   const [selectedHit, setSelectedHit] = $synUseState(null);
 
   const A = chartA.birth.subjectName || "You";
@@ -31,7 +32,18 @@ function SynastryView({ chartA, chartB, settings, onBack }) {
           <span className="syn-hdr-mark">✦</span>
           <span>Synastry · {A} & {B}</span>
         </div>
-        <div className="syn-hdr-spacer"></div>
+        {setTweak ? (
+          <button
+            className={`hdr-pill ${agentOn ? "is-on" : ""}`}
+            onClick={() => setTweak('agentOn', !agentOn)}
+            title={agentOn
+              ? "Agent interpreter on — sends both charts' data to Claude for each reading. Click to turn off."
+              : "Agent interpreter off — readings stay local. Click to turn on."}
+            aria-pressed={agentOn}
+          >
+            agent
+          </button>
+        ) : <div className="syn-hdr-spacer"></div>}
       </header>
 
       <div className="syn-top">
@@ -79,7 +91,7 @@ function SynastryView({ chartA, chartB, settings, onBack }) {
             ))}
           </div>
           {selectedHit !== null && syn.hits[selectedHit] && (
-            <SynAspectDetail hit={syn.hits[selectedHit]} syn={syn} A={A} B={B} />
+            <SynAspectDetail hit={syn.hits[selectedHit]} syn={syn} A={A} B={B} agentOn={agentOn} />
           )}
         </div>
 
@@ -166,9 +178,10 @@ function SynastryView({ chartA, chartB, settings, onBack }) {
   );
 }
 
-function SynAspectDetail({ hit, syn, A, B }) {
-  const [state, setState] = $synUseState({ loading: true, text: null });
+function SynAspectDetail({ hit, syn, A, B, agentOn }) {
+  const [state, setState] = $synUseState({ loading: agentOn, text: null });
   $synUseEffect(() => {
+    if (!agentOn) { setState({ loading: false, text: null }); return; }
     let cancelled = false;
     setState({ loading: true, text: null });
     interpretSynastryAspect(hit, syn).then(
@@ -176,7 +189,8 @@ function SynAspectDetail({ hit, syn, A, B }) {
       () => { if (!cancelled) setState({ loading: false, text: null }); }
     );
     return () => { cancelled = true; };
-  }, [hit.a, hit.b, hit.aspect]);
+  }, [agentOn, hit.a, hit.b, hit.aspect]);
+  const localText = `${aspectMeaning(hit.aspect)} — ${A}'s ${hit.a} signifies ${planetSignifies(hit.a)}; ${B}'s ${hit.b} signifies ${planetSignifies(hit.b)}.`;
   return (
     <div className="syn-asp-detail">
       <div className="syn-asp-detail-head">
@@ -186,7 +200,7 @@ function SynAspectDetail({ hit, syn, A, B }) {
         </span>
       </div>
       <div className="syn-asp-detail-body">
-        {state.loading ? <span className="syn-loading">reading this contact…</span> : (state.text || "—")}
+        {state.loading ? <span className="syn-loading">reading this contact…</span> : (state.text || localText)}
       </div>
     </div>
   );

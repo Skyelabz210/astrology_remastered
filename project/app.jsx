@@ -88,7 +88,8 @@ function App() {
   if (screen === "landing") {
     return (
       <Boundary>
-        <Landing initial={landingState} onCast={onCast} />
+        <Landing initial={landingState} onCast={onCast}
+                 agentOn={settings.agentOn} onToggleAgent={(v) => setTweak('agentOn', v)} />
       </Boundary>
     );
   }
@@ -114,6 +115,8 @@ function App() {
           onCast={onCastPartner}
           mode="partner"
           onBack={() => setScreen("session")}
+          agentOn={settings.agentOn}
+          onToggleAgent={(v) => setTweak('agentOn', v)}
         />
       </Boundary>
     );
@@ -123,6 +126,7 @@ function App() {
       <Boundary>
         <SynastryScreen
           settings={settings}
+          setTweak={setTweak}
           partner={partner}
           dstNote={dstNote}
           onBack={() => setScreen("session")}
@@ -194,7 +198,7 @@ function ChartStatusBanners({ chart, settings, dstNote, banners, onDismiss }) {
   );
 }
 
-function SynastryScreen({ settings, partner, dstNote, onBack }) {
+function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
   const { banners, pushError, dismiss } = useErrorBanner();
 
   const chartA = $useMemo(() => {
@@ -237,7 +241,7 @@ function SynastryScreen({ settings, partner, dstNote, onBack }) {
   return (
     <>
       <ChartStatusBanners chart={chartA} settings={settings} dstNote={dstNote || (partner && partner.dstNote)} banners={banners} onDismiss={dismiss} />
-      <SynastryView chartA={chartA} chartB={chartB} settings={settings} onBack={onBack} />
+      <SynastryView chartA={chartA} chartB={chartB} settings={settings} setTweak={setTweak} onBack={onBack} />
     </>
   );
 }
@@ -386,6 +390,16 @@ function Header({ chart, settings, setTweak, onBack }) {
         </div>
       </div>
       <div className="hdr-toggles">
+        <button
+          className={`hdr-pill ${settings.agentOn !== false ? 'is-on' : ''}`}
+          onClick={() => setTweak('agentOn', settings.agentOn === false)}
+          title={settings.agentOn !== false
+            ? "Agent interpreter on — sends birth data to Claude for each reading. Click to turn off."
+            : "Agent interpreter off — readings stay local. Click to turn on."}
+          aria-pressed={settings.agentOn !== false}
+        >
+          agent
+        </button>
         <button
           className={`hdr-pill ${settings.rigorous ? 'is-on' : ''}`}
           onClick={() => setTweak('rigorous', !settings.rigorous)}

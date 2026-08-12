@@ -1168,8 +1168,26 @@ body::before {
   0%,80%,100% { transform: scale(0.7); opacity: 0.35; }
   40%          { transform: scale(1.0); opacity: 0.85; }
 }
-.cs-error { font-family: var(--mono); font-size: 12px; color: oklch(0.65 0.12 30); }
-.cs-placeholder { font-family: var(--mono); font-size: 13px; color: var(--ink-dim); }
+.cs-error { font-family: var(--mono); font-size: 12px; color: oklch(0.65 0.12 30); margin: 0 0 10px 0; }
+/* Local, non-AI reading — shown when the "Agent interpreter" is off or
+   unavailable (see session.jsx CinematicStage). Same shape as card.jsx's
+   .zc-fallback-line/.zc-source-tag, sized for the full-viewport stage. */
+.cs-local-reading { display: flex; flex-direction: column; gap: 6px; }
+.cs-local-line {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(16px, 2.2vw, 22px);
+  line-height: 1.5;
+  color: var(--ink);
+  margin: 0;
+}
+.cs-source-tag {
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  color: var(--ink-dim);
+}
 
 .cs-resonance {
   display: flex; align-items: center; gap: 12px;

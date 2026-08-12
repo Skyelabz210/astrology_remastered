@@ -1,10 +1,13 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Last updated
-2026-08-11: **all 29 work packages complete, verified, and merged to `main`.**
+2026-08-12: **all 29 work packages complete, verified, and merged to `main`.**
 The plan is done. This file is kept as the historical record of what was
-built and how — see "Flagged for owner decision" below for the one item this
-plan deliberately left for the repo owner rather than resolving unilaterally.
+built and how. The one item the plan deliberately left for the repo owner
+(rather than resolving unilaterally) — the `agent.jsx` opt-out — was
+subsequently resolved by owner request; see "Resolved: agent.jsx opt-out"
+below for what changed and the "Flagged for owner decision" section
+(kept for history) for the original finding.
 
 ## Done (verified, committed)
 
@@ -303,7 +306,67 @@ tree caught nothing broken here, but it's the only check that would have.
 Every package has run `--fix` + verify as a mandatory last step since; keep
 doing this.
 
-## Flagged for owner decision
+## Resolved: agent.jsx opt-out (owner-requested, 2026-08-12)
+
+The owner picked option (b) from the list below: add a standalone-reachable
+toggle rather than flipping the default or leaving it as a disclosure only.
+Two things were true before this fix, and both had to be addressed:
+
+1. **No reachable control.** The only in-repo `agentOn` toggle lived inside
+   `tweaks-panel.jsx`'s host-only edit-mode panel — unreachable without a
+   host iframe (as originally flagged below).
+2. **The toggle didn't actually gate every call site**, discovered while
+   fixing (1) by re-reading every `useAgentReading`/`useAgentChartReading`/
+   `useSynastryReading`/`interpretSynastryAspect` call site rather than
+   assuming the existing `settings.agentOn` checks were complete:
+   `session.jsx`'s `ReadingSession` (the main cinematic reading screen,
+   including its next-card pre-warm `interpretCard` call) and `card.jsx`'s
+   `CardBack` called the agent unconditionally, ignoring `agentOn`
+   entirely. `synastry-view.jsx`'s per-aspect `SynAspectDetail` had the same
+   gap. Only `app.jsx`'s `Spread`/`Synthesis` and the synastry overview
+   reading actually checked the setting. Adding a toggle without fixing
+   these would have been cosmetic — flipping it off would not have stopped
+   most of the outbound calls.
+
+**What changed:**
+- `landing.jsx` gained a real checkbox ("Send my birth data to the AI
+  'Agent interpreter'…") next to the privacy note, wired to `agentOn` via
+  new `agentOn`/`onToggleAgent` props threaded from `app.jsx`'s `App()` —
+  reachable *before* the first automatic call the note warns about, in both
+  the primary and partner (synastry) forms.
+- `app.jsx`'s `Header` (full-spread screen), `session.jsx`'s
+  `SessionHeader` (main reading screen), and `synastry-view.jsx`'s header
+  each gained an `agent` `hdr-pill` toggle, matching the existing
+  `rigorous`/`prime layer` pill convention, so the setting is visible and
+  reachable mid-session too, not just at the landing form.
+- `session.jsx`, `card.jsx`, and `synastry-view.jsx` now gate every agent
+  call site on `agentOn`/`settings.agentOn !== false` (previously only
+  `app.jsx` did). Turning the toggle off now genuinely stops all outbound
+  `window.claude.complete()` calls, not just the ones on one screen.
+- Turning the agent off degrades to the existing local, non-AI reading
+  (`readingFor()` from `readings.jsx`) rather than a blank or terse
+  placeholder — `session.jsx`'s `CinematicStage` previously showed only a
+  bare `element · modality · dignity` placeholder when there was no agent
+  text; it now shows the same structured local reading `card.jsx` already
+  used. `card.jsx`'s own fallback had a related bug fixed in passing: its
+  error branch's own text said "reading from local fallback" but the
+  `!agent.error` condition on the fallback render meant it never actually
+  rendered one on error — fixed so the local reading now shows in both the
+  off and the errored-while-on cases, matching what the message promises.
+- Default (`DEFAULT_SETTINGS.agentOn = true` in `app.jsx`) intentionally
+  left unchanged — the ask was a working opt-out, not a different default.
+
+Verified by reading every changed call site directly (not trusting a
+self-report) and by rebuilding+viewing the standalone bundle
+(`project/tools/build-standalone.mjs` → `project/dist/standalone.html`) in
+a real browser to confirm the checkbox and pills render, toggle, and that
+`npm test`/`npm run lint` stay green (this is presentation-layer `.jsx`
+wiring — outside what the Node test suite covers by convention, same as
+the rest of `app.jsx`/`session.jsx`/`card.jsx`).
+
+---
+
+## Flagged for owner decision (historical — resolved above)
 
 - **`agent.jsx`'s LLM interpretation feature is on by default and sends raw
   birth data.** `app.jsx`'s `DEFAULT_SETTINGS.agentOn = true`; the instant a
