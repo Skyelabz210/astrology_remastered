@@ -238,9 +238,22 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
       </div>
     );
   }
+  // ChartStatusBanners only inspects one `chart` object's `timeUnknown` flag
+  // (it wasn't written with two charts in mind); on this screen either
+  // person's birth time can be unknown and either one's houses/ASC/MC then
+  // show as fact in SynastryView's overlays, so — matching the dstNote OR
+  // just below — the "unreliable" banner must fire if EITHER chart has an
+  // unknown time, not only the user's own (chartA).
+  const eitherTimeUnknown = !!(chartA.timeUnknown || chartB.timeUnknown);
   return (
     <>
-      <ChartStatusBanners chart={chartA} settings={settings} dstNote={dstNote || (partner && partner.dstNote)} banners={banners} onDismiss={dismiss} />
+      <ChartStatusBanners
+        chart={eitherTimeUnknown ? { ...chartA, timeUnknown: true } : chartA}
+        settings={settings}
+        dstNote={dstNote || (partner && partner.dstNote)}
+        banners={banners}
+        onDismiss={dismiss}
+      />
       <SynastryView chartA={chartA} chartB={chartB} settings={settings} setTweak={setTweak} onBack={onBack} />
     </>
   );
@@ -383,7 +396,7 @@ function Header({ chart, settings, setTweak, onBack }) {
           <div className="hdr-subtitle">
             {dateStr} · {timeStr} · {settings.placeLabel}
             <span className="hdr-dot">·</span>
-            ASC {chart.asc.toFixed(2)}° {ascSign}
+            {chart.timeUnknown ? "ASC unknown (birth time unknown)" : `ASC ${chart.asc.toFixed(2)}° ${ascSign}`}
             <span className="hdr-dot">·</span>
             {chart.isDayChart ? "Day" : "Night"} chart
           </div>
@@ -511,12 +524,20 @@ function NatalTweaks({ t }) {
     }
     setDateError(null);
     const t2 = /^\d{2}:\d{2}$/.test(timeStr) ? timeStr : "12:00";
-    t.setTweak('dateISO', `${s}T${t2}:00`);
+    // Explicit "Z" (UTC): this panel has no city/timezone selection (unlike
+    // landing.jsx, which resolves the wall-clock time through tzresolve.js
+    // against the selected city's IANA zone), so treating the entered
+    // date/time as bare local-to-the-browser — what an offset-less ISO
+    // string means to `new Date(...)` — made the SAME typed values produce
+    // a DIFFERENT chart depending on which timezone machine happened to be
+    // running the page. Anchoring to UTC removes that non-determinism; it
+    // is not a claim that the typed time IS the birth city's local time.
+    t.setTweak('dateISO', `${s}T${t2}:00Z`);
   };
   const setTime = (s) => {
     if (!s || !/^\d{2}:\d{2}$/.test(s)) return;
     const d2 = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : "1990-03-21";
-    t.setTweak('dateISO', `${d2}T${s}:00`);
+    t.setTweak('dateISO', `${d2}T${s}:00Z`);
   };
   return (
     <TweakSection label="Natal coordinates">
@@ -609,10 +630,16 @@ function TraditionalPanel({ chart }) {
       <div className="tp-grid">
         <div className="tp-card">
           <h4>Four angles</h4>
-          <div className="tp-row"><span className="l">ASC ascendant</span><span className="v">{chart.asc.toFixed(2)}° {ZODIAC[chart.ascSignIdx].name}</span></div>
-          <div className="tp-row"><span className="l">MC midheaven</span><span className="v">{chart.mc.toFixed(2)}° {ZODIAC[chart.mcSignIdx].name}</span></div>
-          <div className="tp-row"><span className="l">DSC descendant</span><span className="v">{chart.desc.toFixed(2)}°</span></div>
-          <div className="tp-row"><span className="l">IC imum coeli</span><span className="v">{chart.ic.toFixed(2)}°</span></div>
+          {chart.timeUnknown ? (
+            <div className="tp-row"><span className="l">unavailable</span><span className="v">birth time unknown — ASC/MC/DSC/IC require a real clock time</span></div>
+          ) : (
+            <>
+              <div className="tp-row"><span className="l">ASC ascendant</span><span className="v">{chart.asc.toFixed(2)}° {ZODIAC[chart.ascSignIdx].name}</span></div>
+              <div className="tp-row"><span className="l">MC midheaven</span><span className="v">{chart.mc.toFixed(2)}° {ZODIAC[chart.mcSignIdx].name}</span></div>
+              <div className="tp-row"><span className="l">DSC descendant</span><span className="v">{chart.desc.toFixed(2)}°</span></div>
+              <div className="tp-row"><span className="l">IC imum coeli</span><span className="v">{chart.ic.toFixed(2)}°</span></div>
+            </>
+          )}
         </div>
 
         <div className="tp-card">
@@ -655,11 +682,17 @@ function TraditionalPanel({ chart }) {
 
         <div className="tp-card">
           <h4>Hemisphere · quadrant</h4>
-          <div className="tp-row"><span className="l">upper / lower</span><span className="v">{chart.hemisphereCount.upper} / {chart.hemisphereCount.lower}</span></div>
-          <div className="tp-row"><span className="l">east / west</span><span className="v">{chart.hemisphereCount.east} / {chart.hemisphereCount.west}</span></div>
-          <div className="tp-row"><span className="l">angular</span><span className="v">{chart.quadrantCount.angular}</span></div>
-          <div className="tp-row"><span className="l">succedent</span><span className="v">{chart.quadrantCount.succedent}</span></div>
-          <div className="tp-row"><span className="l">cadent</span><span className="v">{chart.quadrantCount.cadent}</span></div>
+          {chart.timeUnknown ? (
+            <div className="tp-row"><span className="l">unavailable</span><span className="v">birth time unknown — these counts are all house-position-derived</span></div>
+          ) : (
+            <>
+              <div className="tp-row"><span className="l">upper / lower</span><span className="v">{chart.hemisphereCount.upper} / {chart.hemisphereCount.lower}</span></div>
+              <div className="tp-row"><span className="l">east / west</span><span className="v">{chart.hemisphereCount.east} / {chart.hemisphereCount.west}</span></div>
+              <div className="tp-row"><span className="l">angular</span><span className="v">{chart.quadrantCount.angular}</span></div>
+              <div className="tp-row"><span className="l">succedent</span><span className="v">{chart.quadrantCount.succedent}</span></div>
+              <div className="tp-row"><span className="l">cadent</span><span className="v">{chart.quadrantCount.cadent}</span></div>
+            </>
+          )}
         </div>
       </div>
 
@@ -702,7 +735,7 @@ function TraditionalPanel({ chart }) {
                 <td><span className="pl-gl">{d.glyph}</span> {d.planet}{d.retro ? " ℞" : ""}</td>
                 <td>{d.sign}</td>
                 <td className="num">{d.lon.toFixed(2)}°</td>
-                <td>H{d.house}</td>
+                <td>{chart.timeUnknown ? "—" : `H${d.house}`}</td>
                 <td className={d.score > 0 ? "pos" : d.score < 0 ? "neg" : ""}>{d.kind}</td>
                 <td className={`num ${d.score > 0 ? "pos" : d.score < 0 ? "neg" : ""}`}>
                   {d.score > 0 ? "+" : ""}{d.score}

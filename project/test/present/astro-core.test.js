@@ -22,10 +22,11 @@
 
 import {
   dignityFor,
-  TRIP_DAY, TRIP_NIGHT,
+  TRIP_DAY, TRIP_NIGHT, TRIP_PART,
   termRuler,
   faceRuler,
   nearestAspect,
+  applyingPhase,
   criticalKind,
   PLANET_JOY,
   detectPatterns,
@@ -82,6 +83,21 @@ export function run() {
   t("Water day = Venus",    TRIP_DAY.Water === "Venus");
   t("Water night = Mars",   TRIP_NIGHT.Water === "Mars");
 
+  // ── Regression: TRIP_PART (participating triplicity ruler, Dorothean) ──
+  // Previously untested — an earlier version had Fire/Earth/Air wrong
+  // (Fire and Air each duplicated their own TRIP_NIGHT ruler, which is
+  // itself a giveaway: a triplicity is supposed to have three DISTINCT
+  // rulers, day/night/participating).
+  t("Fire participating = Saturn",  TRIP_PART.Fire === "Saturn");
+  t("Earth participating = Mars",   TRIP_PART.Earth === "Mars");
+  t("Air participating = Jupiter",  TRIP_PART.Air === "Jupiter");
+  t("Water participating = Moon",   TRIP_PART.Water === "Moon");
+  t("every triplicity's three rulers (day/night/participating) are distinct",
+    ["Fire", "Earth", "Air", "Water"].every((elem) => {
+      const trio = [TRIP_DAY[elem], TRIP_NIGHT[elem], TRIP_PART[elem]];
+      return new Set(trio).size === 3;
+    }));
+
   // ── Suite 4: Egyptian terms (Ptolemaic) ───────────────────────────────
   t("Aries 0° → Jupiter (term)",  termRuler(0, 3)  === "Jupiter");
   t("Aries 7° → Venus (term)",    termRuler(0, 7)  === "Venus");
@@ -112,6 +128,24 @@ export function run() {
   t("undecile near 32.73° detected",  nearestAspect(360 / 11).name === "Undecile");
   t("tredecile near 27.69° detected", nearestAspect(360 / 13).name === "Tredecile");
   t("no aspect at 100° (out of orb)", nearestAspect(100) === null);
+
+  // ── Regression: applyingPhase for fast-body/small-orb aspects ─────────
+  // An earlier version used a whole-DAY forward-Euler step to decide
+  // direction; for a body closing faster than the orb is wide (the Moon
+  // against slower bodies is typically 11-15°/day, well past the default
+  // 2-8° orbs), the day-step overshoots exact and lands back on the far
+  // side, misreporting "separating" for a pair that is actually applying.
+  // Moon at 95°, other body at 100°, relative speed 12°/day (13-1):
+  // instantaneously closing on the 0° conjunction (separation 5° and
+  // shrinking) -> must be "applying", not "separating".
+  t("applyingPhase: fast Moon-like body closing a small orb reports 'applying', not 'separating'",
+    applyingPhase(95, 100, 13, 1, 0) === "applying");
+  // Mirror case: moving away from exact should still report "separating".
+  t("applyingPhase: fast body moving away from a small orb still reports 'separating'",
+    applyingPhase(95, 100, -13, 1, 0) === "separating");
+  // Ordinary slow-body case (well within a day-step) still works as before.
+  t("applyingPhase: slow bodies approaching a trine report 'applying'",
+    applyingPhase(115, 0, 1, 0.5, 120) === "applying");
   t("trine family = classical",       nearestAspect(120).family === "classical");
   t("opposition family = cardinal",   nearestAspect(180).family === "cardinal");
   t("undecile family = undecile (shadow)", nearestAspect(360 / 11).family === "undecile");

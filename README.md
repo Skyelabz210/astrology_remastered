@@ -10,7 +10,7 @@ of 1,296,000; every lane is a BigInt residue; every claim is either exhaustively
 swept or explicitly marked open.
 
 ```
-4404/4404 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 20/20 core modules float-free
+4432/4432 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 20/20 core modules float-free
 ```
 
 **Before taking any claim below at face value, read:**
@@ -156,17 +156,20 @@ time — the `accuracy` job in
   Horizons (DE441) apparent geocentric ecliptic-of-date longitudes at 20
   reference instants spanning 1700–2050
   (`project/test/fixtures/reference-vectors.json`). Tolerance: **≤ 60″**
-  for Sun/Mercury/Venus/Mars/Jupiter/Saturn/Uranus/Neptune/Pluto, **≤ 120″**
-  for the Moon (astronomy-engine's lunar theory vs. DE441, documented in
-  `project/test/accuracy.test.js`). Observed: worst single-point error
-  **~29.5″ (Pluto)**; worst per-body mean error **~10.4″ (Neptune)** — both
-  well inside tolerance.
+  for every body, Moon included (documented in
+  `project/test/accuracy.test.js`, including why the Moon no longer gets a
+  separate, wider budget). Observed: worst single-point error **~29.5″
+  (Pluto)**; worst per-body mean error **~10.4″ (Neptune)**; Moon's own
+  worst single-point error **~15.4″** — all well inside tolerance.
 - **House cusps** (`tools/ephemeris/houses.js`: Placidus, Koch,
   Regiomontanus, Campanus, Alcabitius, Topocentric, Morinus, Meridian,
   Porphyry) — checked against genuine Swiss Ephemeris (`pyswisseph`) output
   across 5 charts × 8 systems × 12 cusps. Tolerance: **≤ 30″**. Observed
-  worst case: **~12.5″**, attributed uniformly to a mean-vs-true-obliquity
-  difference (confirmed not a per-system bug).
+  worst case: **~12.4″**, attributed uniformly to a mean-vs-true-obliquity
+  difference (confirmed not a per-system bug). Above ~66.56° latitude,
+  Placidus/Koch/Alcabitius/Regiomontanus/Campanus/Topocentric refuse
+  outright (`PolarLatitudeError`) rather than return a number at all — see
+  `tools/ephemeris/houses.js`'s `POLAR_FALLBACK_POLICY`.
 - **Retrograde/station timing** — 5 published stationary instants (Mercury,
   Mars, Venus; 2022–2023): the sign of the computed speed flips within
   ±36 h of each published instant, and `retrograde ≡ (speed < 0)` holds
