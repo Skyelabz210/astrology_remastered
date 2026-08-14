@@ -2,11 +2,56 @@
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Last updated
 2026-08-14: **all 29 work packages complete, verified, and merged to `main`,**
-plus two owner-requested follow-ups since: the `agent.jsx` opt-out (see
-"Resolved: agent.jsx opt-out" below) and a full-app correctness audit (see
+plus three owner-requested follow-ups since: the `agent.jsx` opt-out (see
+"Resolved: agent.jsx opt-out" below), a full-app correctness audit (see
 "Resolved: correctness audit findings" below) that found and fixed 9 real
-bugs the original plan's own quality gates didn't catch. This file is kept
-as the historical record of what was built and how.
+bugs the original plan's own quality gates didn't catch, and a new capability
+addition, the Division Chimera (see "Added: the Division Chimera" below).
+This file is kept as the historical record of what was built and how.
+
+## Added: the Division Chimera (owner-requested, 2026-08-14)
+
+The owner uploaded an external, machine-checked CRAM reference implementation
+(`cram_review_20260616` — Lean 4 + exhaustive Python, 42/42 theorems proven,
+468,853 checks; author: Anthony Diaz / Skyelabz210, the same authorship this
+repo's own `src/core/` already credits implicitly through its matching
+terminology — Safe Basis, Colony, Shadow Anchor, K-Elimination, signed-carry
+arrow, transduction, Saturation Principle) and asked for an analysis of what
+it implies for implementation here. Comparison against the existing 20
+`src/core/` modules found most of the reference's Parts I–IV and VII already
+ported under matching names (`basis.js`/`safe-basis.js`, `cram.js`,
+`arrow.js`, `identity.js`, `tower-recover.js`, `operators.js`). The one
+concrete, self-contained gap — general exact division of an arbitrary
+integer `a` by an arbitrary divisor `d`, entirely in residue space (the
+reference's `div_family.py`, "Division Chimera") — was not present anywhere
+in this repo; `identity.js`'s `kElim`/`doubleKElim` recover a WINDING NUMBER
+from an integer and an anchor, a related but genuinely different operation.
+Confirmed out of scope by the owner's own choice: the reference's much larger
+CVM (an executable virtual machine with an ISA and a Fibonacci demo program),
+adelic metadata/fault-hierarchy/serialization layer, and carry-free counters
+— all general-purpose computing infrastructure with no astrology use case.
+
+**What was added:** `project/src/core/div-chimera.js` (21st core module) —
+the five division varieties (V1 K-Elimination, V2 FPD fused, V3 FPD anchors,
+V4 lanewise DIV homogeneous/heterogeneous, V5 transduction-enriched), a
+`route()` dispatcher, DIV³ (multiplication synthesized from division alone,
+zero `mul` anywhere in the construction), and Φ³ (triple certification that
+the residue-native, fused, and carried-magnitude readings of one division
+event agree on every lane). Ported deliberately, not mechanically translated:
+reuses this repo's own `gcd`/`inverse`/`shellModulus` (`cram.js`) and `mod`
+(`residues.js`) rather than reimplementing them, and two custom error classes
+(`NonExactDivisionError`, `DivisorNotCoprimeError`) replace the reference's
+bare `ValueError`s to match this repo's own error-class convention (see
+`variants.js`'s `DegenerateAnglesError`, `houses.js`'s `PolarLatitudeError`).
+
+`test/div-chimera.test.js` (68 assertions, some scanning hundreds of cases
+internally per assertion — e.g. DIV³ correctness is checked over all 881
+unit pairs across every Safe-Basis lane, matching the external certificate's
+own 881/881 count exactly) mirrors the reference's own proof-certificate
+theorems (T-DIV-V1..V5, T-ROUTER, T-DISTINCT, T-DIV3-CONSTRUCTION,
+T-DIV3-CORRECT, T-PHI3) rather than re-running the Python original. Verified:
+full `npm test` (4501/4501, up from 4432), lint, and `check-claims` (every
+new export documented in `project/docs/INPUTS_OUTPUTS.md`) all green.
 
 ## Resolved: correctness audit findings (owner-requested, 2026-08-14)
 
