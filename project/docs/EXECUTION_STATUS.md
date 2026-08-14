@@ -1,13 +1,101 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Last updated
-2026-08-12: **all 29 work packages complete, verified, and merged to `main`.**
-The plan is done. This file is kept as the historical record of what was
-built and how. The one item the plan deliberately left for the repo owner
-(rather than resolving unilaterally) — the `agent.jsx` opt-out — was
-subsequently resolved by owner request; see "Resolved: agent.jsx opt-out"
-below for what changed and the "Flagged for owner decision" section
-(kept for history) for the original finding.
+2026-08-14: **all 29 work packages complete, verified, and merged to `main`,**
+plus two owner-requested follow-ups since: the `agent.jsx` opt-out (see
+"Resolved: agent.jsx opt-out" below) and a full-app correctness audit (see
+"Resolved: correctness audit findings" below) that found and fixed 9 real
+bugs the original plan's own quality gates didn't catch. This file is kept
+as the historical record of what was built and how.
+
+## Resolved: correctness audit findings (owner-requested, 2026-08-14)
+
+Requested as "analyze deeply the app, check correctness, everything." Seven
+parallel independent audits (core BigInt arithmetic, ledger/timescale/
+producer, house-system math, interpretation logic, the React/UI layer, test-
+suite integrity, CI/docs consistency) each verified their subsystem by
+actually computing/re-deriving results rather than reading and assuming —
+brute-forcing edge cases against independent oracles, hand-deriving
+formulas from spherical-astronomy first principles, cross-checking classical
+tables against real sources. Confirmed findings, all fixed and covered by
+new regression tests:
+
+- **`ascMc()` silently returned the Descendant (180° error) above ~66.56°
+  latitude** (`tools/ephemeris/houses.js`) — reachable at real inhabited
+  latitudes (verified failing at Tromsø, Norway, 69.6°N), not just a
+  theoretical polar edge case. The module's own docs had claimed it stayed
+  correct at any latitude; that was true about not crashing, false about
+  staying right. Now throws `PolarLatitudeError` at the same 66.56°
+  boundary Placidus/Koch/Alcabitius already use. Regiomontanus, Campanus,
+  and Topocentric inherit the same guard, since their angular cusps are
+  exact identities of `ascMc()`'s output — `POLAR_FALLBACK_POLICY` updated
+  from "soft" to "hard" for all three.
+- **`porphyryCusps()` had no polar guard and silently corrupted cusps**
+  (`src/core/variants.js`) — a hardcoded quadrant-traversal order valid
+  only when MC leads ASC by more than half the ring (true for every
+  non-polar chart, false beyond ~66.56°); violated its own documented
+  "twelve arcs sum to exactly one ring" invariant. Now throws a new
+  `DegenerateAnglesError` instead of returning corrupted cusps.
+- **Lot of Courage's day/night formulas were swapped**
+  (`src/present/astro-core.js`) — classical is day = Asc+Fortune−Mars,
+  night = Asc+Mars−Fortune; code had it backwards, the only one of the
+  seven Hellenistic lots not following its siblings' shared pattern.
+- **Participating triplicity ruler (`TRIP_PART`) wrong for Fire/Earth/Air**
+  (`src/present/astro-core.js`) — only Water was correct; Fire and Air each
+  duplicated their own night-ruler (itself a red flag: a triplicity is
+  supposed to have three distinct rulers). Never tested before this pass.
+- **`applyingPhase` misclassified applying-vs-separating for fast Moon
+  aspects** (`src/present/astro-core.js`) — used a whole-day forward-Euler
+  step to decide direction, which overshoots and reports the wrong phase
+  whenever the current orb is smaller than a day's relative motion (common
+  for Moon aspects at this app's default 2-8° orbs, since the Moon's
+  relative speed is typically 11-15°/day). Now uses a 1-minute step.
+- **`SynastryScreen` only checked the user's own `timeUnknown`, never the
+  partner's** (`app.jsx`) — a direct sibling of the exact bug class fixed
+  in the `agent.jsx` opt-out work: `dstNote` correctly ORs both charts,
+  `timeUnknown` didn't, so the "houses unreliable" banner could be silently
+  absent while the partner's house overlays were shown as fact.
+- **House/ASC/MC data displayed unconditionally in several UI surfaces
+  despite `chart.timeUnknown`** (`card.jsx`, `session.jsx`, `app.jsx`'s
+  `Header`/`TraditionalPanel`, `synastry-view.jsx`'s house overlays) —
+  `readings.jsx` correctly withheld this per WP-29, but the card front
+  face, cinematic stage, spread header, dignities table, and hemisphere/
+  quadrant counts didn't. Each now shows a placeholder/caveat instead.
+- **A free-text date field in the Tweaks panel bypassed DST/timezone
+  resolution entirely** (`app.jsx`'s `NatalTweaks`) — built an offset-less
+  ISO string that `new Date()` parses in the *browser's* local timezone,
+  so the same typed date/time silently produced a different chart
+  depending on which machine ran the page. Now anchored to UTC explicitly
+  (this panel has no city/timezone selector to resolve a "real" local
+  time against, unlike `landing.jsx`; the fix removes the
+  machine-dependent non-determinism, it doesn't claim to reconstruct a
+  birth city's local time).
+- **`no-float-audit.js`'s decimal-literal regex missed bare-dot floats**
+  (`.5`, not just `0.5`) — a real gap in Mandate A1's mechanical
+  enforcement; the negative self-test never exercised it either. Both
+  fixed; the browser and Node gates share this one module, so both
+  updated together automatically.
+
+Lower-severity items fixed in the same pass: the ledger admission gate
+(`import-ledger.js`) wasn't actually checking `certificate.notes` (schema-
+required) or that `event_id`/`body`/`source.*` were strings, not just
+present — none of it reached real astronomical data, but it's now checked;
+`accuracy.test.js`'s Moon tolerance (120″, ~8x the observed 15.4″ worst
+case) was tightened to the same flat 60″ every other body uses, since the
+stated "Moon deserves more slack" reasoning was never tied to an actual
+number for this fixture; three stale documentation numbers (`tools/
+README.md`'s file inventory, README's house-cusp accuracy figure, a
+hardware-dependent bench number in this file) were corrected.
+
+All fixes verified: full `npm test` (4432/4432), `npm run lint`,
+`npm run test:accuracy`, `node tools/validate-ledgers.mjs`, and
+`node scripts/check-claims.mjs` all green; the UI-layer fixes additionally
+driven in a real Chromium session (local React/React-DOM/Babel substituted
+for the network-blocked CDN) confirming the `timeUnknown` suppression,
+synastry partner-banner fix, and Tweaks-panel date field all behave
+correctly with zero console errors.
+
+## Resolved: agent.jsx opt-out (owner-requested, 2026-08-12)
 
 ## Done (verified, committed)
 
@@ -202,7 +290,10 @@ below for what changed and the "Flagged for owner decision" section
       gates CI at 3× the target for variance headroom. **Observed:** every
       threshold passes by 2+ orders of magnitude (full chart ~1.3ms vs
       250ms target; single-body ~0.04ms vs 5ms; aspect scan ~0.01ms vs
-      10ms). Ring-sweep wall time (~272ms) reported informationally.
+      10ms). Ring-sweep wall time reported informationally, not gated —
+      it's genuinely hardware-dependent (observed ~110-270ms across
+      different runs/machines in this project's history) rather than a
+      figure worth pinning to one number here.
 - [x] **WP-22** Port `tests.jsx` to CLI — all ~20 browser-only suites
       (155 assertions) ported faithfully to `project/test/present/` across
       4 files, split by actual source module (`astro-core.js`, `astro.jsx`

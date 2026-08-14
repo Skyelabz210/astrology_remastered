@@ -105,13 +105,15 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
                   fill="none" stroke="currentColor" strokeWidth="0.15" strokeOpacity="0.55" />
           </svg>
 
-          {/* corner marks */}
+          {/* corner marks — the house number depends on a real birth time
+              (Ascendant-anchored whole-sign houses); with timeUnknown, show
+              a placeholder rather than a specific house as fact. */}
           <div className="zc-corner zc-tl">
-            <div className="zc-house">{roman(card.house)}</div>
+            <div className="zc-house">{chart && chart.timeUnknown ? "—" : roman(card.house)}</div>
             <div className="zc-glyph-mini">{card.glyph}</div>
           </div>
           <div className="zc-corner zc-br">
-            <div className="zc-house">{roman(card.house)}</div>
+            <div className="zc-house">{chart && chart.timeUnknown ? "—" : roman(card.house)}</div>
             <div className="zc-glyph-mini">{card.glyph}</div>
           </div>
 

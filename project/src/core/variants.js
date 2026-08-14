@@ -278,9 +278,50 @@ export function vehlowHouse(x, asc) {
 }
 
 /**
- * Porphyry: trisect each ecliptic quadrant. Houses run in increasing longitude
- * ASC → IC → DSC → MC, which is the cyclic order of the four angles, so the
- * twelve arcs sum to exactly one ring.
+ * Thrown by porphyryCusps() when (asc, mc) do not stand in the cyclic
+ * relationship quadrant-trisection houses require — see that function's
+ * comment.
+ */
+export class DegenerateAnglesError extends Error {
+  constructor(asc, mc) {
+    super(
+      `DegenerateAnglesError: porphyryCusps(asc=${asc}, mc=${mc}) — MC does not lead ASC by more ` +
+        `than half the ring, so the fixed house-1..4..7..10 = ASC/IC/DSC/MC labeling cannot be ` +
+        `trisected without a quadrant "arc" wrapping most of the way around the ring. This is not ` +
+        `a rounding edge case: it means asc/mc do not come from an ordinary (non-polar) chart.`
+    );
+    this.name = "DegenerateAnglesError";
+    this.asc = asc;
+    this.mc = mc;
+  }
+}
+
+/**
+ * Porphyry: trisect each ecliptic quadrant. Houses run in increasing
+ * longitude ASC(1) → IC(4) → DSC(7) → MC(10) — a FIXED labeling, not a
+ * choice — so the twelve arcs sum to exactly one ring only when IC and MC
+ * are actually encountered in that order walking forward from ASC.
+ *
+ * ASC/DSC and MC/IC are each an antipodal pair, so going around the ring
+ * from ASC they interleave in exactly one of two ways: IC before MC (the
+ * ordinary case for every non-polar chart — MC leads ASC by more than half
+ * the ring) or MC before IC (MC leads by less than half). An earlier
+ * version of this function assumed the first case unconditionally; when fed
+ * an (asc, mc) pair from the second case (reachable at extreme/polar
+ * latitudes, where the semi-arc geometry ASC/MC derive from becomes
+ * asymmetric enough to invert this), the four arcs computed under the FIXED
+ * asc→ic→dsc→mc labeling stop being the genuine local quadrants — one or
+ * more balloons to cover most of the ring — and silently sum to a multiple
+ * of the ring (verified: 3x) instead of exactly one ring, corrupting every
+ * cusp. Rather than silently emit that corrupted output, this function now
+ * validates the precondition and throws — the same "refuse rather than be
+ * silently wrong" choice this codebase already makes for the float quadrant
+ * systems beyond the polar circle (see project/tools/ephemeris/houses.js's
+ * PolarLatitudeError). In the normal producer pipeline this is unreachable
+ * in practice: ascMc() itself now throws before producing an asc/mc pair
+ * that could violate this precondition (see houses.js) — this check exists
+ * because porphyryCusps() is a general pure function callable with any
+ * (asc, mc), not only ones that came from ascMc().
  *
  * Exact integer arithmetic — each quadrant arc is divided by 3 and the
  * remainder (0, 1, or 2 arcseconds) is distributed to the earliest houses of
@@ -289,8 +330,12 @@ export function vehlowHouse(x, asc) {
  * @param {bigint} asc - the ascendant, in arcseconds.
  * @param {bigint} mc - the midheaven, in arcseconds.
  * @returns {bigint[]} the twelve house cusps, in arcseconds, house 1 first.
+ * @throws {DegenerateAnglesError} if MC does not lead ASC by more than half the ring.
  */
 export function porphyryCusps(asc, mc) {
+  if (mod(mc - asc, RING) <= RING / 2n) {
+    throw new DegenerateAnglesError(asc, mc);
+  }
   const ic = mod(mc + RING / 2n, RING);
   const dsc = mod(asc + RING / 2n, RING);
   const order = [asc, ic, dsc, mc];

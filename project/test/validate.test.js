@@ -97,9 +97,14 @@ export function run() {
   t("polarHouseWarning: koch at -70 (southern polar) -> warns (symmetric range)",
     polarHouseWarning(-70, "koch", POLAR_FALLBACK_POLICY) !== null);
   {
+    // Regiomontanus/Campanus/Topocentric were corrected from "soft" to
+    // "hard": their angular cusps are exact identities of ascMc(), which
+    // was found to silently return the Descendant beyond the polar limit
+    // (see houses.js's PolarLatitudeError class comment) rather than
+    // staying numerically safe as the earlier "soft" label assumed.
     const w = polarHouseWarning(70, "regiomontanus", POLAR_FALLBACK_POLICY);
-    t("polarHouseWarning: regiomontanus (soft-enforced) warning says 'unreliable', not 'undefined'",
-      w && w.message.includes("unreliable"), w && w.message);
+    t("polarHouseWarning: regiomontanus (corrected to hard-enforced) warning says 'undefined', not 'unreliable'",
+      w && w.message.includes("undefined") && w.enforced === "hard", w && w.message);
   }
   t("polarHouseWarning: meridian at 89N -> no warning (validLatRange is the full [-90,90])",
     polarHouseWarning(89, "meridian", POLAR_FALLBACK_POLICY) === null);

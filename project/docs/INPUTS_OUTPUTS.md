@@ -211,7 +211,8 @@ ring.
 | `wholeSignHouse(x, asc, offset)` | fn(`bigint,bigint,bigint`) → `bigint` (1–12) | exact |
 | `equalHouse(x, origin)` | fn(`bigint,bigint`) → `bigint` (1–12) | exact |
 | `vehlowHouse(x, asc)` | fn(`bigint,bigint`) → `bigint` (1–12) | exact, ASC at house-1 midpoint |
-| `porphyryCusps(asc, mc)` | fn(`bigint,bigint`) → `bigint[12]` cusps | exact integer trisection with remainder distribution — every cusp stays on the arcsecond lattice |
+| `porphyryCusps(asc, mc)` | fn(`bigint,bigint`) → `bigint[12]` cusps, throws `DegenerateAnglesError` | exact integer trisection with remainder distribution — every cusp stays on the arcsecond lattice; throws instead of silently corrupting the partition if MC does not lead ASC by more than half the ring (the ordinary case for every non-polar chart — see the function's own comment) |
+| `DegenerateAnglesError` | class extends `Error` | thrown by `porphyryCusps` for the degenerate (asc, mc) case above; carries `.asc`/`.mc` |
 | `FIRDARIA_YEARS` / `VIMSHOTTARI_YEARS` | arrays | `{lord, years}` time-lord tables |
 | `totalYears(table)` | fn(array) → `bigint` | |
 | `VARIANTS` | array | one entry per tradition: `{id, name, tradition, frame, houses, aspects, divisions, note}` |
@@ -616,18 +617,18 @@ Midheaven, used by all of them) and a float Porphyry cross-check. Every
 
 | Export | Signature | Notes |
 |---|---|---|
-| `PolarLatitudeError` | `class extends Error`, `new PolarLatitudeError(latDeg, systemLabel="Placidus")` | thrown by Placidus/Koch/Alcabitius when `\|latDeg\| > 66.56°` (≈ 90° − mean obliquity); ecliptic longitudes are circumpolar at that latitude so the semi-arc trisection has no real solution. Not thrown by `ascMc()`. |
-| `ascMc(jdUt1, jdTt, latDeg, lngDeg)` | `number` × 4 → `{ascDeg, mcDeg}` | Ascendant/Midheaven, float degrees `[0,360)` |
+| `PolarLatitudeError` | `class extends Error`, `new PolarLatitudeError(latDeg, systemLabel="Placidus")` | thrown by `ascMc`, Placidus, Koch, Alcabitius, Regiomontanus, Campanus, and Topocentric when `\|latDeg\| > 66.56°` (≈ 90° − mean obliquity). Placidus/Koch/Alcabitius: ecliptic longitudes are circumpolar at that latitude so the semi-arc trisection has no real solution (a domain limit). `ascMc`/Regiomontanus/Campanus/Topocentric: corrected from an earlier version that didn't throw — `ascMc`'s atan2 branch was found to silently return the Descendant (a 180° error) beyond this latitude for some RAMC values, and the other three inherit it since their angular cusps are exact identities of `ascMc()`. |
+| `ascMc(jdUt1, jdTt, latDeg, lngDeg)` | `number` × 4 → `{ascDeg, mcDeg}`, throws `PolarLatitudeError` above 66.56° | Ascendant/Midheaven, float degrees `[0,360)` |
 | `placidusCusps(jdUt1, jdTt, latDeg, lngDeg)` | same signature → `number[12]` | semi-arc trisection (iterative); throws `PolarLatitudeError` above 66.56° |
 | `kochCusps(...)` | same | Midheaven-declination-based semi-arc variant; same 66.56° limit |
 | `alcabitiusCusps(...)` | same | non-iterative closed form using the Ascendant's declination; same 66.56° limit; cusps 1/4/7/10 = ASC/IC/DSC/MC exactly |
-| `regiomontanusCusps(...)` | same | equator-based; cusp1===ASC and cusp10===MC exactly by construction; no polar throw |
-| `campanusCusps(...)` | same | prime-vertical-based; house1/house10 exact identities; no polar throw |
-| `topocentricCusps(...)` | same | Polich-Page scaled-latitude approximation to Placidus; no `asin()`, never throws `PolarLatitudeError` |
-| `meridianCusps(...)` | same | pure function of RAMC+obliquity (no latitude dependence); cusp10===MC exactly; cusp1 is the "equatorial ascendant", NOT the true ASC |
-| `morinusCusps(...)` | same | ecliptic-pole projection variant of Meridian; no latitude dependence; none of cusp1/4/7/10 match `ascMc()` |
+| `regiomontanusCusps(...)` | same | equator-based; cusp1===ASC and cusp10===MC exactly by construction; throws `PolarLatitudeError` above 66.56° (cusp1 inherits ascMc()'s failure mode) |
+| `campanusCusps(...)` | same | prime-vertical-based; house1/house10 exact identities; throws `PolarLatitudeError` above 66.56° (same reason as Regiomontanus) |
+| `topocentricCusps(...)` | same | Polich-Page scaled-latitude approximation to Placidus; no `asin()`, but cusps 1/4/7/10 are ascMc()'s ASC/IC/DSC/MC exactly, so it throws `PolarLatitudeError` above 66.56° the same as the others |
+| `meridianCusps(...)` | same | pure function of RAMC+obliquity (no latitude dependence); cusp10===MC exactly; cusp1 is the "equatorial ascendant", NOT the true ASC; never throws |
+| `morinusCusps(...)` | same | ecliptic-pole projection variant of Meridian; no latitude dependence; none of cusp1/4/7/10 match `ascMc()`; never throws |
 | `porphyryCuspsFloat(ascDeg, mcDeg)` | `number, number` → `number[12]` | float cross-check of the exact-integer `src/core/variants.js#porphyryCusps` |
-| `POLAR_FALLBACK_POLICY` | `Object<string, {validLatRange, enforced, fallback}>` | per-system polar-latitude guidance table (`enforced: "hard"\|"soft"\|"none"`); also published to `window.HousesPolicy` in a browser context |
+| `POLAR_FALLBACK_POLICY` | `Object<string, {validLatRange, enforced, fallback}>` | per-system polar-latitude guidance table; `enforced` is `"hard"` for Placidus/Koch/Alcabitius/Regiomontanus/Campanus/Topocentric (all six now actually throw at the table's stated boundary) or `"none"` for Meridian/Morinus (no latitude dependence at all); also published to `window.HousesPolicy` in a browser context |
 
 All angle parameters/returns are float **degrees**, `[0, 360)` unless noted;
 `latDeg` is geographic latitude (north positive), `lngDeg` is geographic

@@ -82,6 +82,34 @@ export function run() {
       lots.map((l) => l.name).join(",") === "Fortune,Spirit,Eros,Necessity,Courage,Victory,Nemesis");
   }
 
+  // ── Regression: Lot of Courage day/night formula ─────────────────────
+  // Classical Dorothean formula: day = Asc + Fortune − Mars,
+  // night = Asc + Mars − Fortune (an earlier version of astro-core.js had
+  // these two swapped — the only one of the seven lots not following the
+  // shared "Fortune ∓ planet" pattern its siblings Necessity/Nemesis use).
+  {
+    const bodies = [
+      { name: "Sun", lon: 10 }, { name: "Moon", lon: 100 },
+      { name: "Venus", lon: 0 }, { name: "Mars", lon: 200 }, { name: "Jupiter", lon: 0 },
+      { name: "Mercury", lon: 0 }, { name: "Saturn", lon: 0 },
+    ];
+    const dayLots = computeAllLots(0, bodies, true);
+    const fortuneDay = dayLots.find((l) => l.name === "Fortune").lon;
+    const courageDay = dayLots.find((l) => l.name === "Courage").lon;
+    // Asc=0, Fortune(day)=90, Mars=200 -> Asc+Fortune-Mars = -110 mod 360 = 250
+    t("Courage day formula = Asc + Fortune − Mars",
+      Math.abs(fortuneDay - 90) < 1e-5 && Math.abs(courageDay - 250) < 1e-5,
+      `fortune=${fortuneDay} courage=${courageDay}`);
+
+    const nightLots = computeAllLots(0, bodies, false);
+    const fortuneNight = nightLots.find((l) => l.name === "Fortune").lon;
+    const courageNight = nightLots.find((l) => l.name === "Courage").lon;
+    // Asc=0, Fortune(night)=270, Mars=200 -> Asc+Mars-Fortune = -70 mod 360 = 290
+    t("Courage night formula = Asc + Mars − Fortune",
+      Math.abs(fortuneNight - 270) < 1e-5 && Math.abs(courageNight - 290) < 1e-5,
+      `fortune=${fortuneNight} courage=${courageNight}`);
+  }
+
   // ── Suite 10: Lunar phase — Moon−Sun elongation, illumination, names ──
   {
     const p = lunarPhase(0, 0);

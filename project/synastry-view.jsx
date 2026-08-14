@@ -100,33 +100,45 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
           <h3 className="syn-panel-h">House overlays</h3>
           <div className="syn-overlay-group">
             <div className="syn-overlay-title">{B}'s planets in {A}'s houses</div>
-            <table className="tp-table">
-              <tbody>
-                {syn.overlaysBonA.slice(0, 7).map((o, i) => (
-                  <tr key={i}>
-                    <td><span className="pl-gl">{o.glyph}</span> {o.planet}</td>
-                    <td style={{ color: "var(--ink-dim)" }}>{o.sign}</td>
-                    <td className="num">H{o.house}</td>
-                    <td style={{ color: "var(--ink-dim)" }}>{HOUSE_SHORT[o.house]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {chartA.timeUnknown ? (
+              <div className="syn-overlay-unavailable" style={{ color: "var(--ink-dim)" }}>
+                {A}'s birth time is unknown — house overlays need a real Ascendant.
+              </div>
+            ) : (
+              <table className="tp-table">
+                <tbody>
+                  {syn.overlaysBonA.slice(0, 7).map((o, i) => (
+                    <tr key={i}>
+                      <td><span className="pl-gl">{o.glyph}</span> {o.planet}</td>
+                      <td style={{ color: "var(--ink-dim)" }}>{o.sign}</td>
+                      <td className="num">H{o.house}</td>
+                      <td style={{ color: "var(--ink-dim)" }}>{HOUSE_SHORT[o.house]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
           <div className="syn-overlay-group">
             <div className="syn-overlay-title">{A}'s planets in {B}'s houses</div>
-            <table className="tp-table">
-              <tbody>
-                {syn.overlaysAonB.slice(0, 7).map((o, i) => (
-                  <tr key={i}>
-                    <td><span className="pl-gl">{o.glyph}</span> {o.planet}</td>
-                    <td style={{ color: "var(--ink-dim)" }}>{o.sign}</td>
-                    <td className="num">H{o.house}</td>
-                    <td style={{ color: "var(--ink-dim)" }}>{HOUSE_SHORT[o.house]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {chartB.timeUnknown ? (
+              <div className="syn-overlay-unavailable" style={{ color: "var(--ink-dim)" }}>
+                {B}'s birth time is unknown — house overlays need a real Ascendant.
+              </div>
+            ) : (
+              <table className="tp-table">
+                <tbody>
+                  {syn.overlaysAonB.slice(0, 7).map((o, i) => (
+                    <tr key={i}>
+                      <td><span className="pl-gl">{o.glyph}</span> {o.planet}</td>
+                      <td style={{ color: "var(--ink-dim)" }}>{o.sign}</td>
+                      <td className="num">H{o.house}</td>
+                      <td style={{ color: "var(--ink-dim)" }}>{HOUSE_SHORT[o.house]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
           {(syn.receptionsAB.length > 0 || syn.receptionsBA.length > 0) && (
             <div className="syn-reception">

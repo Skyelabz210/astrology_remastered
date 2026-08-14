@@ -73,7 +73,7 @@ export function dignityFor(planet, signIdx) {
 // Triplicity lords by sect (Dorothean)
 export const TRIP_DAY   = { Fire:"Sun",    Earth:"Venus", Air:"Saturn",  Water:"Venus" };
 export const TRIP_NIGHT = { Fire:"Jupiter",Earth:"Moon",  Air:"Mercury", Water:"Mars"  };
-export const TRIP_PART  = { Fire:"Jupiter",Earth:"Mercury",Air:"Mercury",Water:"Moon"  }; // participating
+export const TRIP_PART   = { Fire:"Saturn",  Earth:"Mars",  Air:"Jupiter", Water:"Moon"  }; // participating
 
 // Egyptian terms — each sign 30° partitioned into 5 unequal segments
 // (degrees of upper bound, ruler). From Ptolemy.
@@ -146,7 +146,7 @@ export const LOTS = [
   { name: "Spirit",       day: "Asc + Sun − Moon",     night: "Asc + Moon − Sun" },
   { name: "Eros",         day: "Asc + Venus − Spirit", night: "Asc + Spirit − Venus" },
   { name: "Necessity",    day: "Asc + Fortune − Mercury", night: "Asc + Mercury − Fortune" },
-  { name: "Courage",      day: "Asc + Mars − Fortune", night: "Asc + Fortune − Mars" },
+  { name: "Courage",      day: "Asc + Fortune − Mars", night: "Asc + Mars − Fortune" },
   { name: "Victory",      day: "Asc + Jupiter − Spirit", night: "Asc + Spirit − Jupiter" },
   { name: "Nemesis",      day: "Asc + Fortune − Saturn", night: "Asc + Saturn − Fortune" },
 ];
@@ -186,8 +186,8 @@ export function computeAllLots(asc, planets, isDay) {
       formula: isDay ? "Asc + Venus − Spirit" : "Asc + Spirit − Venus" },
     { name: "Necessity", lon: isDay ? lot(asc, fortune, lonOf("Mercury")) : lot(asc, lonOf("Mercury"), fortune),
       formula: isDay ? "Asc + Fortune − Mercury" : "Asc + Mercury − Fortune" },
-    { name: "Courage",   lon: isDay ? lot(asc, lonOf("Mars"), fortune) : lot(asc, fortune, lonOf("Mars")),
-      formula: isDay ? "Asc + Mars − Fortune" : "Asc + Fortune − Mars" },
+    { name: "Courage",   lon: isDay ? lot(asc, fortune, lonOf("Mars")) : lot(asc, lonOf("Mars"), fortune),
+      formula: isDay ? "Asc + Fortune − Mars" : "Asc + Mars − Fortune" },
     { name: "Victory",   lon: isDay ? lot(asc, lonOf("Jupiter"), spirit) : lot(asc, spirit, lonOf("Jupiter")),
       formula: isDay ? "Asc + Jupiter − Spirit" : "Asc + Spirit − Jupiter" },
     { name: "Nemesis",   lon: isDay ? lot(asc, fortune, lonOf("Saturn")) : lot(asc, lonOf("Saturn"), fortune),
@@ -246,9 +246,24 @@ export function nearestAspect(deltaDeg) {
 
 // Is the faster planet moving toward the exact aspect angle?
 // Returns "applying" or "separating".
+//
+// Direction is decided by comparing the current separation to the
+// separation a short time LATER, so this needs to be the instantaneous
+// direction of travel, not where the pair ends up after a full day. An
+// earlier version used a whole-day forward-Euler step (relSpeed is
+// degrees/day), which overshoots whenever the current orb is smaller than
+// the day's relative motion — very common for Moon aspects, since the
+// Moon's relative speed against slower bodies is typically 11-15°/day
+// while this app's default orbs (see ASPECTS above) are mostly 2-8°: the
+// pair would exact and re-separate WITHIN that single day-step, so the
+// coarse step lands on the wrong side of exact and reports the opposite
+// phase. A step far smaller than any realistic orb/relSpeed timescale (1
+// minute, vs. orbs measured in whole degrees and speeds in degrees/day)
+// keeps the linear approximation valid and avoids that overshoot.
+const APPLYING_PHASE_STEP_DAYS = 1 / 1440; // 1 minute
 export function applyingPhase(lonA, lonB, speedA, speedB, target) {
   const relSpeed = speedA - speedB;
-  const sep1 = mod360(lonA + relSpeed - lonB);
+  const sep1 = mod360(lonA + relSpeed * APPLYING_PHASE_STEP_DAYS - lonB);
   const sep0 = mod360(lonA - lonB);
   const distTo = (s) => Math.min(Math.abs(s - target), Math.abs(s - (360 - target)), Math.abs(s - target - 360), Math.abs(s + target));
   return distTo(sep1) < distTo(sep0) ? "applying" : "separating";

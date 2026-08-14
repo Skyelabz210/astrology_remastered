@@ -101,6 +101,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         : <CinematicStage
             key={current.idx}
             card={current}
+            timeUnknown={!!chart.timeUnknown}
             agent={agent}
             localReading={localReading}
             pos={pos}
@@ -134,7 +135,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
 // ──────────────────────────────────────────────────────────────────────
 // CINEMATIC STAGE
 // ──────────────────────────────────────────────────────────────────────
-function CinematicStage({ card, agent, localReading, pos, total, voiceOn, voiceSpeaking, onSpeakNow }) {
+function CinematicStage({ card, timeUnknown, agent, localReading, pos, total, voiceOn, voiceSpeaking, onSpeakNow }) {
   const p = card.principal;
 
   return (
@@ -156,7 +157,7 @@ function CinematicStage({ card, agent, localReading, pos, total, voiceOn, voiceS
           <span className="cs-planet-glyph">{p.glyph}</span>
           <span className="cs-title">{p.name} in {card.name}</span>
           {p.retrograde && <span className="cs-retro">℞</span>}
-          <span className="cs-house">House {roman(card.house)}</span>
+          <span className="cs-house">{timeUnknown ? "House —" : `House ${roman(card.house)}`}</span>
           <span className="cs-dig cs-dig-{card.dignity.kind}">{card.dignity.kind}</span>
         </div>
 
