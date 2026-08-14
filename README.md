@@ -10,7 +10,7 @@ of 1,296,000; every lane is a BigInt residue; every claim is either exhaustively
 swept or explicitly marked open.
 
 ```
-4432/4432 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 20/20 core modules float-free
+4501/4501 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 **Before taking any claim below at face value, read:**
@@ -102,7 +102,7 @@ Four layers, with a hard rule about which ones floats are allowed in:
                  ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │ CORE           project/src/core/ — BigInt only, Mandate A1            │
-│  basis.js, shell-kelim.js, ring.js, variants.js, … (20 modules)       │
+│  basis.js, shell-kelim.js, ring.js, variants.js, … (21 modules)       │
 │  no floats, no Math.*, no Date, no Number()/parseFloat/parseInt,      │
 │  no decimal literals — mechanically enforced by the no-float audit    │
 └──────────────────────────────────────────────────────────────────────┘

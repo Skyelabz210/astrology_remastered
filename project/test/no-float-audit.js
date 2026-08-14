@@ -29,6 +29,7 @@ export const CORE_MANIFEST = [
   "basis.js",
   "carry.js",
   "cram.js",
+  "div-chimera.js",
   "fixture.js",
   "gear-class.js",
   "hcrm-core.js",

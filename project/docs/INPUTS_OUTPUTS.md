@@ -408,6 +408,40 @@ basis) preserves i.i.d. lane independence.
 | `parkedRecover(r, s, M, A)` | `bigint` × 4 | `bigint` — K mod A; throws if M not coprime to A |
 | `parkedRecoverFrom(x, M, A)` | `bigint` × 3 | `bigint` — same, from the integer |
 
+### div-chimera.js
+
+The Division Chimera: exact integer division `a/d` for an arbitrary divisor
+`d`, entirely in residue space, by five distinct mechanisms that all reach
+the same quotient (V1–V5), plus two distortion-catalog constructs riding on
+the same primitives (DIV³, Φ³). Ported from the external CRAM reference
+implementation's `div_family.py` (`cram_review_20260616`, 2026-07-22) — see
+that package's `PROOF_CERTIFICATE.md` Part V/VI for the formal theorems this
+module's own test suite (`test/div-chimera.test.js`) mirrors. Genuinely new
+relative to `cram.js`/`identity.js`: those recover a WINDING NUMBER K from
+an integer and an anchor; this module divides an integer by an arbitrary
+divisor, lane by lane, never leaving residue space.
+
+| Function | Params | Returns / Throws |
+|---|---|---|
+| `ROOT_OPS` | — | `["add","sub","id","neg","mul","div","sqr","inv"]` — the 8-operator alphabet, degree ≤ 2 |
+| `CHIMERA_ROLES` | — | `Map<bigint,string>` — the Four-Division Chimera's lane-role labels over `basis.js#B8`; informational only |
+| `DEFAULT_ANCHORS` | — | `bigint[]` — `[23n,29n,31n,37n,41n]`, V3's default auxiliary anchors |
+| `DEFAULT_ALT_BASIS` | — | `bigint[]` — `[23n,29n,31n,37n,41n,43n]`, V5's default alternate basis |
+| `NonExactDivisionError` | `class extends Error`, `new NonExactDivisionError(aVal, d)` | thrown whenever `d` does not evenly divide the dividend; carries `.aVal`/`.d` |
+| `DivisorNotCoprimeError` | `class extends Error`, `new DivisorNotCoprimeError(message)` | thrown when a variety's coprimality precondition on the divisor fails (V1/V4-homogeneous: `gcd(d,M)≠1`; V3: no candidate anchor coprime to `d`; V5: alternate basis not coprime to `d`) |
+| `laneOp(op, a, b, p)` | `op: string` (one of `ROOT_OPS`), `a,b,p: bigint` | `?bigint` — one root operator, exact mod `p`; `div`/`inv` return `null` when undefined there |
+| `v1KElim(aVal, d, basis)` | `aVal,d: bigint` (`d>0`), `basis: bigint[]` | `{q, alpha}` — V1, the flagship: `gcd(d,shellModulus(basis))=1` and `d\|aVal` required; throws `NonExactDivisionError`/`DivisorNotCoprimeError` |
+| `v2FpdFused(aVal, bVal, d, basis)` | `bigint`s, `basis: bigint[]` | `{q, alpha}` — V2: `(aVal·bVal)/d` as one multiplication + one V1-style division; throws `NonExactDivisionError` if `d` doesn't divide the product |
+| `v3FpdAnchors(aVal, d, anchors=DEFAULT_ANCHORS)` | `aVal,d: bigint`, `anchors: bigint[]` | `{q, reads: Map<bigint,bigint>}` — V3: quotient residues read directly through each coprime anchor; throws `NonExactDivisionError`/`DivisorNotCoprimeError` |
+| `v4LanewiseDivHomogeneous(aVal, d, basis)` | `aVal,d: bigint`, `basis: bigint[]` | `{tray, expect}` — V4 homogeneous: every lane runs `div` against the unit divisor `d`; `expect` is the in-ring value `(aVal·d⁻¹) mod M`; throws `DivisorNotCoprimeError` if `d` is not a unit mod `shellModulus(basis)` |
+| `v4LanewiseDivHeterogeneous(aVal, bVal, ops, basis)` | `bigint`s, `ops: string[]` (one `ROOT_OPS` entry per lane), `basis: bigint[]` | `{tray, mask}` — V4 heterogeneous: a distinct operator per lane, in-ring, `mask[i]` false where `tray[i]` is `null` |
+| `transduceLane(gamma, K, M, b)` | `bigint`s | `bigint` — `(gamma + K·M) mod b`, exact for arbitrary `b` coprime to `M` or not (the bare formula V5 uses; see `cram.js#transduce` for the richer state-object form) |
+| `v5Transduced(aVal, d, homeBasis, altBasis=DEFAULT_ALT_BASIS)` | `aVal,d: bigint`, `basis: bigint[]` × 2 | `{q, resHome}` — V5: transduces the carried magnitude to `altBasis` (coprime to `d`), divides there via V1, transduces the quotient home; throws `NonExactDivisionError`/`DivisorNotCoprimeError` |
+| `route(aVal, d, basis)` | `aVal,d: bigint` (`d` may be negative or zero), `basis: bigint[]` | `{variety: "V1_k_elim"\|"V5_transduced", q}` — dispatches to V1 when `gcd(\|d\|,M)=1`, else V5; handles sign via absolute-value routing; throws `"division by zero"` at `d=0n`, `NonExactDivisionError` otherwise |
+| `div3Mul(a, b, p)` | `bigint`s | `?bigint` — `(a·b) mod p` synthesized as `DIV(1,DIV(DIV(1,a),b))`, zero `mul` anywhere; `null` unless both `a`,`b` are units mod `p` |
+| `div3Schema(aVal, bVal, basis)` | `bigint`s, `basis: bigint[]` | `(?bigint)[]` — `div3Mul` applied lanewise |
+| `phi3Certify(aVal, bVal, d, basis)` | `bigint`s, `basis: bigint[]` | `{q, discrepancies}` — Φ³ triple certification of the division event `(aVal·d)/d`; `discrepancies===0n` on a correct implementation (also cross-checks `div3Mul` against plain multiplication on every lane where both operands are units) |
+
 ### fixture.js
 
 Star numbers, the winding tower (unbounded-depth K recovery via
