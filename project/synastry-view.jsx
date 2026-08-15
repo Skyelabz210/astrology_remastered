@@ -8,7 +8,9 @@ const { useState: $synUseState, useMemo: $synUseMemo, useEffect: $synUseEffect }
 
 function SynastryView({ chartA, chartB, settings, onBack }) {
   const syn = $synUseMemo(() => computeSynastry(chartA, chartB), [chartA, chartB]);
-  const reading = useSynastryReading(syn, settings.agentOn !== false);
+  // `!== false` defaulted to ON whenever the key was absent; the default is
+  // opt-in now, so require an explicit true.
+  const reading = useSynastryReading(syn, settings.agentOn === true);
   const [selectedHit, setSelectedHit] = $synUseState(null);
 
   const A = chartA.birth.subjectName || "You";

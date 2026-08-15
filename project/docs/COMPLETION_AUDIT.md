@@ -88,19 +88,20 @@ assertions test `houses.js` — the module the UI does not call.
 
 ## 3. Confirmed open items
 
-| # | Item | Evidence | Severity |
-|---|------|----------|----------|
-| 1 | Shipped ASC wrong by up to 109°; verified solver unwired | `astro.jsx:269,350` vs `houses.js:836` | **blocker** |
-| 2 | `outOfBounds` can never be non-empty — declination is derived from longitude alone, so `\|dec\| ≤ 23.4393°` against a `23.45°` threshold | `astro.jsx:264,591` | major |
-| 3 | Four `PROVEN-BY-EXHAUSTIVE-SWEEP` claims rest on sweeps `npm test` and CI never run — `runSpineSweep`/`runFrameSweep` are called only by `Core Test Harness.html` | `STATUS.md:22`, `shadow-spine.test.js:242,399` | major |
-| 4 | README states `accuracy.test.js` asserts the gate catches a >5′ error; no such assertion exists in its 489 | `README.md:175` | major |
-| 5 | Vacuous assertion counted in the 4404: `gearClass(16n) === null \|\| true` can never fail, and its "tested by sweep" alibi is false — the sweep never calls `gearClass` | `test/core.test.js:68` | minor |
-| 6 | Second vacuous assertion: `c.isDayChart === true \|\| c.isDayChart === false` accepts any boolean while its name promises "night chart" | `test/present/astro-chart.test.js:95` | minor |
-| 7 | `schema-validate` is a blocking CI job that validates **zero** files — no `*.ledger.json` is committed | `tools/validate-ledgers.mjs` | minor |
-| 8 | WP-20's promised `docs/a11y-report.md` was never created, though its ACCEPT criterion is "report committed" | `EXECUTION_PLAN.md:399` | minor |
-| 9 | Quadrant house systems are `LEDGER` in code but still `OPEN` in the two documents README sends readers to first | `variants.js:237` vs `STATUS.md:19` | minor |
-| 10 | Void-of-course Moon is a self-labelled "Crude" heuristic computing a different quantity than VOC, rendered as fact | `astro.jsx:600` | minor |
-| 11 | South/North Node ship the Sun's dignity as an admitted placeholder | `astro.jsx:401` | minor |
+| # | Item | Evidence | Severity | Status |
+|---|------|----------|----------|--------|
+| 1 | Shipped ASC wrong by up to 109°; verified solver unwired | `astro.jsx:269,350` vs `houses.js:836` | **blocker** | **fixed** |
+| 2 | `outOfBounds` can never be non-empty — declination is derived from longitude alone, so `\|dec\| ≤ 23.4393°` against a `23.45°` threshold | `astro.jsx:264,591` | major | **fixed** |
+| 3 | Four `PROVEN-BY-EXHAUSTIVE-SWEEP` claims rest on sweeps `npm test` and CI never run — `runSpineSweep`/`runFrameSweep` are called only by `Core Test Harness.html` | `STATUS.md:22`, `shadow-spine.test.js:242,399` | major | **fixed** |
+| 4 | README states `accuracy.test.js` asserts the gate catches a >5′ error; no such assertion exists in its 489 | `README.md:175` | major | **fixed** |
+| 5 | Vacuous assertion counted in the 4404: `gearClass(16n) === null \|\| true` can never fail, and its "tested by sweep" alibi is false — the sweep never calls `gearClass` | `test/core.test.js:68` | minor | **fixed** |
+| 6 | Second vacuous assertion: `c.isDayChart === true \|\| c.isDayChart === false` accepts any boolean while its name promises "night chart" | `test/present/astro-chart.test.js:95` | minor | **fixed** |
+| 7 | `schema-validate` is a blocking CI job that validates **zero** files — no `*.ledger.json` is committed | `tools/validate-ledgers.mjs` | minor | open |
+| 8 | WP-20's promised `docs/a11y-report.md` was never created, though its ACCEPT criterion is "report committed" | `EXECUTION_PLAN.md:399` | minor | **fixed** |
+| 9 | Quadrant house systems are `LEDGER` in code but still `OPEN` in the two documents README sends readers to first | `variants.js:237` vs `STATUS.md:19` | minor | **fixed** (STATUS.md) |
+| 10 | Void-of-course Moon is a self-labelled "Crude" heuristic computing a different quantity than VOC, rendered as fact | `astro.jsx:600` | minor | open |
+| 11 | South/North Node ship the Sun's dignity as an admitted placeholder | `astro.jsx:401` | minor | open |
+| 12 | An `aria-conditional-attr` violation (serious, 14 nodes) — `aria-expanded` on plain `<table>` rows — found by a real axe browser pass | `hcrm-view.jsx:202` | major | **fixed** |
 
 ---
 
@@ -109,12 +110,19 @@ assertions test `houses.js` — the module the UI does not call.
 These are **not** oversights; the repo states each one plainly. They are listed
 because "100% complete" is not true while they stand.
 
-- **LLM birth-data egress.** `app.jsx:19` sets `agentOn: true`; a resolved chart
-  sends raw `dateISO`/`lat`/`lng` to `window.claude.complete()`
-  (`agent.jsx:204`). The only opt-out lives in `tweaks-panel.jsx`, which opens
-  solely on an `__activate_edit_mode` `postMessage` from a host iframe — so a
-  standalone deployment has **no reachable off-switch**. Explicitly flagged for
-  owner decision and closed by nobody.
+- **LLM birth-data egress — RESOLVED on this branch.** `app.jsx:19` set
+  `agentOn: true`; a resolved chart sent raw `dateISO`/`lat`/`lng` to
+  `window.claude.complete()` (`agent.jsx:204`), and the only opt-out lived in
+  `tweaks-panel.jsx`, which opens solely on an `__activate_edit_mode`
+  `postMessage` from a host iframe — so a standalone deployment had **no
+  reachable off-switch**. The default is now `false`. Auditing the call sites
+  while making that change turned up three that consulted the flag only
+  partially, so flipping the default alone would not have closed the egress:
+  `card.jsx`'s `CardBack` keyed on the card flip alone, `session.jsx`'s reading
+  session keyed on shuffle alone, and `synastry-view.jsx` used
+  `settings.agentOn !== false`, which reads as ON whenever the key is absent.
+  All three now require an explicit `agentOn === true`. The landing-page
+  privacy note was rewritten to match.
 - **Quadrant houses unreachable.** The picker offers Whole/Equal only; the 9
   verified cusp solvers are Node-only.
 - **Polar house warning unreachable.** Fully implemented and tested, but no
@@ -137,12 +145,44 @@ itself never claims to be finished in the scientific sense.
 
 ---
 
-## 6. Verdict
+## 6. Remediation applied on this branch
+
+| Change | Files |
+|--------|-------|
+| `houses.js` publishes the full solver as `window.Houses` (+ `ascMcFromDate()`); `astro.jsx` routes ASC **and** MC through it, keeping the old closed form as a badged `APPROX` fallback | `tools/ephemeris/houses.js`, `astro.jsx` |
+| All 5 pages that load `astro.jsx` now also load `houses.js` | `Test Harness.html`, `API Reference.html` |
+| New suite pinning the **shipped** path against the verified solver, with a discriminator asserting the fallback still fails the same tolerance | `test/present/angles.test.js` (63) |
+| Declination takes ecliptic latitude, so `outOfBounds` is satisfiable; pinned at the 2006 major lunar standstill (Moon 28.7°) | `astro.jsx`, `test/present/angles.test.js` |
+| The two exhaustive sweeps now run under `npm test` and CI | `test/shadow-spine-sweep.test.js` (11) |
+| Corruption discriminator added, making the README's accuracy claim true | `test/accuracy.test.js` (489→502) |
+| Both vacuous assertions replaced with real branch coverage | `test/core.test.js` (56→62), `test/present/astro-chart.test.js` (31→32) |
+| LLM egress off by default; three partially-gated call sites closed | `app.jsx`, `card.jsx`, `session.jsx`, `synastry-view.jsx`, `landing.jsx` |
+| `aria-expanded` → `aria-current` on register rows (axe, serious) | `hcrm-view.jsx` |
+| WP-20's missing deliverable, from a real axe run | `docs/a11y-report.md` |
+| Quadrant-house status drift corrected | `STATUS.md` |
+
+**Assertions 4404 → 4498; 31 → 33 suites.** Every gate re-run green: `npm test`,
+`npm run lint`, `check-claims`, `bench --assert`, `validate-ledgers`.
+
+The ASC gate was verified to have teeth by reverting the wiring and confirming
+the new suite fails 32 assertions, then restoring it.
+
+### Still open, deliberately
+
+Items 7, 10, 11 above (a schema job with nothing to validate, the crude
+void-of-course heuristic, the node dignity placeholder), everything in §4 other
+than the LLM default, and the whole of §5. None is a correctness defect in a
+computed chart value; each is either a product decision or a disclosed scope
+boundary.
+
+## 7. Verdict
 
 The remediation plan did what it said, and the honesty culture in this repo is
 unusually good — most of §4 exists because the project wrote it down itself.
-What the plan's "all 29 complete" does not cover is that **WP-11's deliverable
+What the plan's "all 29 complete" did not cover is that **WP-11's deliverable
 never reached the product**: a verified solver was built, tested to 12.5″, and
-left unplugged behind a 100°-wrong approximation that no test compares against
-it. Everything in §3 is fixable; item 1 should be fixed before anyone reads a
-chart from this app.
+left unplugged behind a 100°-wrong approximation that no test compared against
+it. That is now fixed, along with eight other items, and the gate that should
+have caught it exists. The framework is not "100% complete" in the sense its
+status documents implied — §4 and §5 still stand, by design — but no chart it
+renders is silently wrong any more.

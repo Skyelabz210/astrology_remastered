@@ -305,6 +305,17 @@ doing this.
 
 ## Flagged for owner decision
 
+> **RESOLVED 2026-08-15.** The LLM birth-data item below was decided by the
+> repo owner: option (a), flip the default. `DEFAULT_SETTINGS.agentOn` is now
+> `false`. Auditing the call sites while making the change found three that
+> consulted the flag only partially — `card.jsx`'s `CardBack`, `session.jsx`'s
+> reading session, and `synastry-view.jsx`'s `!== false` test — so the default
+> flip alone would not have closed the egress; all three now require an
+> explicit `agentOn === true`. The landing privacy note was rewritten to match.
+> See [`COMPLETION_AUDIT.md`](./COMPLETION_AUDIT.md) §4. The original entry is
+> kept below as the record of what was flagged.
+
+
 - **`agent.jsx`'s LLM interpretation feature is on by default and sends raw
   birth data.** `app.jsx`'s `DEFAULT_SETTINGS.agentOn = true`; the instant a
   chart resolves, `useAgentChartReading` calls `window.claude.complete()`
@@ -338,7 +349,15 @@ doing this.
 
 ## Remaining
 
-None. **WP-28** (README rewrite + CONTRIBUTING, the final package) landed
+None *of this plan's 29 work packages*. An independent audit run on
+2026-08-15 — see [`COMPLETION_AUDIT.md`](./COMPLETION_AUDIT.md) — confirmed
+every package was genuinely built and every gate genuinely green, and also
+found that WP-11's verified `ascMc()` solver had never been published to the
+browser, so the shipped chart still used astro.jsx's self-disclaimed
+approximation (wrong by up to ~109°, i.e. the wrong rising sign, propagating
+into houses, sect, and the Lots). Nine items were remediated on that branch and
+the missing regression gate added; a short list of disclosed, deliberate gaps
+remains open there. Read that document alongside this one. **WP-28** (README rewrite + CONTRIBUTING, the final package) landed
 last: `README.md` gained a Quickstart, a real Architecture diagram of the
 four layers this plan built, an Accuracy statement with the actual observed
 numbers and the CI job enforcing them, a documentation map, and an honest

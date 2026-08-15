@@ -275,6 +275,51 @@ export function run() {
     );
   }
 
+  // ── corruption discriminator ──────────────────────────────────────────
+  // README.md's Accuracy section states that "a deliberately corrupted
+  // fixture value is itself part of the test (accuracy.test.js asserts the
+  // gate actually catches a >5′ error), so the check is verified to work,
+  // not just present." That assertion did not exist — the claim described an
+  // ad-hoc check run once during WP-10 and never committed. It exists now.
+  //
+  // A tolerance gate that never fires is indistinguishable from no gate at
+  // all, so this perturbs a real reference value by a known amount and
+  // asserts the SAME comparison used above rejects it. Nothing is mutated on
+  // disk; the corruption is applied to a local copy of one number.
+  // See docs/COMPLETION_AUDIT.md section 3, item 4.
+  {
+    const probe = points[0];
+    const body = "Mars"; // 60″ tolerance, no barycenter substitution
+    const ref = probe && probe.bodies && probe.bodies[body];
+    if (!ref) {
+      t("discriminator: probe fixture cell is available", false, `${body} missing from point ${probe && probe.id}`);
+    } else {
+      const clean = ref.longitude_arcsec_decimal;
+      const tol = toleranceArcsecFor(body);
+      const FIVE_ARCMIN = 300; // ″ — the figure the README names
+
+      t("discriminator: an uncorrupted value passes its own gate",
+        circularDiffArcsec(clean, clean) <= tol, `tol=${tol}″`);
+
+      // >5′ in both directions, and across the 0/360 wrap.
+      for (const delta of [FIVE_ARCMIN + 1, -(FIVE_ARCMIN + 1)]) {
+        const corrupted = ((clean + delta) % 1296000 + 1296000) % 1296000;
+        const diff = circularDiffArcsec(corrupted, clean);
+        t(`discriminator: a ${delta > 0 ? "+" : "−"}${Math.abs(delta)}″ corruption is caught`,
+          diff > tol,
+          `diff=${diff.toFixed(1)}″ exceeds tol=${tol}″`);
+      }
+
+      // The gate must be tight enough that >5′ always fails, i.e. the
+      // tolerance itself never drifts above 5′ for any body.
+      for (const b of BODIES) {
+        t(`discriminator: ${b} tolerance stays under 5′`,
+          toleranceArcsecFor(b) < FIVE_ARCMIN,
+          `tol=${toleranceArcsecFor(b)}″`);
+      }
+    }
+  }
+
   return R;
 }
 

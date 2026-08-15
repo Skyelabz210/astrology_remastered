@@ -65,7 +65,21 @@ export function run() {
 
   // gear classes
   t("gearClass(0) = G-zero", gearClass(0n) === "G-zero");
-  t("gearClass(16·... ) G-pre at x≡16(17)&18(19)", gearClass(16n) === null || true); // placeholder; tested by sweep
+  // This line was `gearClass(16n) === null || true` — a tautology that could
+  // never fail, justified in-comment as "tested by sweep". The sweep
+  // (full-sweep.test.js) imports only basis.js and never calls gearClass, so
+  // nothing covered it: mutation testing showed the G-low branch and the
+  // default return both survived the whole suite. Replaced with real
+  // witnesses for every branch. See docs/COMPLETION_AUDIT.md section 3.
+  t("gearClass(16) = null — r19=16, not the 18 G-pre requires",
+    gearClass(16n) === null, "16 mod 17 = 16 but 16 mod 19 = 16");
+  t("gearClass(322) = G-pre — r17=16 ∧ r19=18", gearClass(322n) === "G-pre");
+  t("gearClass(1) = G-low — r17≤1 ∧ r19≤1", gearClass(1n) === "G-low");
+  t("gearClass(153) = G-low — r17=0, r19=1", gearClass(153n) === "G-low");
+  t("gearClass(171) = G-low — r17=1, r19=0", gearClass(171n) === "G-low");
+  t("gearClass(2) = null — no gear event", gearClass(2n) === null);
+  t("G-zero precedence: 0 classifies G-zero, not G-low",
+    gearClass(0n) === "G-zero", "both branches match 0; order decides");
   // exact G-pre witness: solve x ≡16 mod17, x≡18 mod19 → x=339? check residues
   {
     let xw = null; for (let x = 0n; x < 323n; x++) if (mod(x,17n)===16n && mod(x,19n)===18n) { xw = x; break; }

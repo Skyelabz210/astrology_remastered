@@ -188,6 +188,15 @@ function Ledger({ hcrm, selRow, setSelRow }) {
           </tr>
         </thead>
         <tbody>
+          {/*
+            Row selection is announced with aria-current, NOT aria-expanded.
+            aria-expanded is only valid on treegrid rows; on a plain table row
+            axe-core flags it "serious" (aria-conditional-attr) — it did, on
+            all 14 rows, in the browser pass recorded in docs/a11y-report.md.
+            These rows disclose no nested content: clicking one selects it and
+            drives the detail panel, which is exactly what aria-current means,
+            and aria-current is permitted on any role.
+          */}
           {hcrm.rows.map((r, i) => (
             <tr key={r.bodyId}
                 className={`${selRow === i ? "is-sel" : ""} ${r.shadowHit ? "has-shadow" : ""}`}
@@ -199,7 +208,7 @@ function Ledger({ hcrm, selRow, setSelRow }) {
                   }
                 }}
                 tabIndex={0}
-                aria-expanded={selRow === i}>
+                aria-current={selRow === i ? "true" : undefined}>
               <td className="hc-body"><span className="hc-gl">{r.glyph}</span> {r.bodyId}</td>
               <td className="num">{r.arcsec.toLocaleString()}</td>
               <td>{r.signName}</td>

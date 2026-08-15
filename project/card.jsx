@@ -172,7 +172,10 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
 function CardBack({ card, chart, settings, active }) {
   const reading  = readingFor(card, chart);   // synchronous fallback / skeleton
   const math     = rigorousFor(card, chart);
-  const agent    = useAgentReading(card, chart, active);
+  // Gated on settings.agentOn like every other LLM entry point. This call
+  // site previously keyed only on `active` (card flipped), so flipping a
+  // card sent birth data to the LLM even with the agent interpreter off.
+  const agent    = useAgentReading(card, chart, active && settings.agentOn === true);
 
   return (
     <div className="zc-back-inner">

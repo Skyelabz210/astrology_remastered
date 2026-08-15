@@ -31,7 +31,9 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   }, []);
 
   const current = cards[pos];
-  const agent   = useAgentReading(current, chart, shuffled && !!current);
+  // Gated on settings.agentOn — this call site previously ignored it, so a
+  // reading session sent birth data to the LLM regardless of the setting.
+  const agent   = useAgentReading(current, chart, shuffled && !!current && settings.agentOn === true);
 
   // Voice
   const voice = useVoice({

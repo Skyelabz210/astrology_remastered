@@ -42,6 +42,12 @@ import { dirname, join } from "node:path";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
 const astroSrc = readFileSync(join(ROOT, "astro.jsx"), "utf8");
+// Every HTML page that loads astro.jsx also loads tools/ephemeris/houses.js as
+// a module tag BEFORE it, so window.Houses is populated by the time
+// computeNatal() runs and the REAL ascMc() solver is the live ASC/MC path.
+// The sandbox mirrors that load order; without it these suites would silently
+// exercise the ~109deg-wrong fallback the browser never uses.
+const housesModule = await import("../tools/ephemeris/houses.js");
 const vendorSrc = readFileSync(join(ROOT, "vendor", "astronomy.browser.min.js"), "utf8");
 
 const REAL_BODIES = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
@@ -66,6 +72,7 @@ const astroCoreModule = await import("../src/present/astro-core.js");
 function makeSandbox({ withAstronomy }) {
   const sandbox = {};
   sandbox.window = sandbox; // top-level `window.X = ...` and bare `window` refs resolve here
+  sandbox.Houses = housesModule;
   sandbox.AstroCore = astroCoreModule;
   vm.createContext(sandbox);
   if (withAstronomy) {

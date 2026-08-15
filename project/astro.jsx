@@ -165,6 +165,12 @@ const PLANET_ORDER = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","
 // a badge regardless of which path any individual planet ends up using.
 if (typeof window !== "undefined") {
   window.EPHEMERIS_MODE = window.Astronomy ? "REAL" : "SYNTHETIC";
+  // Which ASC/MC path is live. "REAL" = houses.js ascMc(); "APPROX" =
+  // this file's fallback closed form, which has a known ~109° ASC error.
+  Object.defineProperty(window, "ANGLES_MODE", {
+    configurable: true,
+    get() { return (window.Houses && typeof window.Houses.ascMcFromDate === "function") ? "REAL" : "APPROX"; },
+  });
 }
 
 const REAL_EPHEMERIS_BODIES = new Set([
@@ -188,6 +194,19 @@ function dateToJD(date) {
 // internally (see produce-ledger.mjs's header comment on why that — not
 // tools/ephemeris/timescale.js — is the right ΔT source to stay consistent
 // with the position actually computed).
+// Apparent geocentric ecliptic LATITUDE (degrees), same source and settings
+// as realEclipticLongitudeDeg(). Returns null when this body has no real
+// model (NorthNode/Chiron/Lilith) or astronomy-engine is absent, so callers
+// fall back to the β = 0 assumption rather than a fabricated value.
+function realEclipticLatitudeDeg(planet, jd) {
+  if (typeof Astronomy === "undefined" || !Astronomy || !REAL_EPHEMERIS_BODIES.has(planet)) {
+    return null;
+  }
+  const time = Astronomy.MakeTime(new Date((jd - 2440587.5) * 86400000));
+  const vec = Astronomy.GeoVector(Astronomy.Body[planet], time, true); // aberration on
+  return Astronomy.Ecliptic(vec).elat;
+}
+
 function realEclipticLongitudeDeg(planet, jd) {
   const Astronomy = window.Astronomy;
   const date = new Date((jd - 2440587.5) * 86400000);
@@ -250,7 +269,12 @@ function isRetrograde(planet, jd) {
 
 // Midheaven from local sidereal time. Simplified spherical formula:
 // MC = atan2(sin(LST), cos(LST)·cos(ε))  (returns ecliptic longitude)
-function midheavenDeg(date, lng) {
+// Midheaven. Unlike the ascendant, this closed form already had the right
+// branch — it agrees with houses.js ascMc() to ~12″, the residual being
+// GMST-vs-GAST and a fixed 23.4393° obliquity. It is still routed through the
+// real solver when available so ASC and MC come from one consistent
+// timescale; the local form remains the offline fallback.
+function approxMidheavenDeg(date, lng) {
   const jd = dateToJD(date);
   const gmstDeg = mod360(280.46061837 + 360.98564736629 * (jd - 2451545.0));
   const lst = mod360(gmstDeg + lng);
@@ -260,20 +284,49 @@ function midheavenDeg(date, lng) {
   return mod360(mc * 180 / Math.PI);
 }
 
-// Solar declination (degrees). Used for out-of-bounds detection.
-function planetDeclination(lon) {
-  const eRad = 23.4393 * Math.PI / 180;
-  return Math.asin(Math.sin(lon * Math.PI / 180) * Math.sin(eRad)) * 180 / Math.PI;
+function midheavenDeg(date, lng, lat) {
+  const H = typeof window !== "undefined" ? window.Houses : null;
+  if (H && typeof H.ascMcFromDate === "function") {
+    // MC is latitude-independent; pass 0 when the caller has no latitude.
+    return H.ascMcFromDate(date, typeof lat === "number" ? lat : 0, lng).mcDeg;
+  }
+  return approxMidheavenDeg(date, lng);
 }
-// Approximation: ASC ≈ GMST + longitude + 90° + lat-modulation
-function ascendantDeg(date, lat, lng) {
+
+// Declination (degrees) from ecliptic coordinates.
+//
+// This used to take longitude ALONE, implicitly assuming every body sits
+// exactly on the ecliptic (β = 0). Under that assumption |δ| ≤ ε = 23.4393°
+// by construction, so the out-of-bounds filter below — which asks for
+// |δ| > 23.45° — could never match for ANY input: the feature was
+// unsatisfiable, not merely unused. Out-of-bounds declination is precisely a
+// statement about bodies OFF the ecliptic, so the latitude term is what the
+// test was looking for. See docs/COMPLETION_AUDIT.md section 3, item 2.
+//
+//   sin δ = sin β · cos ε + cos β · sin ε · sin λ
+//
+// With β = 0 this reduces to the previous expression exactly, so callers that
+// genuinely have no latitude (the synthetic model) are unaffected.
+function planetDeclination(lon, eclLatDeg) {
+  const eRad = 23.4393 * Math.PI / 180;
+  const beta = (Number.isFinite(eclLatDeg) ? eclLatDeg : 0) * Math.PI / 180;
+  const lam  = lon * Math.PI / 180;
+  return Math.asin(
+    Math.sin(beta) * Math.cos(eRad) + Math.cos(beta) * Math.sin(eRad) * Math.sin(lam)
+  ) * 180 / Math.PI;
+}
+// Fallback ascendant — retained ONLY for the offline case where
+// tools/ephemeris/houses.js was not loaded (e.g. a page that omits it, or a
+// module-load failure). It picks the wrong atan2 branch and lands up to
+// ~109° from the truth, i.e. the wrong rising sign; never prefer it when the
+// real solver is reachable. Kept rather than deleted so a page missing the
+// module still renders a chart, badged as APPROX, instead of throwing.
+function approxAscendantDeg(date, lat, lng) {
   const jd = dateToJD(date);
-  const T = (jd - 2451545.0) / 36525;
   // GMST in degrees, approximate
   const gmstDeg = mod360(280.46061837 + 360.98564736629 * (jd - 2451545.0));
   const lst = mod360(gmstDeg + lng);
   const obliquity = 23.4393;
-  // Simplified ascendant (good enough for the visual layer; not a real solver)
   const ra = lst + 90;
   const latRad = lat * Math.PI / 180;
   const eRad   = obliquity * Math.PI / 180;
@@ -283,6 +336,18 @@ function ascendantDeg(date, lat, lng) {
     Math.sin(raRad) * Math.cos(eRad) + Math.tan(latRad) * Math.sin(eRad)
   );
   return mod360(ascRad * 180 / Math.PI);
+}
+
+// Ascendant. Prefers WP-11's real solver (tools/ephemeris/houses.js ascMc(),
+// cross-checked against Swiss Ephemeris to ~12.5″), which every page that
+// loads this file now publishes as window.Houses. window.ANGLES_MODE records
+// which path produced the number, mirroring window.EPHEMERIS_MODE.
+function ascendantDeg(date, lat, lng) {
+  const H = typeof window !== "undefined" ? window.Houses : null;
+  if (H && typeof H.ascMcFromDate === "function") {
+    return H.ascMcFromDate(date, lat, lng).ascDeg;
+  }
+  return approxAscendantDeg(date, lat, lng);
 }
 
 // Whole-sign houses: ASC sign is house 1, then forward.
@@ -348,7 +413,7 @@ function computeNatal(birth) {
   const date = new Date(birth.dateISO);
   const jd = dateToJD(date);
   const asc = ascendantDeg(date, birth.lat, birth.lng);
-  const mc  = midheavenDeg(date, birth.lng);
+  const mc  = midheavenDeg(date, birth.lng, birth.lat);
   const desc = mod360(asc + 180);
   const ic   = mod360(mc  + 180);
   const ascSignIdx = Math.floor(asc / 30);
@@ -376,7 +441,7 @@ function computeNatal(birth) {
         : houseForLongEqual(lon, asc),
       dignity: dignityFor(p, sign),
       residues: residues(arcsec),
-      declination: planetDeclination(lon),
+      declination: planetDeclination(lon, realEclipticLatitudeDeg(p, jd)),
       criticalDegree: criticalKind(sign, degInSign),
     };
   });
@@ -400,7 +465,7 @@ function computeNatal(birth) {
         : houseForLongEqual(snLon, asc),
       dignity: dignityFor("Sun", snSign), // nodes don't have dignity; placeholder
       residues: residues(snLon * 3600),
-      declination: planetDeclination(snLon),
+      declination: planetDeclination(snLon), // nodes lie on the ecliptic: β ≡ 0
       criticalDegree: criticalKind(snSign, snLon - snSign * 30),
     });
   }

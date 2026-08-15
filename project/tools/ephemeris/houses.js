@@ -174,7 +174,7 @@
 // unrestricted and documents the difference here rather than throwing
 // pre-emptively.
 
-import { gastDeg, meanObliquityDeg } from "./timescale.js";
+import { gastDeg, meanObliquityDeg, ttFromUtc } from "./timescale.js";
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
@@ -832,6 +832,49 @@ export const POLAR_FALLBACK_POLICY = {
 // project/docs/ux-validation-checklist.md scenario 4 for the honest
 // caveat on how far this reaches in the current UI.
 // ---------------------------------------------------------------------------
+
+/**
+ * Ascendant and Midheaven for a JS Date, the form the browser presentation
+ * layer actually holds. Wraps ascMc() with this module's own timescale
+ * conversion so a classic <script> caller needs no JD arithmetic of its own.
+ *
+ * The JD expression is astro.jsx's dateToJD() convention (ms → JD(UT)), and
+ * jdTt comes from timescale.js's Espenak-Meeus ΔT — the same pair
+ * produce-ledger.mjs feeds ascMc().
+ *
+ * @param {Date} date - the birth/chart instant (UTC-based).
+ * @param {number} latDeg - geographic latitude, degrees, north positive.
+ * @param {number} lngDeg - geographic longitude, degrees, EAST positive.
+ * @returns {{ascDeg: number, mcDeg: number}} float degrees [0, 360).
+ */
+export function ascMcFromDate(date, latDeg, lngDeg) {
+  const jdUt1 = date.getTime() / 86400000 + 2440587.5;
+  return ascMc(jdUt1, ttFromUtc(jdUt1), latDeg, lngDeg);
+}
+
+// The publish was previously the policy table ALONE, on the reasoning that
+// the browser build did not compute quadrant houses. That left astro.jsx's
+// self-disclaimed "not a real solver" ascendant as the only ASC any page
+// could reach — and it is wrong by up to ~109°, i.e. the wrong rising sign,
+// which then seeds every house number, the sect, and all seven Lots. The
+// solver this module already exports had been verified against Swiss
+// Ephemeris to ~12.5″ and was simply never plugged in. It is published in
+// full now; see project/docs/COMPLETION_AUDIT.md §2.
 if (typeof window !== "undefined") {
   window.HousesPolicy = { POLAR_FALLBACK_POLICY };
+  window.Houses = {
+    ascMc,
+    ascMcFromDate,
+    placidusCusps,
+    kochCusps,
+    regiomontanusCusps,
+    campanusCusps,
+    alcabitiusCusps,
+    topocentricCusps,
+    meridianCusps,
+    morinusCusps,
+    porphyryCuspsFloat,
+    PolarLatitudeError,
+    POLAR_FALLBACK_POLICY,
+  };
 }

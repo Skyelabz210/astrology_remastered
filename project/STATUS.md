@@ -16,7 +16,7 @@ isolation, tests, and claim-status tagging.
 | Layer | Path | Status | Admissible for |
 |-------|------|--------|----------------|
 | Exact register core | `src/core/` | PROVEN-BY-EXACT-TEST (full ecliptic sweep, parked shell 881,790 / lane 11; gear split retained) | evidence, extraction |
-| Variant registry | `src/core/variants.js` | PROVEN structure · DEFINED constants · OPEN quadrant houses | evidence for closure claims only |
+| Variant registry | `src/core/variants.js` | PROVEN structure · DEFINED constants · LEDGER quadrant houses (WP-12) · OPEN heliocentric frame | evidence for closure claims only |
 | Safe Basis architecture | `src/core/safe-basis.js` | DEFINED roles · PROVEN Gaussian class, families, saturation | evidence, extraction |
 | ρ invariant | `src/core/rho.js` | PROVEN against framework reference values | evidence, extraction |
 | Shadow / closure axes | `src/core/shadow-spine.js` | PROVEN-BY-EXHAUSTIVE-SWEEP (cross, census, orthogonality, additivity) | evidence, extraction |
