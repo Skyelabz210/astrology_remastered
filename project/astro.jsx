@@ -171,6 +171,13 @@ if (typeof window !== "undefined") {
     configurable: true,
     get() { return (window.Houses && typeof window.Houses.ascMcFromDate === "function") ? "REAL" : "APPROX"; },
   });
+  // Per-chart refinement of the above: REAL says the solver is LOADED, this
+  // says whether it actually produced the Ascendant for a given latitude
+  // (it declines above |lat| = 66.56°). app.jsx's polar banner is the
+  // user-facing half; this is for tests and diagnostics.
+  window.ascendantIsExactAt = function (date, lat, lng) {
+    return realAngles(date, lat, lng) !== null;
+  };
 }
 
 const REAL_EPHEMERIS_BODIES = new Set([
@@ -285,12 +292,11 @@ function approxMidheavenDeg(date, lng) {
 }
 
 function midheavenDeg(date, lng, lat) {
-  const H = typeof window !== "undefined" ? window.Houses : null;
-  if (H && typeof H.ascMcFromDate === "function") {
-    // MC is latitude-independent; pass 0 when the caller has no latitude.
-    return H.ascMcFromDate(date, typeof lat === "number" ? lat : 0, lng).mcDeg;
-  }
-  return approxMidheavenDeg(date, lng);
+  // MC is latitude-independent, so pass 0 when the caller has no latitude —
+  // which also keeps this below ascMc()'s polar guard and lets the MC stay
+  // exact even at latitudes where the Ascendant falls back.
+  const real = realAngles(date, 0, lng);
+  return real ? real.mcDeg : approxMidheavenDeg(date, lng);
 }
 
 // Declination (degrees) from ecliptic coordinates.
@@ -343,11 +349,34 @@ function approxAscendantDeg(date, lat, lng) {
 // loads this file now publishes as window.Houses. window.ANGLES_MODE records
 // which path produced the number, mirroring window.EPHEMERIS_MODE.
 function ascendantDeg(date, lat, lng) {
+  const real = realAngles(date, lat, lng);
+  return real ? real.ascDeg : approxAscendantDeg(date, lat, lng);
+}
+
+// Shared accessor for the real solver, with the polar case handled once.
+//
+// houses.js `ascMc()` THROWS PolarLatitudeError above |lat| = 66.56° — a
+// deliberate correctness fix (it previously returned the Descendant, a 180°
+// error, verified at Tromsø 69.6°N). But WP-19 removed the ±66° entry clamp on
+// purpose, so those latitudes are reachable from the form. Letting the throw
+// escape would take down the whole chart, including the planetary positions,
+// which are perfectly well-defined at any latitude.
+//
+// So: fall back to the local closed form there, and report APPROX. That value
+// carries the same large error as the no-module case, and it is NOT presented
+// as trustworthy — app.jsx's ChartStatusBanners already raises WP-19's polar
+// house-system warning for exactly these latitudes via
+// Validate.polarHouseWarning(). Callers that need to distinguish "no module"
+// from "polar" can read ANGLES_MODE alongside that banner.
+function realAngles(date, lat, lng) {
   const H = typeof window !== "undefined" ? window.Houses : null;
-  if (H && typeof H.ascMcFromDate === "function") {
-    return H.ascMcFromDate(date, lat, lng).ascDeg;
+  if (!H || typeof H.ascMcFromDate !== "function") return null;
+  try {
+    return H.ascMcFromDate(date, lat, lng);
+  } catch (e) {
+    if (H.PolarLatitudeError && e instanceof H.PolarLatitudeError) return null;
+    throw e; // anything else is a real fault; do not swallow it
   }
-  return approxAscendantDeg(date, lat, lng);
 }
 
 // Whole-sign houses: ASC sign is house 1, then forward.

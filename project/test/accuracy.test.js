@@ -18,16 +18,23 @@
 // Horizons error being measured, which matters when tracking a 60″ budget.
 //
 // ── Tolerance ────────────────────────────────────────────────────────
-// 60″ for Sun/Mercury/Venus/Mars/Jupiter/Saturn/Uranus/Neptune/Pluto.
-// 120″ for the Moon: astronomy-engine's lunar theory (ELP2000-82B-derived)
-// and JPL Horizons' DE441 (a full numerically-integrated ephemeris) are
-// two different lunar models; their disagreement is dominated by physics
-// (different lunar theories), not implementation bugs, and the Moon's own
-// ~13°/day motion makes a given time/model discrepancy translate into a
-// larger longitude error than for any other body. This is a documented,
-// widely-cited astronomy-engine-vs-JPL characteristic (not a project bug),
-// so the Moon gets a wider, explicitly-labeled budget rather than being
-// silently excluded.
+// 60″ for every body, Moon included.
+//
+// A correctness audit flagged the Moon's earlier 120″ tolerance (vs. every
+// other body's 60″) as under-justified: the stated reasoning (astronomy-
+// engine's ELP2000-82B-derived lunar theory vs. JPL Horizons' DE441
+// genuinely disagree, and the Moon's ~13°/day motion turns a given
+// time/model discrepancy into a bigger longitude error than for a slower
+// body) is a real, documented characteristic of comparing lunar theories
+// in general — but it wasn't tied to any actual number for THIS fixture,
+// and the real observed worst case across all 20 points is 15.41″ (mean
+// 3.05″), comfortably inside the same 60″ every other body uses (whose own
+// worst observed case, Pluto's ~29.5″, uses about the same headroom over
+// its tolerance that the Moon would). Rather than keep an arbitrary 120″
+// that would let a real ~90″ regression pass silently, the Moon now shares
+// the flat 60″ family-wide tolerance — still ~4x the observed worst case,
+// and revisit with real data if a future fixture point shows it's not
+// enough, rather than keep it wide pre-emptively.
 //
 // ── Barycenter-substituted cells ────────────────────────────────────
 // 5 cells (points 1-2: Saturn/Neptune/Pluto at points before Horizons has
@@ -70,8 +77,8 @@ const BODIES = [
   "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto",
 ];
 
-function toleranceArcsecFor(body) {
-  return body === "Moon" ? 120 : 60;
+function toleranceArcsecFor() {
+  return 60;
 }
 
 /** Shortest-arc, wraparound-safe absolute difference between two arcsec

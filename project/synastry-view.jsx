@@ -6,11 +6,12 @@
 
 const { useState: $synUseState, useMemo: $synUseMemo, useEffect: $synUseEffect } = React;
 
-function SynastryView({ chartA, chartB, settings, onBack }) {
+function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
   const syn = $synUseMemo(() => computeSynastry(chartA, chartB), [chartA, chartB]);
-  // `!== false` defaulted to ON whenever the key was absent; the default is
-  // opt-in now, so require an explicit true.
-  const reading = useSynastryReading(syn, settings.agentOn === true);
+  // `=== true`, not `!== false`: DEFAULT_SETTINGS.agentOn is opt-in now, so a
+  // settings object that simply lacks the key must read as OFF.
+  const agentOn = settings.agentOn === true;
+  const reading = useSynastryReading(syn, agentOn);
   const [selectedHit, setSelectedHit] = $synUseState(null);
 
   const A = chartA.birth.subjectName || "You";
@@ -33,7 +34,18 @@ function SynastryView({ chartA, chartB, settings, onBack }) {
           <span className="syn-hdr-mark">✦</span>
           <span>Synastry · {A} & {B}</span>
         </div>
-        <div className="syn-hdr-spacer"></div>
+        {setTweak ? (
+          <button
+            className={`hdr-pill ${agentOn ? "is-on" : ""}`}
+            onClick={() => setTweak('agentOn', !agentOn)}
+            title={agentOn
+              ? "Agent interpreter on — sends both charts' data to Claude for each reading. Click to turn off."
+              : "Agent interpreter off — readings stay local. Click to turn on."}
+            aria-pressed={agentOn}
+          >
+            agent
+          </button>
+        ) : <div className="syn-hdr-spacer"></div>}
       </header>
 
       <div className="syn-top">
@@ -81,7 +93,7 @@ function SynastryView({ chartA, chartB, settings, onBack }) {
             ))}
           </div>
           {selectedHit !== null && syn.hits[selectedHit] && (
-            <SynAspectDetail hit={syn.hits[selectedHit]} syn={syn} A={A} B={B} />
+            <SynAspectDetail hit={syn.hits[selectedHit]} syn={syn} A={A} B={B} agentOn={agentOn} />
           )}
         </div>
 
@@ -90,33 +102,45 @@ function SynastryView({ chartA, chartB, settings, onBack }) {
           <h3 className="syn-panel-h">House overlays</h3>
           <div className="syn-overlay-group">
             <div className="syn-overlay-title">{B}'s planets in {A}'s houses</div>
-            <table className="tp-table">
-              <tbody>
-                {syn.overlaysBonA.slice(0, 7).map((o, i) => (
-                  <tr key={i}>
-                    <td><span className="pl-gl">{o.glyph}</span> {o.planet}</td>
-                    <td style={{ color: "var(--ink-dim)" }}>{o.sign}</td>
-                    <td className="num">H{o.house}</td>
-                    <td style={{ color: "var(--ink-dim)" }}>{HOUSE_SHORT[o.house]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {chartA.timeUnknown ? (
+              <div className="syn-overlay-unavailable" style={{ color: "var(--ink-dim)" }}>
+                {A}'s birth time is unknown — house overlays need a real Ascendant.
+              </div>
+            ) : (
+              <table className="tp-table">
+                <tbody>
+                  {syn.overlaysBonA.slice(0, 7).map((o, i) => (
+                    <tr key={i}>
+                      <td><span className="pl-gl">{o.glyph}</span> {o.planet}</td>
+                      <td style={{ color: "var(--ink-dim)" }}>{o.sign}</td>
+                      <td className="num">H{o.house}</td>
+                      <td style={{ color: "var(--ink-dim)" }}>{HOUSE_SHORT[o.house]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
           <div className="syn-overlay-group">
             <div className="syn-overlay-title">{A}'s planets in {B}'s houses</div>
-            <table className="tp-table">
-              <tbody>
-                {syn.overlaysAonB.slice(0, 7).map((o, i) => (
-                  <tr key={i}>
-                    <td><span className="pl-gl">{o.glyph}</span> {o.planet}</td>
-                    <td style={{ color: "var(--ink-dim)" }}>{o.sign}</td>
-                    <td className="num">H{o.house}</td>
-                    <td style={{ color: "var(--ink-dim)" }}>{HOUSE_SHORT[o.house]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {chartB.timeUnknown ? (
+              <div className="syn-overlay-unavailable" style={{ color: "var(--ink-dim)" }}>
+                {B}'s birth time is unknown — house overlays need a real Ascendant.
+              </div>
+            ) : (
+              <table className="tp-table">
+                <tbody>
+                  {syn.overlaysAonB.slice(0, 7).map((o, i) => (
+                    <tr key={i}>
+                      <td><span className="pl-gl">{o.glyph}</span> {o.planet}</td>
+                      <td style={{ color: "var(--ink-dim)" }}>{o.sign}</td>
+                      <td className="num">H{o.house}</td>
+                      <td style={{ color: "var(--ink-dim)" }}>{HOUSE_SHORT[o.house]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
           {(syn.receptionsAB.length > 0 || syn.receptionsBA.length > 0) && (
             <div className="syn-reception">
@@ -168,9 +192,10 @@ function SynastryView({ chartA, chartB, settings, onBack }) {
   );
 }
 
-function SynAspectDetail({ hit, syn, A, B }) {
-  const [state, setState] = $synUseState({ loading: true, text: null });
+function SynAspectDetail({ hit, syn, A, B, agentOn }) {
+  const [state, setState] = $synUseState({ loading: agentOn, text: null });
   $synUseEffect(() => {
+    if (!agentOn) { setState({ loading: false, text: null }); return; }
     let cancelled = false;
     setState({ loading: true, text: null });
     interpretSynastryAspect(hit, syn).then(
@@ -178,7 +203,8 @@ function SynAspectDetail({ hit, syn, A, B }) {
       () => { if (!cancelled) setState({ loading: false, text: null }); }
     );
     return () => { cancelled = true; };
-  }, [hit.a, hit.b, hit.aspect]);
+  }, [agentOn, hit.a, hit.b, hit.aspect]);
+  const localText = `${aspectMeaning(hit.aspect)} — ${A}'s ${hit.a} signifies ${planetSignifies(hit.a)}; ${B}'s ${hit.b} signifies ${planetSignifies(hit.b)}.`;
   return (
     <div className="syn-asp-detail">
       <div className="syn-asp-detail-head">
@@ -188,7 +214,7 @@ function SynAspectDetail({ hit, syn, A, B }) {
         </span>
       </div>
       <div className="syn-asp-detail-body">
-        {state.loading ? <span className="syn-loading">reading this contact…</span> : (state.text || "—")}
+        {state.loading ? <span className="syn-loading">reading this contact…</span> : (state.text || localText)}
       </div>
     </div>
   );

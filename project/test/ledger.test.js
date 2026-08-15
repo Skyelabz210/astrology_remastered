@@ -101,6 +101,36 @@ export function run() {
       r.threw && r.msg.includes("certificate.status"), r.msg);
   }
 
+  // ── rejection: schema-required fields the validator previously let
+  // through unchecked (found during a correctness audit: certificate.notes
+  // is schema-required but was never actually checked; event_id/body/
+  // source.* were only checked for presence, not for being strings) ──────
+  {
+    const r = trap(() => validateLedgerEntry(entry({ certificate: { status: "IMPORTED_INTEGER_LEDGER" } })));
+    t("rejects certificate missing notes (schema-required)",
+      r.threw && r.msg.includes("certificate.notes"), r.msg);
+  }
+  {
+    const r = trap(() => validateLedgerEntry(entry({ certificate: { status: "IMPORTED_INTEGER_LEDGER", notes: 42 } })));
+    t("rejects non-string certificate.notes",
+      r.threw && r.msg.includes("certificate.notes"), r.msg);
+  }
+  {
+    const r = trap(() => validateLedgerEntry(entry({ event_id: 12345 })));
+    t("rejects non-string event_id",
+      r.threw && r.msg.includes("event_id"), r.msg);
+  }
+  {
+    const r = trap(() => validateLedgerEntry(entry({ body: ["Sun"] })));
+    t("rejects non-string body",
+      r.threw && r.msg.includes("body"), r.msg);
+  }
+  {
+    const r = trap(() => validateLedgerEntry(entry({ source: { kind: 1, name: "wp16-ledger-suite", checksum: "sha256:deadbeef" } })));
+    t("rejects non-string source.kind",
+      r.threw && r.msg.includes("source incomplete"), r.msg);
+  }
+
   // ── importLedger: array in, array out — nothing else ─────────────
   {
     const r = trap(() => importLedger(entry()));

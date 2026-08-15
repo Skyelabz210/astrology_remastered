@@ -1,10 +1,146 @@
 # Execution Status — Audit Remediation
 
 Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Last updated
-2026-08-11: **all 29 work packages complete, verified, and merged to `main`.**
-The plan is done. This file is kept as the historical record of what was
-built and how — see "Flagged for owner decision" below for the one item this
-plan deliberately left for the repo owner rather than resolving unilaterally.
+2026-08-14: **all 29 work packages complete, verified, and merged to `main`,**
+plus three owner-requested follow-ups since: the `agent.jsx` opt-out (see
+"Resolved: agent.jsx opt-out" below), a full-app correctness audit (see
+"Resolved: correctness audit findings" below) that found and fixed 9 real
+bugs the original plan's own quality gates didn't catch, and a new capability
+addition, the Division Chimera (see "Added: the Division Chimera" below).
+This file is kept as the historical record of what was built and how.
+
+## Added: the Division Chimera (owner-requested, 2026-08-14)
+
+The owner uploaded an external, machine-checked CRAM reference implementation
+(`cram_review_20260616` — Lean 4 + exhaustive Python, 42/42 theorems proven,
+468,853 checks; author: Anthony Diaz / Skyelabz210, the same authorship this
+repo's own `src/core/` already credits implicitly through its matching
+terminology — Safe Basis, Colony, Shadow Anchor, K-Elimination, signed-carry
+arrow, transduction, Saturation Principle) and asked for an analysis of what
+it implies for implementation here. Comparison against the existing 20
+`src/core/` modules found most of the reference's Parts I–IV and VII already
+ported under matching names (`basis.js`/`safe-basis.js`, `cram.js`,
+`arrow.js`, `identity.js`, `tower-recover.js`, `operators.js`). The one
+concrete, self-contained gap — general exact division of an arbitrary
+integer `a` by an arbitrary divisor `d`, entirely in residue space (the
+reference's `div_family.py`, "Division Chimera") — was not present anywhere
+in this repo; `identity.js`'s `kElim`/`doubleKElim` recover a WINDING NUMBER
+from an integer and an anchor, a related but genuinely different operation.
+Confirmed out of scope by the owner's own choice: the reference's much larger
+CVM (an executable virtual machine with an ISA and a Fibonacci demo program),
+adelic metadata/fault-hierarchy/serialization layer, and carry-free counters
+— all general-purpose computing infrastructure with no astrology use case.
+
+**What was added:** `project/src/core/div-chimera.js` (21st core module) —
+the five division varieties (V1 K-Elimination, V2 FPD fused, V3 FPD anchors,
+V4 lanewise DIV homogeneous/heterogeneous, V5 transduction-enriched), a
+`route()` dispatcher, DIV³ (multiplication synthesized from division alone,
+zero `mul` anywhere in the construction), and Φ³ (triple certification that
+the residue-native, fused, and carried-magnitude readings of one division
+event agree on every lane). Ported deliberately, not mechanically translated:
+reuses this repo's own `gcd`/`inverse`/`shellModulus` (`cram.js`) and `mod`
+(`residues.js`) rather than reimplementing them, and two custom error classes
+(`NonExactDivisionError`, `DivisorNotCoprimeError`) replace the reference's
+bare `ValueError`s to match this repo's own error-class convention (see
+`variants.js`'s `DegenerateAnglesError`, `houses.js`'s `PolarLatitudeError`).
+
+`test/div-chimera.test.js` (68 assertions, some scanning hundreds of cases
+internally per assertion — e.g. DIV³ correctness is checked over all 881
+unit pairs across every Safe-Basis lane, matching the external certificate's
+own 881/881 count exactly) mirrors the reference's own proof-certificate
+theorems (T-DIV-V1..V5, T-ROUTER, T-DISTINCT, T-DIV3-CONSTRUCTION,
+T-DIV3-CORRECT, T-PHI3) rather than re-running the Python original. Verified:
+full `npm test` (4501/4501, up from 4432), lint, and `check-claims` (every
+new export documented in `project/docs/INPUTS_OUTPUTS.md`) all green.
+
+## Resolved: correctness audit findings (owner-requested, 2026-08-14)
+
+Requested as "analyze deeply the app, check correctness, everything." Seven
+parallel independent audits (core BigInt arithmetic, ledger/timescale/
+producer, house-system math, interpretation logic, the React/UI layer, test-
+suite integrity, CI/docs consistency) each verified their subsystem by
+actually computing/re-deriving results rather than reading and assuming —
+brute-forcing edge cases against independent oracles, hand-deriving
+formulas from spherical-astronomy first principles, cross-checking classical
+tables against real sources. Confirmed findings, all fixed and covered by
+new regression tests:
+
+- **`ascMc()` silently returned the Descendant (180° error) above ~66.56°
+  latitude** (`tools/ephemeris/houses.js`) — reachable at real inhabited
+  latitudes (verified failing at Tromsø, Norway, 69.6°N), not just a
+  theoretical polar edge case. The module's own docs had claimed it stayed
+  correct at any latitude; that was true about not crashing, false about
+  staying right. Now throws `PolarLatitudeError` at the same 66.56°
+  boundary Placidus/Koch/Alcabitius already use. Regiomontanus, Campanus,
+  and Topocentric inherit the same guard, since their angular cusps are
+  exact identities of `ascMc()`'s output — `POLAR_FALLBACK_POLICY` updated
+  from "soft" to "hard" for all three.
+- **`porphyryCusps()` had no polar guard and silently corrupted cusps**
+  (`src/core/variants.js`) — a hardcoded quadrant-traversal order valid
+  only when MC leads ASC by more than half the ring (true for every
+  non-polar chart, false beyond ~66.56°); violated its own documented
+  "twelve arcs sum to exactly one ring" invariant. Now throws a new
+  `DegenerateAnglesError` instead of returning corrupted cusps.
+- **Lot of Courage's day/night formulas were swapped**
+  (`src/present/astro-core.js`) — classical is day = Asc+Fortune−Mars,
+  night = Asc+Mars−Fortune; code had it backwards, the only one of the
+  seven Hellenistic lots not following its siblings' shared pattern.
+- **Participating triplicity ruler (`TRIP_PART`) wrong for Fire/Earth/Air**
+  (`src/present/astro-core.js`) — only Water was correct; Fire and Air each
+  duplicated their own night-ruler (itself a red flag: a triplicity is
+  supposed to have three distinct rulers). Never tested before this pass.
+- **`applyingPhase` misclassified applying-vs-separating for fast Moon
+  aspects** (`src/present/astro-core.js`) — used a whole-day forward-Euler
+  step to decide direction, which overshoots and reports the wrong phase
+  whenever the current orb is smaller than a day's relative motion (common
+  for Moon aspects at this app's default 2-8° orbs, since the Moon's
+  relative speed is typically 11-15°/day). Now uses a 1-minute step.
+- **`SynastryScreen` only checked the user's own `timeUnknown`, never the
+  partner's** (`app.jsx`) — a direct sibling of the exact bug class fixed
+  in the `agent.jsx` opt-out work: `dstNote` correctly ORs both charts,
+  `timeUnknown` didn't, so the "houses unreliable" banner could be silently
+  absent while the partner's house overlays were shown as fact.
+- **House/ASC/MC data displayed unconditionally in several UI surfaces
+  despite `chart.timeUnknown`** (`card.jsx`, `session.jsx`, `app.jsx`'s
+  `Header`/`TraditionalPanel`, `synastry-view.jsx`'s house overlays) —
+  `readings.jsx` correctly withheld this per WP-29, but the card front
+  face, cinematic stage, spread header, dignities table, and hemisphere/
+  quadrant counts didn't. Each now shows a placeholder/caveat instead.
+- **A free-text date field in the Tweaks panel bypassed DST/timezone
+  resolution entirely** (`app.jsx`'s `NatalTweaks`) — built an offset-less
+  ISO string that `new Date()` parses in the *browser's* local timezone,
+  so the same typed date/time silently produced a different chart
+  depending on which machine ran the page. Now anchored to UTC explicitly
+  (this panel has no city/timezone selector to resolve a "real" local
+  time against, unlike `landing.jsx`; the fix removes the
+  machine-dependent non-determinism, it doesn't claim to reconstruct a
+  birth city's local time).
+- **`no-float-audit.js`'s decimal-literal regex missed bare-dot floats**
+  (`.5`, not just `0.5`) — a real gap in Mandate A1's mechanical
+  enforcement; the negative self-test never exercised it either. Both
+  fixed; the browser and Node gates share this one module, so both
+  updated together automatically.
+
+Lower-severity items fixed in the same pass: the ledger admission gate
+(`import-ledger.js`) wasn't actually checking `certificate.notes` (schema-
+required) or that `event_id`/`body`/`source.*` were strings, not just
+present — none of it reached real astronomical data, but it's now checked;
+`accuracy.test.js`'s Moon tolerance (120″, ~8x the observed 15.4″ worst
+case) was tightened to the same flat 60″ every other body uses, since the
+stated "Moon deserves more slack" reasoning was never tied to an actual
+number for this fixture; three stale documentation numbers (`tools/
+README.md`'s file inventory, README's house-cusp accuracy figure, a
+hardware-dependent bench number in this file) were corrected.
+
+All fixes verified: full `npm test` (4432/4432), `npm run lint`,
+`npm run test:accuracy`, `node tools/validate-ledgers.mjs`, and
+`node scripts/check-claims.mjs` all green; the UI-layer fixes additionally
+driven in a real Chromium session (local React/React-DOM/Babel substituted
+for the network-blocked CDN) confirming the `timeUnknown` suppression,
+synastry partner-banner fix, and Tweaks-panel date field all behave
+correctly with zero console errors.
+
+## Resolved: agent.jsx opt-out (owner-requested, 2026-08-12)
 
 ## Done (verified, committed)
 
@@ -199,7 +335,10 @@ plan deliberately left for the repo owner rather than resolving unilaterally.
       gates CI at 3× the target for variance headroom. **Observed:** every
       threshold passes by 2+ orders of magnitude (full chart ~1.3ms vs
       250ms target; single-body ~0.04ms vs 5ms; aspect scan ~0.01ms vs
-      10ms). Ring-sweep wall time (~272ms) reported informationally.
+      10ms). Ring-sweep wall time reported informationally, not gated —
+      it's genuinely hardware-dependent (observed ~110-270ms across
+      different runs/machines in this project's history) rather than a
+      figure worth pinning to one number here.
 - [x] **WP-22** Port `tests.jsx` to CLI — all ~20 browser-only suites
       (155 assertions) ported faithfully to `project/test/present/` across
       4 files, split by actual source module (`astro-core.js`, `astro.jsx`
@@ -303,7 +442,67 @@ tree caught nothing broken here, but it's the only check that would have.
 Every package has run `--fix` + verify as a mandatory last step since; keep
 doing this.
 
-## Flagged for owner decision
+## Resolved: agent.jsx opt-out (owner-requested, 2026-08-12)
+
+The owner picked option (b) from the list below: add a standalone-reachable
+toggle rather than flipping the default or leaving it as a disclosure only.
+Two things were true before this fix, and both had to be addressed:
+
+1. **No reachable control.** The only in-repo `agentOn` toggle lived inside
+   `tweaks-panel.jsx`'s host-only edit-mode panel — unreachable without a
+   host iframe (as originally flagged below).
+2. **The toggle didn't actually gate every call site**, discovered while
+   fixing (1) by re-reading every `useAgentReading`/`useAgentChartReading`/
+   `useSynastryReading`/`interpretSynastryAspect` call site rather than
+   assuming the existing `settings.agentOn` checks were complete:
+   `session.jsx`'s `ReadingSession` (the main cinematic reading screen,
+   including its next-card pre-warm `interpretCard` call) and `card.jsx`'s
+   `CardBack` called the agent unconditionally, ignoring `agentOn`
+   entirely. `synastry-view.jsx`'s per-aspect `SynAspectDetail` had the same
+   gap. Only `app.jsx`'s `Spread`/`Synthesis` and the synastry overview
+   reading actually checked the setting. Adding a toggle without fixing
+   these would have been cosmetic — flipping it off would not have stopped
+   most of the outbound calls.
+
+**What changed:**
+- `landing.jsx` gained a real checkbox ("Send my birth data to the AI
+  'Agent interpreter'…") next to the privacy note, wired to `agentOn` via
+  new `agentOn`/`onToggleAgent` props threaded from `app.jsx`'s `App()` —
+  reachable *before* the first automatic call the note warns about, in both
+  the primary and partner (synastry) forms.
+- `app.jsx`'s `Header` (full-spread screen), `session.jsx`'s
+  `SessionHeader` (main reading screen), and `synastry-view.jsx`'s header
+  each gained an `agent` `hdr-pill` toggle, matching the existing
+  `rigorous`/`prime layer` pill convention, so the setting is visible and
+  reachable mid-session too, not just at the landing form.
+- `session.jsx`, `card.jsx`, and `synastry-view.jsx` now gate every agent
+  call site on `agentOn`/`settings.agentOn !== false` (previously only
+  `app.jsx` did). Turning the toggle off now genuinely stops all outbound
+  `window.claude.complete()` calls, not just the ones on one screen.
+- Turning the agent off degrades to the existing local, non-AI reading
+  (`readingFor()` from `readings.jsx`) rather than a blank or terse
+  placeholder — `session.jsx`'s `CinematicStage` previously showed only a
+  bare `element · modality · dignity` placeholder when there was no agent
+  text; it now shows the same structured local reading `card.jsx` already
+  used. `card.jsx`'s own fallback had a related bug fixed in passing: its
+  error branch's own text said "reading from local fallback" but the
+  `!agent.error` condition on the fallback render meant it never actually
+  rendered one on error — fixed so the local reading now shows in both the
+  off and the errored-while-on cases, matching what the message promises.
+- Default (`DEFAULT_SETTINGS.agentOn = true` in `app.jsx`) intentionally
+  left unchanged — the ask was a working opt-out, not a different default.
+
+Verified by reading every changed call site directly (not trusting a
+self-report) and by rebuilding+viewing the standalone bundle
+(`project/tools/build-standalone.mjs` → `project/dist/standalone.html`) in
+a real browser to confirm the checkbox and pills render, toggle, and that
+`npm test`/`npm run lint` stay green (this is presentation-layer `.jsx`
+wiring — outside what the Node test suite covers by convention, same as
+the rest of `app.jsx`/`session.jsx`/`card.jsx`).
+
+---
+
+## Flagged for owner decision (historical — resolved above)
 
 > **RESOLVED 2026-08-15.** The LLM birth-data item below was decided by the
 > repo owner: option (a), flip the default. `DEFAULT_SETTINGS.agentOn` is now

@@ -31,9 +31,15 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   }, []);
 
   const current = cards[pos];
-  // Gated on settings.agentOn — this call site previously ignored it, so a
-  // reading session sent birth data to the LLM regardless of the setting.
-  const agent   = useAgentReading(current, chart, shuffled && !!current && settings.agentOn === true);
+  // `=== true`, not `!== false`: DEFAULT_SETTINGS.agentOn is opt-in now, so a
+  // settings object that simply lacks the key must read as OFF.
+  const agentOn = settings.agentOn === true;
+  const agent   = useAgentReading(current, chart, agentOn && shuffled && !!current);
+  // Local, non-AI fallback — used whenever the agent is off (or errors),
+  // so turning the "Agent interpreter" off degrades to a real reading
+  // instead of the bare element/modality/dignity placeholder. With the
+  // opt-in default this is now the ORDINARY path, not the exception.
+  const localReading = $sUseMemo(() => current && readingFor(current, chart), [current, chart]);
 
   // Voice
   const voice = useVoice({
@@ -60,8 +66,8 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   // Pre-warm next
   const nextCard = cards[pos + 1];
   $sUseEffect(() => {
-    if (nextCard) interpretCard(nextCard, chart).catch(() => {});
-  }, [nextCard && nextCard.idx]);
+    if (agentOn && nextCard) interpretCard(nextCard, chart).catch(() => {});
+  }, [agentOn, nextCard && nextCard.idx]);
 
   // Auto-advance
   $sUseEffect(() => {
@@ -89,6 +95,8 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         voiceBlocked={voice.blocked}
         onToggleVoice={handleVoiceToggle}
         onUnblockVoice={() => { primeSpeech(); voice.unblock && voice.unblock(); }}
+        agentOn={agentOn}
+        onToggleAgent={() => setTweak('agentOn', !agentOn)}
       />
 
       {!shuffled
@@ -96,7 +104,9 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         : <CinematicStage
             key={current.idx}
             card={current}
+            timeUnknown={!!chart.timeUnknown}
             agent={agent}
+            localReading={localReading}
             pos={pos}
             total={cards.length}
             voiceOn={settings.voiceOn}
@@ -128,7 +138,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
 // ──────────────────────────────────────────────────────────────────────
 // CINEMATIC STAGE
 // ──────────────────────────────────────────────────────────────────────
-function CinematicStage({ card, agent, pos, total, voiceOn, voiceSpeaking, onSpeakNow }) {
+function CinematicStage({ card, timeUnknown, agent, localReading, pos, total, voiceOn, voiceSpeaking, onSpeakNow }) {
   const p = card.principal;
 
   return (
@@ -150,7 +160,7 @@ function CinematicStage({ card, agent, pos, total, voiceOn, voiceSpeaking, onSpe
           <span className="cs-planet-glyph">{p.glyph}</span>
           <span className="cs-title">{p.name} in {card.name}</span>
           {p.retrograde && <span className="cs-retro">℞</span>}
-          <span className="cs-house">House {roman(card.house)}</span>
+          <span className="cs-house">{timeUnknown ? "House —" : `House ${roman(card.house)}`}</span>
           <span className="cs-dig cs-dig-{card.dignity.kind}">{card.dignity.kind}</span>
         </div>
 
@@ -162,12 +172,17 @@ function CinematicStage({ card, agent, pos, total, voiceOn, voiceSpeaking, onSpe
               <span className="cs-loading-dot" style={{animationDelay:"0.6s"}} />
             </div>
           )}
-          {agent.error && <p className="cs-error">interpreter unavailable</p>}
+          {agent.error && <p className="cs-error">interpreter unavailable — reading from local fallback</p>}
           {agent.text && <WordReveal text={agent.text} resonance={card.resonance} />}
-          {!agent.loading && !agent.text && !agent.error && (
-            <p className="cs-placeholder">
-              {card.element} · {card.modality} · {card.dignity.kind}
-            </p>
+          {!agent.loading && !agent.text && localReading && (
+            <div className="cs-local-reading">
+              {localReading.body.map((line, i) => (
+                <p key={i} className="cs-local-line">
+                  {line.text}
+                  <span className="cs-source-tag"> — {line.sourceTag}</span>
+                </p>
+              ))}
+            </div>
           )}
         </div>
 
@@ -245,7 +260,8 @@ function ShuffleAnimation() {
 }
 
 function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onBack,
-                         voiceOn, voiceSpeaking, voiceBlocked, onToggleVoice }) {
+                         voiceOn, voiceSpeaking, voiceBlocked, onToggleVoice,
+                         agentOn, onToggleAgent }) {
   const d = new Date(chart.birth.dateISO);
   const dateStr = isNaN(d) ? "—" : d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" });
   const timeStr = isNaN(d) ? "—" : d.toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit" });
@@ -271,6 +287,16 @@ function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onBack,
           <span className="hdr-voice-label">
             {voiceBlocked ? "tap to enable" : voiceOn ? "voice on" : "voice off"}
           </span>
+        </button>
+        <button
+          className={`hdr-pill ${agentOn ? "is-on" : ""}`}
+          onClick={onToggleAgent}
+          title={agentOn
+            ? "Agent interpreter on — sends birth data to Claude for each reading. Click to turn off."
+            : "Agent interpreter off — readings stay local. Click to turn on."}
+          aria-pressed={agentOn}
+        >
+          agent
         </button>
         {onOpenSynastry && (
           <button className="hdr-pill hdr-pill-syn" onClick={onOpenSynastry}>synastry</button>

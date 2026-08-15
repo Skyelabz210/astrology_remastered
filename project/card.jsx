@@ -105,13 +105,15 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
                   fill="none" stroke="currentColor" strokeWidth="0.15" strokeOpacity="0.55" />
           </svg>
 
-          {/* corner marks */}
+          {/* corner marks — the house number depends on a real birth time
+              (Ascendant-anchored whole-sign houses); with timeUnknown, show
+              a placeholder rather than a specific house as fact. */}
           <div className="zc-corner zc-tl">
-            <div className="zc-house">{roman(card.house)}</div>
+            <div className="zc-house">{chart && chart.timeUnknown ? "—" : roman(card.house)}</div>
             <div className="zc-glyph-mini">{card.glyph}</div>
           </div>
           <div className="zc-corner zc-br">
-            <div className="zc-house">{roman(card.house)}</div>
+            <div className="zc-house">{chart && chart.timeUnknown ? "—" : roman(card.house)}</div>
             <div className="zc-glyph-mini">{card.glyph}</div>
           </div>
 
@@ -172,9 +174,8 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
 function CardBack({ card, chart, settings, active }) {
   const reading  = readingFor(card, chart);   // synchronous fallback / skeleton
   const math     = rigorousFor(card, chart);
-  // Gated on settings.agentOn like every other LLM entry point. This call
-  // site previously keyed only on `active` (card flipped), so flipping a
-  // card sent birth data to the LLM even with the agent interpreter off.
+  // `=== true`, not `!== false`: DEFAULT_SETTINGS.agentOn is opt-in now, so a
+  // settings object that simply lacks the key must read as OFF.
   const agent    = useAgentReading(card, chart, active && settings.agentOn === true);
 
   return (
@@ -206,7 +207,7 @@ function CardBack({ card, chart, settings, active }) {
             <p className="zc-agent-error">agent unavailable — reading from local fallback.</p>
           )}
           {agent.text && <p className="zc-agent-text">{agent.text}</p>}
-          {!agent.loading && !agent.text && !agent.error && reading.body.map((line, i) => (
+          {!agent.loading && !agent.text && reading.body.map((line, i) => (
             <p key={i} className="zc-fallback-line">
               {line.text}
               <span className="zc-source-tag"> — {line.sourceTag}</span>

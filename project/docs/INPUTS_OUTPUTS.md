@@ -211,7 +211,8 @@ ring.
 | `wholeSignHouse(x, asc, offset)` | fn(`bigint,bigint,bigint`) → `bigint` (1–12) | exact |
 | `equalHouse(x, origin)` | fn(`bigint,bigint`) → `bigint` (1–12) | exact |
 | `vehlowHouse(x, asc)` | fn(`bigint,bigint`) → `bigint` (1–12) | exact, ASC at house-1 midpoint |
-| `porphyryCusps(asc, mc)` | fn(`bigint,bigint`) → `bigint[12]` cusps | exact integer trisection with remainder distribution — every cusp stays on the arcsecond lattice |
+| `porphyryCusps(asc, mc)` | fn(`bigint,bigint`) → `bigint[12]` cusps, throws `DegenerateAnglesError` | exact integer trisection with remainder distribution — every cusp stays on the arcsecond lattice; throws instead of silently corrupting the partition if MC does not lead ASC by more than half the ring (the ordinary case for every non-polar chart — see the function's own comment) |
+| `DegenerateAnglesError` | class extends `Error` | thrown by `porphyryCusps` for the degenerate (asc, mc) case above; carries `.asc`/`.mc` |
 | `FIRDARIA_YEARS` / `VIMSHOTTARI_YEARS` | arrays | `{lord, years}` time-lord tables |
 | `totalYears(table)` | fn(array) → `bigint` | |
 | `VARIANTS` | array | one entry per tradition: `{id, name, tradition, frame, houses, aspects, divisions, note}` |
@@ -406,6 +407,40 @@ basis) preserves i.i.d. lane independence.
 | `parkingReport(basis, parked, power=1n)` | `bigint[]`, `bigint[]`, `bigint` | `LANE_OCCUPANCY_V1` — shell/anchor moduli, coprimality, `admissible` |
 | `parkedRecover(r, s, M, A)` | `bigint` × 4 | `bigint` — K mod A; throws if M not coprime to A |
 | `parkedRecoverFrom(x, M, A)` | `bigint` × 3 | `bigint` — same, from the integer |
+
+### div-chimera.js
+
+The Division Chimera: exact integer division `a/d` for an arbitrary divisor
+`d`, entirely in residue space, by five distinct mechanisms that all reach
+the same quotient (V1–V5), plus two distortion-catalog constructs riding on
+the same primitives (DIV³, Φ³). Ported from the external CRAM reference
+implementation's `div_family.py` (`cram_review_20260616`, 2026-07-22) — see
+that package's `PROOF_CERTIFICATE.md` Part V/VI for the formal theorems this
+module's own test suite (`test/div-chimera.test.js`) mirrors. Genuinely new
+relative to `cram.js`/`identity.js`: those recover a WINDING NUMBER K from
+an integer and an anchor; this module divides an integer by an arbitrary
+divisor, lane by lane, never leaving residue space.
+
+| Function | Params | Returns / Throws |
+|---|---|---|
+| `ROOT_OPS` | — | `["add","sub","id","neg","mul","div","sqr","inv"]` — the 8-operator alphabet, degree ≤ 2 |
+| `CHIMERA_ROLES` | — | `Map<bigint,string>` — the Four-Division Chimera's lane-role labels over `basis.js#B8`; informational only |
+| `DEFAULT_ANCHORS` | — | `bigint[]` — `[23n,29n,31n,37n,41n]`, V3's default auxiliary anchors |
+| `DEFAULT_ALT_BASIS` | — | `bigint[]` — `[23n,29n,31n,37n,41n,43n]`, V5's default alternate basis |
+| `NonExactDivisionError` | `class extends Error`, `new NonExactDivisionError(aVal, d)` | thrown whenever `d` does not evenly divide the dividend; carries `.aVal`/`.d` |
+| `DivisorNotCoprimeError` | `class extends Error`, `new DivisorNotCoprimeError(message)` | thrown when a variety's coprimality precondition on the divisor fails (V1/V4-homogeneous: `gcd(d,M)≠1`; V3: no candidate anchor coprime to `d`; V5: alternate basis not coprime to `d`) |
+| `laneOp(op, a, b, p)` | `op: string` (one of `ROOT_OPS`), `a,b,p: bigint` | `?bigint` — one root operator, exact mod `p`; `div`/`inv` return `null` when undefined there |
+| `v1KElim(aVal, d, basis)` | `aVal,d: bigint` (`d>0`), `basis: bigint[]` | `{q, alpha}` — V1, the flagship: `gcd(d,shellModulus(basis))=1` and `d\|aVal` required; throws `NonExactDivisionError`/`DivisorNotCoprimeError` |
+| `v2FpdFused(aVal, bVal, d, basis)` | `bigint`s, `basis: bigint[]` | `{q, alpha}` — V2: `(aVal·bVal)/d` as one multiplication + one V1-style division; throws `NonExactDivisionError` if `d` doesn't divide the product |
+| `v3FpdAnchors(aVal, d, anchors=DEFAULT_ANCHORS)` | `aVal,d: bigint`, `anchors: bigint[]` | `{q, reads: Map<bigint,bigint>}` — V3: quotient residues read directly through each coprime anchor; throws `NonExactDivisionError`/`DivisorNotCoprimeError` |
+| `v4LanewiseDivHomogeneous(aVal, d, basis)` | `aVal,d: bigint`, `basis: bigint[]` | `{tray, expect}` — V4 homogeneous: every lane runs `div` against the unit divisor `d`; `expect` is the in-ring value `(aVal·d⁻¹) mod M`; throws `DivisorNotCoprimeError` if `d` is not a unit mod `shellModulus(basis)` |
+| `v4LanewiseDivHeterogeneous(aVal, bVal, ops, basis)` | `bigint`s, `ops: string[]` (one `ROOT_OPS` entry per lane), `basis: bigint[]` | `{tray, mask}` — V4 heterogeneous: a distinct operator per lane, in-ring, `mask[i]` false where `tray[i]` is `null` |
+| `transduceLane(gamma, K, M, b)` | `bigint`s | `bigint` — `(gamma + K·M) mod b`, exact for arbitrary `b` coprime to `M` or not (the bare formula V5 uses; see `cram.js#transduce` for the richer state-object form) |
+| `v5Transduced(aVal, d, homeBasis, altBasis=DEFAULT_ALT_BASIS)` | `aVal,d: bigint`, `basis: bigint[]` × 2 | `{q, resHome}` — V5: transduces the carried magnitude to `altBasis` (coprime to `d`), divides there via V1, transduces the quotient home; throws `NonExactDivisionError`/`DivisorNotCoprimeError` |
+| `route(aVal, d, basis)` | `aVal,d: bigint` (`d` may be negative or zero), `basis: bigint[]` | `{variety: "V1_k_elim"\|"V5_transduced", q}` — dispatches to V1 when `gcd(\|d\|,M)=1`, else V5; handles sign via absolute-value routing; throws `"division by zero"` at `d=0n`, `NonExactDivisionError` otherwise |
+| `div3Mul(a, b, p)` | `bigint`s | `?bigint` — `(a·b) mod p` synthesized as `DIV(1,DIV(DIV(1,a),b))`, zero `mul` anywhere; `null` unless both `a`,`b` are units mod `p` |
+| `div3Schema(aVal, bVal, basis)` | `bigint`s, `basis: bigint[]` | `(?bigint)[]` — `div3Mul` applied lanewise |
+| `phi3Certify(aVal, bVal, d, basis)` | `bigint`s, `basis: bigint[]` | `{q, discrepancies}` — Φ³ triple certification of the division event `(aVal·d)/d`; `discrepancies===0n` on a correct implementation (also cross-checks `div3Mul` against plain multiplication on every lane where both operands are units) |
 
 ### fixture.js
 
@@ -616,18 +651,18 @@ Midheaven, used by all of them) and a float Porphyry cross-check. Every
 
 | Export | Signature | Notes |
 |---|---|---|
-| `PolarLatitudeError` | `class extends Error`, `new PolarLatitudeError(latDeg, systemLabel="Placidus")` | thrown by Placidus/Koch/Alcabitius when `\|latDeg\| > 66.56°` (≈ 90° − mean obliquity); ecliptic longitudes are circumpolar at that latitude so the semi-arc trisection has no real solution. Not thrown by `ascMc()`. |
-| `ascMc(jdUt1, jdTt, latDeg, lngDeg)` | `number` × 4 → `{ascDeg, mcDeg}` | Ascendant/Midheaven, float degrees `[0,360)` |
+| `PolarLatitudeError` | `class extends Error`, `new PolarLatitudeError(latDeg, systemLabel="Placidus")` | thrown by `ascMc`, Placidus, Koch, Alcabitius, Regiomontanus, Campanus, and Topocentric when `\|latDeg\| > 66.56°` (≈ 90° − mean obliquity). Placidus/Koch/Alcabitius: ecliptic longitudes are circumpolar at that latitude so the semi-arc trisection has no real solution (a domain limit). `ascMc`/Regiomontanus/Campanus/Topocentric: corrected from an earlier version that didn't throw — `ascMc`'s atan2 branch was found to silently return the Descendant (a 180° error) beyond this latitude for some RAMC values, and the other three inherit it since their angular cusps are exact identities of `ascMc()`. |
+| `ascMc(jdUt1, jdTt, latDeg, lngDeg)` | `number` × 4 → `{ascDeg, mcDeg}`, throws `PolarLatitudeError` above 66.56° | Ascendant/Midheaven, float degrees `[0,360)` |
 | `placidusCusps(jdUt1, jdTt, latDeg, lngDeg)` | same signature → `number[12]` | semi-arc trisection (iterative); throws `PolarLatitudeError` above 66.56° |
 | `kochCusps(...)` | same | Midheaven-declination-based semi-arc variant; same 66.56° limit |
 | `alcabitiusCusps(...)` | same | non-iterative closed form using the Ascendant's declination; same 66.56° limit; cusps 1/4/7/10 = ASC/IC/DSC/MC exactly |
-| `regiomontanusCusps(...)` | same | equator-based; cusp1===ASC and cusp10===MC exactly by construction; no polar throw |
-| `campanusCusps(...)` | same | prime-vertical-based; house1/house10 exact identities; no polar throw |
-| `topocentricCusps(...)` | same | Polich-Page scaled-latitude approximation to Placidus; no `asin()`, never throws `PolarLatitudeError` |
-| `meridianCusps(...)` | same | pure function of RAMC+obliquity (no latitude dependence); cusp10===MC exactly; cusp1 is the "equatorial ascendant", NOT the true ASC |
-| `morinusCusps(...)` | same | ecliptic-pole projection variant of Meridian; no latitude dependence; none of cusp1/4/7/10 match `ascMc()` |
+| `regiomontanusCusps(...)` | same | equator-based; cusp1===ASC and cusp10===MC exactly by construction; throws `PolarLatitudeError` above 66.56° (cusp1 inherits ascMc()'s failure mode) |
+| `campanusCusps(...)` | same | prime-vertical-based; house1/house10 exact identities; throws `PolarLatitudeError` above 66.56° (same reason as Regiomontanus) |
+| `topocentricCusps(...)` | same | Polich-Page scaled-latitude approximation to Placidus; no `asin()`, but cusps 1/4/7/10 are ascMc()'s ASC/IC/DSC/MC exactly, so it throws `PolarLatitudeError` above 66.56° the same as the others |
+| `meridianCusps(...)` | same | pure function of RAMC+obliquity (no latitude dependence); cusp10===MC exactly; cusp1 is the "equatorial ascendant", NOT the true ASC; never throws |
+| `morinusCusps(...)` | same | ecliptic-pole projection variant of Meridian; no latitude dependence; none of cusp1/4/7/10 match `ascMc()`; never throws |
 | `porphyryCuspsFloat(ascDeg, mcDeg)` | `number, number` → `number[12]` | float cross-check of the exact-integer `src/core/variants.js#porphyryCusps` |
-| `POLAR_FALLBACK_POLICY` | `Object<string, {validLatRange, enforced, fallback}>` | per-system polar-latitude guidance table (`enforced: "hard"\|"soft"\|"none"`); also published to `window.HousesPolicy` in a browser context |
+| `POLAR_FALLBACK_POLICY` | `Object<string, {validLatRange, enforced, fallback}>` | per-system polar-latitude guidance table; `enforced` is `"hard"` for Placidus/Koch/Alcabitius/Regiomontanus/Campanus/Topocentric (all six now actually throw at the table's stated boundary) or `"none"` for Meridian/Morinus (no latitude dependence at all); also published to `window.HousesPolicy` in a browser context |
 
 All angle parameters/returns are float **degrees**, `[0, 360)` unless noted;
 `latDeg` is geographic latitude (north positive), `lngDeg` is geographic

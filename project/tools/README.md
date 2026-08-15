@@ -66,15 +66,23 @@ expect a stale copy to be committed):
 
 - **CSS** (`styles.css`, `hcrm.css`) — inlined as `<style>`.
 - **JSX pages** (`astro.jsx`, `cities.jsx`, `globe.jsx`, `landing.jsx`,
-  `hcrm.jsx`, `hcrm-view.jsx`, `hcrm-app.jsx`) — pre-transpiled with
-  `@babel/core` + `@babel/preset-react` (classic runtime, matching
-  babel-standalone's `data-presets="react"` behavior) and inlined as plain
-  `<script>`.
-- **`core-shim.js` / `tzresolve.js`** (real ES modules, importing the
-  `src/core/`/`src/ledger/` graph) — bundled into a single IIFE with
-  `esbuild` (`buildSync`, `bundle: true, format: "iife"`) and inlined as a
-  plain `<script>`, so `window.HCRM_CORE` / `window.TzResolve` are populated
-  with no runtime `import` left at all.
+  `errors.jsx`, `hcrm.jsx`, `hcrm-view.jsx`, `hcrm-app.jsx`) —
+  pre-transpiled with `@babel/core` + `@babel/preset-react` (classic
+  runtime, matching babel-standalone's `data-presets="react"` behavior) and
+  inlined as plain `<script>`. This list is NOT hardcoded in the build
+  script (which walks the live page's own `<script type="text/babel">`
+  tags) — it is written out here only as documentation of what's currently
+  on the page; if `HCRM Console.html` gains or drops a `.jsx` script tag,
+  update this list to match rather than trusting it's still accurate.
+- **`core-shim.js` / `tzresolve.js` / `validate.js` /
+  `tools/ephemeris/houses.js` / `src/present/astro-core.js`** (real ES
+  modules, importing the `src/core/`/`src/ledger/` graph) — bundled into a
+  single IIFE per module with `esbuild` (`buildSync`, `bundle: true, format:
+  "iife"`) and inlined as a plain `<script>`, so `window.HCRM_CORE` /
+  `window.TzResolve` / `window.Validate` / `window.HousesPolicy` /
+  `window.AstroCore` are populated with no runtime `import` left at all.
+  Same caveat as the JSX list above: this is the current
+  `<script type="module">` tag list, not a hardcoded input to the build.
 - **`vendor/astronomy.browser.min.js`** — inlined verbatim (already a plain
   UMD script, WP-17).
 - **React / ReactDOM** — swapped from the live page's

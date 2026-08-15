@@ -14,6 +14,10 @@ import { CORE_MANIFEST, auditSource } from "./no-float-audit.js";
 // Each planted snippet is a float construct Mandate A1 forbids in src/core.
 const PLANTED = [
   "const x = 0.5",
+  "const x = .5", // bare-dot form of the same literal — a real gap once
+                  // found: FLOAT_PATTERNS' original decimal-literal regex
+                  // required a digit before the "." and never matched this.
+  "return a * -.25 + b",
   "Math.floor(y)",
   "Number(z)",
   "parseFloat(s)",

@@ -164,6 +164,35 @@ itself never claims to be finished in the scientific sense.
 **Assertions 4404 → 4498; 31 → 33 suites.** Every gate re-run green: `npm test`,
 `npm run lint`, `check-claims`, `bench --assert`, `validate-ledgers`.
 
+### Merge with `main` (PR #14 and predecessors)
+
+`main` moved while this branch was open, and two of its changes interact
+directly with the work above:
+
+- **The LLM opt-out was fixed there too, differently** — a real, always-reachable
+  checkbox on the landing form, plus gating at every call site. That is the
+  better mechanism and it is kept in full. This branch contributes the other
+  half: the default is `false`, and every gate reads `agentOn === true` rather
+  than `!== false`, so a settings object missing the key fails closed. Reachable
+  toggle *and* opt-in default.
+- **`ascMc()` now throws `PolarLatitudeError` above |lat| = 66.56°** — a real
+  correctness fix (it previously returned the Descendant, a 180° error, verified
+  at Tromsø). Combined with the wiring above, that would have taken down every
+  chart at those latitudes, which WP-19 deliberately made reachable by removing
+  the ±66° entry clamp. `astro.jsx` now catches only that error and falls back,
+  so a polar chart still builds; the **Midheaven stays exact** there (it is
+  latitude-independent, so it is computed at latitude 0 and never trips the
+  guard), planetary positions are untouched, and any other error from the solver
+  still propagates rather than being silently swallowed. `window.ascendantIsExactAt()`
+  reports whether a given chart's Ascendant came from the solver, alongside
+  WP-19's existing polar banner. 17 assertions in `angles.test.js` cover it.
+
+The Ascendant at |lat| > 66.56° therefore remains **approximate and flagged** —
+a genuine open limitation, not a fix. Closing it means deciding what a correct
+Ascendant is at those latitudes, which is a design question, not a bug.
+
+**Merged totals: 4612/4612 assertions, 34 suites, 21/21 core modules float-free.**
+
 The ASC gate was verified to have teeth by reverting the wiring and confirming
 the new suite fails 32 assertions, then restoring it.
 

@@ -10,7 +10,7 @@ of 1,296,000; every lane is a BigInt residue; every claim is either exhaustively
 swept or explicitly marked open.
 
 ```
-4498/4498 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 20/20 core modules float-free
+4612/4612 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 **Before taking any claim below at face value, read:**
@@ -102,7 +102,7 @@ Four layers, with a hard rule about which ones floats are allowed in:
                  ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │ CORE           project/src/core/ — BigInt only, Mandate A1            │
-│  basis.js, shell-kelim.js, ring.js, variants.js, … (20 modules)       │
+│  basis.js, shell-kelim.js, ring.js, variants.js, … (21 modules)       │
 │  no floats, no Math.*, no Date, no Number()/parseFloat/parseInt,      │
 │  no decimal literals — mechanically enforced by the no-float audit    │
 └──────────────────────────────────────────────────────────────────────┘
@@ -132,13 +132,15 @@ ledger — that path is specific to the exact-register demo); otherwise it
 falls back to a synthetic orbital model and sets `window.EPHEMERIS_MODE =
 "SYNTHETIC"` so the UI can badge it honestly.
 
-One presentation-layer behavior is a **disclosed, unresolved item for the
-repo owner**, not something this package (or any package in the plan) tries
-to resolve: `agent.jsx`'s optional LLM chart-interpretation feature is
-on by default and sends raw birth data to it, with no reachable
-off-switch in a standalone deployment. Full detail, options, and why it was
-left as a disclosed finding rather than silently changed: see
-["Flagged for owner decision" in `project/docs/EXECUTION_STATUS.md`](project/docs/EXECUTION_STATUS.md#flagged-for-owner-decision).
+`agent.jsx`'s optional LLM chart-interpretation feature defaults to on and
+sends raw birth data to it (`window.claude.complete()`). This was originally
+shipped as a disclosed, unresolved finding — no reachable off-switch existed
+in a standalone deployment, and (found while fixing it) some screens ignored
+the in-repo toggle entirely. Both gaps are now fixed: a real checkbox on the
+landing form and an `agent` toggle pill on every reading screen turn it off,
+and every agent call site now honors that setting, falling back to the
+existing local, non-AI reading. Full history: see ["Resolved: agent.jsx
+opt-out" in `project/docs/EXECUTION_STATUS.md`](project/docs/EXECUTION_STATUS.md#resolved-agentjsx-opt-out-owner-requested-2026-08-12).
 
 ---
 
@@ -154,17 +156,20 @@ time — the `accuracy` job in
   Horizons (DE441) apparent geocentric ecliptic-of-date longitudes at 20
   reference instants spanning 1700–2050
   (`project/test/fixtures/reference-vectors.json`). Tolerance: **≤ 60″**
-  for Sun/Mercury/Venus/Mars/Jupiter/Saturn/Uranus/Neptune/Pluto, **≤ 120″**
-  for the Moon (astronomy-engine's lunar theory vs. DE441, documented in
-  `project/test/accuracy.test.js`). Observed: worst single-point error
-  **~29.5″ (Pluto)**; worst per-body mean error **~10.4″ (Neptune)** — both
-  well inside tolerance.
+  for every body, Moon included (documented in
+  `project/test/accuracy.test.js`, including why the Moon no longer gets a
+  separate, wider budget). Observed: worst single-point error **~29.5″
+  (Pluto)**; worst per-body mean error **~10.4″ (Neptune)**; Moon's own
+  worst single-point error **~15.4″** — all well inside tolerance.
 - **House cusps** (`tools/ephemeris/houses.js`: Placidus, Koch,
   Regiomontanus, Campanus, Alcabitius, Topocentric, Morinus, Meridian,
   Porphyry) — checked against genuine Swiss Ephemeris (`pyswisseph`) output
   across 5 charts × 8 systems × 12 cusps. Tolerance: **≤ 30″**. Observed
-  worst case: **~12.5″**, attributed uniformly to a mean-vs-true-obliquity
-  difference (confirmed not a per-system bug).
+  worst case: **~12.4″**, attributed uniformly to a mean-vs-true-obliquity
+  difference (confirmed not a per-system bug). Above ~66.56° latitude,
+  Placidus/Koch/Alcabitius/Regiomontanus/Campanus/Topocentric refuse
+  outright (`PolarLatitudeError`) rather than return a number at all — see
+  `tools/ephemeris/houses.js`'s `POLAR_FALLBACK_POLICY`.
 - **Retrograde/station timing** — 5 published stationary instants (Mercury,
   Mars, Venus; 2022–2023): the sign of the computed speed flips within
   ±36 h of each published instant, and `retrograde ≡ (speed < 0)` holds

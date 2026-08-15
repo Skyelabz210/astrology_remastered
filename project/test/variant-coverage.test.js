@@ -24,7 +24,7 @@ import {
   FIRDARIA_YEARS, VIMSHOTTARI_YEARS, totalYears,
   frame, division, variant, variantReport, allVariantReports,
   toFrame, fromFrame, separation, signIndex, wholeSignHouse, equalHouse,
-  vehlowHouse, porphyryCusps, ARCSEC_PER_SIGN, ARCSEC_PER_DEGREE,
+  vehlowHouse, porphyryCusps, DegenerateAnglesError, ARCSEC_PER_SIGN, ARCSEC_PER_DEGREE,
 } from "../src/core/variants.js";
 import { divisionClosure, divisionShadow } from "../src/core/shadow-spine.js";
 
@@ -163,6 +163,47 @@ export function run() {
     t("Porphyry: cusp 1 = ASC, cusp 4 = IC, cusp 7 = DSC, cusp 10 = MC",
       cusps[0] === asc && cusps[3] === mod(mc + RING / 2n, RING)
       && cusps[6] === mod(asc + RING / 2n, RING) && cusps[9] === mc);
+  }
+  {
+    // Regression: porphyryCusps() used to hardcode the ASC->IC->DSC->MC
+    // traversal order unconditionally. That's correct only when MC leads
+    // ASC by more than half the ring (the ordinary, non-polar case) — when
+    // it doesn't (asc=mc here is the most degenerate instance: MC leads by
+    // exactly 0), the old code silently produced cusps whose arcs summed to
+    // a multiple of the ring instead of exactly one ring. It must now throw
+    // instead of silently corrupting the partition.
+    const asc = 200000n, mc = 200000n; // MC leads ASC by 0 — squarely degenerate
+    let threw = null;
+    try {
+      porphyryCusps(asc, mc);
+    } catch (e) {
+      threw = e;
+    }
+    t("Porphyry: degenerate asc===mc throws DegenerateAnglesError instead of corrupting cusps",
+      threw instanceof DegenerateAnglesError, threw ? threw.name : "no throw");
+
+    // MC leading by exactly half the ring (asc and mc antipodal) is the
+    // other degenerate boundary — also must throw, not silently produce
+    // zero-width quadrants.
+    const asc2 = 200000n, mc2 = mod(asc2 + RING / 2n, RING);
+    let threw2 = null;
+    try {
+      porphyryCusps(asc2, mc2);
+    } catch (e) {
+      threw2 = e;
+    }
+    t("Porphyry: MC exactly opposite ASC also throws DegenerateAnglesError",
+      threw2 instanceof DegenerateAnglesError, threw2 ? threw2.name : "no throw");
+
+    // Just past the boundary (MC leads by half-the-ring + 1″) must NOT
+    // throw and must still tile the ring exactly — confirms the guard's
+    // threshold doesn't over-reject valid input.
+    const asc3 = 200000n, mc3 = mod(asc3 + RING / 2n + 1n, RING);
+    const cusps3 = porphyryCusps(asc3, mc3);
+    let sum3 = 0n;
+    for (let i = 0; i < 12; i++) sum3 += mod(cusps3[(i + 1) % 12] - cusps3[i], RING);
+    t("Porphyry: just past the degenerate boundary does NOT throw and still tiles the ring exactly",
+      cusps3.length === 12 && sum3 === RING, "Σ arcs = " + sum3.toString() + "″");
   }
 
   // ── Vedic / Jyotiṣa ───────────────────────────────────────────────

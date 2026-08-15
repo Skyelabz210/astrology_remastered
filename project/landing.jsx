@@ -139,7 +139,7 @@ function SearchablePicker({ label, value, options, onChange, placeholder }) {
   );
 }
 
-function Landing({ initial, onCast, mode, onBack }) {
+function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
   const isPartner = mode === "partner";
   const isHcrm = mode === "hcrm";
   const pad = (n) => String(n).padStart(2, "0");
@@ -369,31 +369,46 @@ function Landing({ initial, onCast, mode, onBack }) {
             {/* Privacy note — wording audited against the actual code, not
                 aspirational. Verified by `grep -rn "fetch(\|XMLHttpRequest\|sendBeacon"
                 project/*.jsx`: zero hits anywhere in the app, so chart math
-                itself never makes a network call.
-                The one genuine egress path is agent.jsx's
-                `window.claude.complete(prompt)`, whose prompt (agent.jsx
-                buildChartPrompt) embeds the raw birth date, latitude and
-                longitude verbatim.
-                WP-20 flagged that this was ON BY DEFAULT with no reachable
-                off-switch in a standalone deployment, and left the decision
-                to the repo owner. Resolved: DEFAULT_SETTINGS.agentOn is now
-                `false` (app.jsx), so nothing is sent unless the feature is
-                deliberately switched on. Three call sites that consulted the
-                flag only partially — card.jsx's CardBack (keyed on the flip
-                alone), session.jsx's reading session (keyed on shuffle
-                alone), and synastry-view.jsx (`!== false`, which defaulted to
-                ON when the key was absent) — are now gated on an explicit
-                `agentOn === true`, so no path can send birth data while the
-                setting reads off. See docs/COMPLETION_AUDIT.md section 4.
-                The toggle itself (tweaks-panel.jsx's SubstrateTweaks) is
-                still only reachable via the host frame's
-                `__activate_edit_mode` postMessage; that is now a way to turn
-                the feature ON rather than the only way to turn it off, so it
-                no longer leaves a standalone user without recourse. */}
+                itself never makes a network call. The one genuine egress
+                path is agent.jsx's `window.claude.complete(prompt)` — used
+                by the "Agent interpreter" narrative reading. Its prompt
+                (agent.jsx buildChartPrompt) includes the raw birth date,
+                latitude and longitude verbatim, and for the natal
+                chart-level reading it fires automatically the moment a
+                chart resolves, with no extra click — i.e. right after this
+                form is submitted.
+                Two things close the WP-20 finding together, and both are
+                needed. (1) The checkbox below is a real, always-reachable
+                control, offered *before* the automatic call this note
+                warns about, wired to the same `agentOn` setting and
+                threaded through so every screen that calls the agent
+                (session, full spread, synastry) honors it — replacing the
+                host-only tweaks-panel toggle that a standalone deployment
+                could never open. (2) `DEFAULT_SETTINGS.agentOn` is `false`,
+                so the feature is opt-in: nothing is sent unless the reader
+                ticks the box. Every gate reads `agentOn === true` rather
+                than `!== false`, so a settings object missing the key fails
+                closed. See project/docs/COMPLETION_AUDIT.md section 4 and
+                EXECUTION_STATUS.md's "Flagged for owner decision". */}
+            {!isHcrm && (
+              <label className="lf-check">
+                <input
+                  type="checkbox"
+                  checked={agentOn === true}
+                  onChange={(e) => onToggleAgent && onToggleAgent(e.target.checked)}
+                />
+                <span>
+                  Send my birth data to the AI "Agent interpreter" for a spoken-style reading
+                  (leaving this unchecked uses the local, non-AI reading — nothing leaves your browser)
+                </span>
+              </label>
+            )}
             <p className="lf-privacy">
               {isHcrm
                 ? "Every register value on this console — positions, residues, houses — is computed entirely in your browser; nothing about your birth data is sent anywhere. The register map does not use the AI \"Agent interpreter\" feature at all."
-                : "Chart math — positions, houses, aspects, dignities — is computed entirely in your browser; none of it is sent anywhere. The optional \"Agent interpreter\" reading is the one feature that would send " + (isPartner ? "the name you enter above and both charts' computed placements" : "your birth date, time, and location") + " to Claude (Anthropic); it is turned OFF by default, so nothing leaves your browser unless you switch it on."}
+                : "Chart math — positions, houses, aspects, dignities — is computed entirely in your browser; none of it is sent anywhere. " + (agentOn === true
+                    ? "Because you ticked the checkbox above, right after you submit this form this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "your birth date, time, and location") + " to Claude (Anthropic) to generate the spoken-style \"Agent interpreter\" reading — untick it to keep everything local."
+                    : "The checkbox above is off by default, so nothing is sent to Claude (Anthropic) — every reading uses the local, non-AI text instead.")}
             </p>
           </form>
         </section>

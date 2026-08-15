@@ -144,6 +144,63 @@ export async function run() {
       houseSystem: "whole", sect: "auto",
     }).asc));
 
+  // ── Polar latitudes ────────────────────────────────────────────────────
+  // houses.js ascMc() throws PolarLatitudeError above |lat| = 66.56° (a
+  // correctness fix: it used to return the Descendant, a 180° error). WP-19
+  // deliberately removed the ±66° entry clamp, so those latitudes ARE
+  // reachable from the form — letting the throw escape would take down the
+  // whole chart, including planetary positions that are perfectly valid
+  // there. astro.jsx catches it and falls back; these assertions pin that a
+  // polar chart still builds, that the MC stays exact anyway (it is
+  // latitude-independent), and that the fallback is honestly reported.
+  const POLAR = [
+    ["Tromsø 69.6°N", 69.6492, 18.9553],
+    ["Longyearbyen 78.2°N", 78.2232, 15.6267],
+    ["McMurdo 77.8°S", -77.8419, 166.6863],
+  ];
+  const polarISO = "2010-02-14T06:15:00Z";
+  const polarDate = new Date(polarISO);
+
+  t("sub-polar latitude still gets the exact Ascendant",
+    sandbox.ascendantIsExactAt(polarDate, 64.1466, -21.9426) === true);
+
+  for (const [label, lat, lng] of POLAR) {
+    let chart = null, threw = null;
+    try {
+      chart = computeNatal({ dateISO: polarISO, lat, lng, houseSystem: "whole", sect: "auto" });
+    } catch (e) { threw = e; }
+
+    t(`${label} · chart builds instead of throwing`, threw === null && chart !== null,
+      threw ? `${threw.name}: ${threw.message}` : "");
+    if (!chart) continue;
+
+    t(`${label} · Ascendant is reported as NOT exact`,
+      sandbox.ascendantIsExactAt(polarDate, lat, lng) === false);
+    t(`${label} · Ascendant is still a finite number`, Number.isFinite(chart.asc));
+
+    // The MC does not depend on latitude, so it must remain exact even where
+    // the Ascendant cannot be computed. This is the half worth keeping.
+    const mcRef = housesModule.ascMcFromDate(polarDate, 0, lng).mcDeg;
+    t(`${label} · Midheaven stays exact`,
+      Math.abs(circDiffDeg(chart.mc, mcRef)) < IDENTITY_TOL_DEG,
+      `mc=${chart.mc.toFixed(6)} ref=${mcRef.toFixed(6)}`);
+
+    // Planetary positions are latitude-independent and must be unaffected.
+    t(`${label} · planets still computed`, chart.planets.length > 0 &&
+      chart.planets.every((p) => Number.isFinite(p.lon)));
+  }
+
+  // A non-polar error must NOT be swallowed by that catch.
+  {
+    const boom = new Error("unrelated failure");
+    const probe = makeSandbox();
+    probe.Houses = { ...housesModule, ascMcFromDate: () => { throw boom; } };
+    let caught = null;
+    try { probe.ascendantDeg(polarDate, 40, -74); } catch (e) { caught = e; }
+    t("a non-polar solver error propagates rather than silently falling back",
+      caught === boom, caught ? `got ${caught.message}` : "nothing thrown");
+  }
+
   // ── Declination / out-of-bounds ────────────────────────────────────────
   // planetDeclination() took longitude alone, implying beta = 0 for every
   // body, which caps |dec| at eps = 23.4393 deg — below the 23.45 deg

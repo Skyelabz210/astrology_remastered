@@ -350,16 +350,37 @@ export function run() {
       errAt66 ? `unexpectedly threw ${errAt66.name}` : ""
     );
 
-    // ascMc is documented to remain valid at high latitude (only Placidus
-    // truly breaks down) — confirm it does not throw at the same lat=75
-    // input that makes placidusCusps throw.
-    let ascMcThrew = false;
+    // ascMc() beyond 66.56° silently returns the Descendant (180° error)
+    // for some RAMC values instead of the true Ascendant — an earlier
+    // version of this module claimed ascMc() stays correct at high
+    // latitude and left it unguarded; that claim was false (verified
+    // failing for real at Tromsø, Norway, 69.6°N), so it now throws the
+    // same as Placidus/Koch/Alcabitius.
+    let ascMcThrew = null;
     try {
       ascMc(jdUt1, jdTt, 75, 0);
-    } catch {
-      ascMcThrew = true;
+    } catch (e) {
+      ascMcThrew = e;
     }
-    t("ascMc(latDeg=75) does NOT throw (documented design: ASC/MC stay defined at high latitude)", !ascMcThrew);
+    t(
+      "ascMc(latDeg=75) throws PolarLatitudeError (corrected: no longer silently wrong)",
+      ascMcThrew instanceof PolarLatitudeError,
+      ascMcThrew ? `threw ${ascMcThrew.name}` : "no exception thrown"
+    );
+
+    let ascMcOkAt66 = true;
+    let ascMcErrAt66 = null;
+    try {
+      ascMc(jdUt1, jdTt, 66.5, 0);
+    } catch (e) {
+      ascMcOkAt66 = false;
+      ascMcErrAt66 = e;
+    }
+    t(
+      "ascMc(latDeg=66.5) does NOT throw (below the 66.56° threshold)",
+      ascMcOkAt66,
+      ascMcErrAt66 ? `unexpectedly threw ${ascMcErrAt66.name}` : ""
+    );
   }
 
   // ── Determinism ──────────────────────────────────────────────────
@@ -501,15 +522,24 @@ export function run() {
     }
   }
 
-  // ── Koch / Alcabitius throw PolarLatitudeError beyond 66.56° ────────
-  // Same domain argument as Placidus (see PolarLatitudeError's class
-  // comment in houses.js): both use asin(tan(lat)*tan(dec)) for a
-  // declination bounded by +-obliquity, so the identical 66.56 deg
-  // threshold applies.
+  // ── Koch / Alcabitius / Regiomontanus / Campanus / Topocentric throw
+  // PolarLatitudeError beyond 66.56° ───────────────────────────────────
+  // Koch/Alcabitius: asin(tan(lat)*tan(dec)) for a declination bounded by
+  // +-obliquity, the same domain argument as Placidus (see
+  // PolarLatitudeError's class comment in houses.js).
+  // Regiomontanus/Campanus/Topocentric: their angular cusps (1/4/7/10) are
+  // exact identities of ascMc(), which was found to silently return the
+  // Descendant (a 180° error) for some RAMC values beyond this same
+  // latitude — corrected from an earlier version of this test, which
+  // asserted these three must NOT throw even at high latitude on the
+  // mistaken premise that they were latitude-safe ("soft"/no polar limit).
   {
     for (const [name, fn] of [
       ["koch", kochCusps],
       ["alcabitius", alcabitiusCusps],
+      ["regiomontanus", regiomontanusCusps],
+      ["campanus", campanusCusps],
+      ["topocentric", topocentricCusps],
     ]) {
       let threw = null;
       try {
@@ -529,16 +559,17 @@ export function run() {
       t(`${name}Cusps(latDeg=66.5) does NOT throw (below threshold)`, okAt66);
     }
 
-    // The 5 "soft" systems must NOT throw even at high latitude (see
-    // POLAR_FALLBACK_POLICY — they stay numerically defined).
-    for (const name of ["regiomontanus", "campanus", "topocentric", "meridian", "morinus"]) {
+    // Meridian and Morinus have no latitude dependence at all (see their
+    // comments — pure functions of RAMC and obliquity) — they genuinely
+    // must not throw even at high latitude.
+    for (const name of ["meridian", "morinus"]) {
       let threw = null;
       try {
         NEW_SYSTEMS[name](jdUt1, jdTt, 80, 0);
       } catch (e) {
         threw = e;
       }
-      t(`${name}Cusps(latDeg=80) does NOT throw (soft/no polar limit per POLAR_FALLBACK_POLICY)`, threw === null, threw ? threw.message : "");
+      t(`${name}Cusps(latDeg=80) does NOT throw (no latitude dependence)`, threw === null, threw ? threw.message : "");
     }
   }
 
@@ -560,8 +591,14 @@ export function run() {
       );
     }
     t(
-      "hard-enforced entries (placidus, koch, alcabitius) match the actual throw threshold",
-      ["placidus", "koch", "alcabitius"].every((id) => POLAR_FALLBACK_POLICY[id].enforced === "hard" && POLAR_FALLBACK_POLICY[id].validLatRange[1] === 66.56)
+      "hard-enforced entries match the actual throw threshold",
+      ["placidus", "koch", "alcabitius", "regiomontanus", "campanus", "topocentric"].every(
+        (id) => POLAR_FALLBACK_POLICY[id].enforced === "hard" && POLAR_FALLBACK_POLICY[id].validLatRange[1] === 66.56
+      )
+    );
+    t(
+      "meridian/morinus are the only entries with enforced !== \"hard\" (no latitude dependence)",
+      ["meridian", "morinus"].every((id) => POLAR_FALLBACK_POLICY[id].enforced === "none")
     );
   }
 

@@ -167,12 +167,20 @@
 // points (those whose declination approaches ± the obliquity) become
 // circumpolar or never-rising — |tan(φ)·tan(δ)| can exceed 1, and the
 // semi-arc trisection this algorithm depends on has no solution for those
-// longitudes. ascMc() does NOT throw: the ASC/MC formulas above remain
-// mathematically well-defined (no division/asin blow-up) for any |latDeg|
-// short of exactly 90°, so per the brief's own guidance ("ASC is actually
-// still defined at high latitudes in most cases") this module leaves ascMc
-// unrestricted and documents the difference here rather than throwing
-// pre-emptively.
+// longitudes. ascMc() ALSO throws beyond this latitude (a correction to an
+// earlier version of this module, which claimed the ASC/MC formulas stay
+// correct up to ±90° because they never divide by zero or feed asin() an
+// out-of-domain value). That claim was true about not blowing up, but false
+// about staying CORRECT: beyond 66.56°, for RAMC ranges where the true
+// rising point's declination approaches ±obliquity (worst case near the
+// solstice colures, RAMC≈88–92°/268–272°), the atan2 branch this formula
+// follows crosses over to the antipodal point and silently returns the
+// DESCENDANT instead — a full 180° error, not a gradual one, and reachable
+// at real inhabited latitudes (verified failing for several hours a day at
+// Tromsø, Norway, 69.6°N). Since ascMc() has no way to numerically detect
+// which branch it's on, and the other quadrant systems below already
+// establish the convention of refusing outright past this same boundary
+// rather than risking a silently-wrong answer, ascMc() now does the same.
 
 import { gastDeg, meanObliquityDeg, ttFromUtc } from "./timescale.js";
 
@@ -184,18 +192,21 @@ const MAX_ITERATIONS = 100;
 const CONVERGENCE_TOL_DEG = 1e-7;
 
 /**
- * Thrown by placidusCusps(), kochCusps(), and alcabitiusCusps() when
- * |latDeg| exceeds the latitude beyond which their semi-arc/ascensional-
- * difference construction is undefined for some ecliptic longitudes (see
- * the module header for why). All three share the identical mathematical
- * root cause: each computes asin(tan(latDeg)·tan(δ)) for a declination δ
- * that is itself bounded by ±obliquity (Placidus: the sought cusp's own
- * declination varies over the whole ecliptic, up to ±ε; Koch: δ is the
- * Midheaven's declination, also an ecliptic point, so also bounded by ±ε;
- * Alcabitius: δ is the Ascendant's declination, likewise ±ε) — so the exact
- * same 66.56° ≈ 90°-ε threshold applies to all three, not just Placidus.
- * Not thrown by ascMc(), whose formulas remain well-defined at these
- * latitudes — see module header.
+ * Thrown by placidusCusps(), kochCusps(), alcabitiusCusps(), ascMc(),
+ * regiomontanusCusps(), campanusCusps(), and topocentricCusps() when
+ * |latDeg| exceeds the latitude beyond which their construction is
+ * undefined (Placidus/Koch/Alcabitius) or empirically wrong for some
+ * ecliptic longitudes/RAMC values (ascMc() and the three systems that
+ * derive their angular cusps from it) — see the module header for why.
+ * Placidus/Koch/Alcabitius share the identical mathematical root cause:
+ * each computes asin(tan(latDeg)·tan(δ)) for a declination δ that is itself
+ * bounded by ±obliquity (Placidus: the sought cusp's own declination varies
+ * over the whole ecliptic, up to ±ε; Koch: δ is the Midheaven's declination,
+ * also an ecliptic point, so also bounded by ±ε; Alcabitius: δ is the
+ * Ascendant's declination, likewise ±ε) — so the exact same 66.56° ≈ 90°-ε
+ * threshold applies to all three, not just Placidus. ascMc()'s failure mode
+ * is different (an atan2 branch flip, not an asin domain error) but empirically
+ * shares the same 66.56° threshold — see module header.
  */
 export class PolarLatitudeError extends Error {
   constructor(latDeg, systemLabel = "Placidus") {
@@ -285,8 +296,12 @@ function ramcDeg(jdUt1, jdTt, lngDeg) {
  * @param {number} latDeg - geographic latitude, degrees, north positive.
  * @param {number} lngDeg - geographic longitude, degrees, EAST positive.
  * @returns {{ascDeg: number, mcDeg: number}}
+ * @throws {PolarLatitudeError} if |latDeg| > 66.56 — see module header.
  */
 export function ascMc(jdUt1, jdTt, latDeg, lngDeg) {
+  if (Math.abs(latDeg) > POLAR_LATITUDE_LIMIT_DEG) {
+    throw new PolarLatitudeError(latDeg, "Ascendant/Midheaven");
+  }
   const theta = ramcDeg(jdUt1, jdTt, lngDeg); // RAMC
   const eps = meanObliquityDeg(jdTt);
 
@@ -499,9 +514,16 @@ function stepFromMc(houseNumber1to12) {
  * which lies in the same N/S/meridian plane), cusp10 === ascMc().mcDeg —
  * both EXACT identities of the construction, not just close numerically
  * (see test file for the assertion; residual there is float round-off/
- * timescale-model noise only, not a formula approximation).
+ * timescale-model noise only, not a formula approximation). Because cusp1
+ * is exactly ascMc()'s Ascendant, it inherits the same 180°-error failure
+ * mode beyond 66.56° — see PolarLatitudeError's class comment — hence the
+ * same guard.
+ * @throws {PolarLatitudeError} if |latDeg| > 66.56.
  */
 export function regiomontanusCusps(jdUt1, jdTt, latDeg, lngDeg) {
+  if (Math.abs(latDeg) > POLAR_LATITUDE_LIMIT_DEG) {
+    throw new PolarLatitudeError(latDeg, "Regiomontanus");
+  }
   const theta = ramcDeg(jdUt1, jdTt, lngDeg);
   const eps = meanObliquityDeg(jdTt);
   const cusps = [];
@@ -522,9 +544,14 @@ export function regiomontanusCusps(jdUt1, jdTt, latDeg, lngDeg) {
  * Regiomontanus. House 1 (v=0, East point) and house 10 (v=90, zenith) are
  * exact identities for the same reason as Regiomontanus's (East point is on
  * the true horizon; zenith is on the true meridian) — see that function's
- * comment.
+ * comment. Same 66.56° guard as Regiomontanus, same reason (cusp1 inherits
+ * ascMc()'s Ascendant).
+ * @throws {PolarLatitudeError} if |latDeg| > 66.56.
  */
 export function campanusCusps(jdUt1, jdTt, latDeg, lngDeg) {
+  if (Math.abs(latDeg) > POLAR_LATITUDE_LIMIT_DEG) {
+    throw new PolarLatitudeError(latDeg, "Campanus");
+  }
   const theta = ramcDeg(jdUt1, jdTt, lngDeg);
   const eps = meanObliquityDeg(jdTt);
   const cusps = [];
@@ -665,12 +692,16 @@ export function kochCusps(jdUt1, jdTt, latDeg, lngDeg) {
  * pattern (no iteration, no asin) matches structurally. Verified against
  * swisseph at two northern charts and one southern-hemisphere chart,
  * matching within a few arcseconds (the file-wide noise floor — see module
- * header) at every cusp. Unlike Placidus/Koch/Alcabitius this formula has
- * no asin() and never throws PolarLatitudeError — see POLAR_FALLBACK_POLICY
- * for the practical (not hard-mathematical) high-latitude caveat that still
- * applies.
+ * header) at every cusp. Cusps 1/4/7/10 are ascMc()'s ASC/IC/DSC/MC exactly,
+ * so — despite this formula's own trisection steps having no asin() —
+ * it inherits and now guards against ascMc()'s 66.56° failure boundary the
+ * same as the systems above.
+ * @throws {PolarLatitudeError} if |latDeg| > 66.56.
  */
 export function topocentricCusps(jdUt1, jdTt, latDeg, lngDeg) {
+  if (Math.abs(latDeg) > POLAR_LATITUDE_LIMIT_DEG) {
+    throw new PolarLatitudeError(latDeg, "Topocentric");
+  }
   const { ascDeg, mcDeg } = ascMc(jdUt1, jdTt, latDeg, lngDeg);
   const theta = ramcDeg(jdUt1, jdTt, lngDeg);
   const eps = meanObliquityDeg(jdTt);
@@ -789,31 +820,31 @@ export function porphyryCuspsFloat(ascDeg, mcDeg) {
  * at every latitude including exactly +-90°, since it depends only on
  * which sign the Ascendant/each body falls in, not on rise/set geometry).
  *
- * "hard" entries (Placidus, Koch, Alcabitius) are enforced in code: the
- * functions above throw PolarLatitudeError at exactly this boundary,
+ * "hard" entries (Placidus, Koch, Alcabitius, Regiomontanus, Campanus,
+ * Topocentric) are all enforced in code: the functions above throw
+ * PolarLatitudeError at exactly this boundary. Placidus/Koch/Alcabitius
  * because their asin(tan(lat)*tan(dec)) construction has no real solution
  * beyond it for some ecliptic longitudes (see PolarLatitudeError's class
- * comment) — this is a genuine mathematical domain limit.
+ * comment) — a genuine domain limit. Regiomontanus/Campanus/Topocentric
+ * because their angular cusps (1/4/7/10) are exact identities of ascMc(),
+ * which itself was found to silently return the Descendant instead of the
+ * Ascendant (a 180° error, not a domain blow-up) for some RAMC values
+ * beyond this same latitude — a correction to an earlier version of this
+ * table, which had labeled these three "soft" on the mistaken assumption
+ * that "doesn't throw" meant "stays correct."
  *
- * "soft" entries (Regiomontanus, Campanus, Topocentric, Meridian, Morinus)
- * do NOT throw here — their formulas stay numerically defined (no asin,
- * only tan(lat) which blows up only exactly at +-90°) — but this codebase
- * still recommends the same 66.56 deg practical cutoff, because house
- * widths become increasingly extreme and the geometric construction
- * increasingly degenerate well before +-90° for all of them (this is the
- * commonly cited practical guidance for quadrant house systems generally,
- * not a claim of a hard mathematical breakdown at this exact latitude for
- * these five — the honest distinction from the "hard" entries above is
- * itself the point of labeling both kinds in one table rather than
- * silently blurring them).
+ * "none" entries (Meridian, Morinus) have no latitude dependence at all —
+ * their formulas are a pure function of RAMC and obliquity, verified by
+ * inspection of their derivations (see each function's comment) — so there
+ * is nothing to guard.
  */
 export const POLAR_FALLBACK_POLICY = {
   placidus: { validLatRange: [-POLAR_LATITUDE_LIMIT_DEG, POLAR_LATITUDE_LIMIT_DEG], enforced: "hard", fallback: "WholeSign" },
   koch: { validLatRange: [-POLAR_LATITUDE_LIMIT_DEG, POLAR_LATITUDE_LIMIT_DEG], enforced: "hard", fallback: "WholeSign" },
   alcabitius: { validLatRange: [-POLAR_LATITUDE_LIMIT_DEG, POLAR_LATITUDE_LIMIT_DEG], enforced: "hard", fallback: "WholeSign" },
-  regiomontanus: { validLatRange: [-POLAR_LATITUDE_LIMIT_DEG, POLAR_LATITUDE_LIMIT_DEG], enforced: "soft", fallback: "WholeSign" },
-  campanus: { validLatRange: [-POLAR_LATITUDE_LIMIT_DEG, POLAR_LATITUDE_LIMIT_DEG], enforced: "soft", fallback: "WholeSign" },
-  topocentric: { validLatRange: [-POLAR_LATITUDE_LIMIT_DEG, POLAR_LATITUDE_LIMIT_DEG], enforced: "soft", fallback: "WholeSign" },
+  regiomontanus: { validLatRange: [-POLAR_LATITUDE_LIMIT_DEG, POLAR_LATITUDE_LIMIT_DEG], enforced: "hard", fallback: "WholeSign" },
+  campanus: { validLatRange: [-POLAR_LATITUDE_LIMIT_DEG, POLAR_LATITUDE_LIMIT_DEG], enforced: "hard", fallback: "WholeSign" },
+  topocentric: { validLatRange: [-POLAR_LATITUDE_LIMIT_DEG, POLAR_LATITUDE_LIMIT_DEG], enforced: "hard", fallback: "WholeSign" },
   meridian: { validLatRange: [-90, 90], enforced: "none", fallback: "WholeSign" },
   morinus: { validLatRange: [-90, 90], enforced: "none", fallback: "WholeSign" },
 };
