@@ -51,7 +51,7 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
       <div className="syn-top">
         {/* compatibility dial */}
         <div className="syn-dial-card">
-          <CompatibilityDial score={syn.score} ctm={syn.ctm} />
+          <CompatibilityDial score={syn.score} />
         </div>
 
         {/* the relationship synthesis */}
@@ -220,7 +220,7 @@ function SynAspectDetail({ hit, syn, A, B, agentOn }) {
   );
 }
 
-function CompatibilityDial({ score, ctm }) {
+function CompatibilityDial({ score }) {
   const pct = Math.round(score.ratio * 100);
   const R = 56, C = 2 * Math.PI * R;
   const harmArc = C * score.ratio;

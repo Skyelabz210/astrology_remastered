@@ -13,10 +13,20 @@
 //      node_modules/, .git/) and run its contents through importLedger()
 //      (project/src/ledger/import-ledger.js), which validates each entry
 //      against the ledger contract (schema shape, decimal-integer
-//      longitude_arcsec, known certificate.status, ...). No committed
-//      ledger fixtures exist yet at time of writing — that's fine, the
-//      script succeeds trivially and reports "0 ledger files found" rather
-//      than failing on an empty set.
+//      longitude_arcsec, known certificate.status, ...). If none are
+//      found, the script still succeeds and reports "0 ledger files
+//      found" rather than failing on an empty set — the schema check
+//      above is real either way, so an empty repo state is not itself a
+//      failure. But this job was blocking in CI for a long stretch while
+//      that was ALWAYS the actual case (see docs/COMPLETION_AUDIT.md §3
+//      item 7): "OK" never once meant "a real ledger passed," because none
+//      existed. test/fixtures/j2000-nyc-placidus.ledger.json — produced by
+//      this same repo's own tools/ephemeris/produce-ledger.mjs at
+//      2000-01-01T12:00:00Z / NYC, the same instant+location
+//      test/houses.test.js's SWISSEPH_REFERENCE.nyc_2000 cross-checks
+//      against Swiss Ephemeris — closes that gap: this job now genuinely
+//      exercises importLedger() on every run, and was confirmed to
+//      actually reject a corrupted entry before being committed.
 //
 // Exits non-zero if the schema fails its sanity check, if any discovered
 // ledger file fails to parse as JSON, or if importLedger() throws for any

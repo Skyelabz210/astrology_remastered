@@ -60,7 +60,7 @@ function buildCardPrompt(card, chart) {
           : `No active transit to ${p.name} within 2° right now.`,
       ];
     }
-  } catch (e) { /* live state optional */ }
+  } catch { /* live state optional */ }
 
   const lines = [
     `You are the reader of a chart. The mathematics has already run; the placements below are computed and fixed. Your task is to deliver the reading aloud — the way a fluent, experienced astrologer speaks when they sit across from someone and tell them what their chart shows. This is the STANDARD reading: spoken, synthesized, human.`,

@@ -196,7 +196,7 @@ Ascendant is at those latitudes, which is a design question, not a bug.
 The ASC gate was verified to have teeth by reverting the wiring and confirming
 the new suite fails 32 assertions, then restoring it.
 
-### Still open, deliberately
+### Still open, deliberately (as of the previous pass)
 
 Items 7, 10, 11 above (a schema job with nothing to validate, the crude
 void-of-course heuristic, the node dignity placeholder), everything in §4 other
@@ -204,14 +204,70 @@ than the LLM default, and the whole of §5. None is a correctness defect in a
 computed chart value; each is either a product decision or a disclosed scope
 boundary.
 
-## 7. Verdict
+## 7. Second remediation pass
+
+A follow-up request to "complete all remaining items" closed most of §3's
+open row and one of §4's, plus found a genuine crash the first pass's own
+work indirectly exposed a path to. Everything below re-verified against a
+clean `npm test` / `npm run lint` / `check-claims` / `bench --assert` /
+`validate-ledgers` run, same as the first pass.
+
+| # | Item | Resolution |
+|---|------|------------|
+| 3-item-7 | `schema-validate` validated zero files | `test/fixtures/j2000-nyc-placidus.ledger.json` — a real ledger, produced by this repo's own `produce-ledger.mjs` at the same instant+location `houses.test.js`'s Swiss Ephemeris reference already cross-checks, round-tripped through `importLedger()`. Verified the gate has teeth: a corrupted copy of it was rejected before the real fixture was committed. |
+| 3-item-10 | Void-of-course Moon counted any aspect, applying or separating | Now checks `aspectGrid`'s own `applyingPhase()` result — only a still-*applying* major aspect keeps the Moon "not VOC." Documented remaining approximation: it still doesn't check whether that aspect perfects *before* the Moon's sign change, which would need per-aspect root-finding this snapshot-based grid doesn't attempt. |
+| 3-item-11 | South Node's `.dignity` field called `dignityFor("Sun", ...)`, fabricating a Leo-domicile/Aries-exaltation/Aquarius-detriment/Libra-fall dignity a node doesn't classically carry | Calls `dignityFor("SouthNode", ...)` — neither `DOMICILE` nor `EXALT` has a node entry, so this was always available; it was simply never used. North Node was never affected (already routed through the generic per-planet call). |
+| §4 "Quadrant houses unreachable" | The picker offered only Whole/Equal; the 8 Swiss-Ephemeris-verified quadrant solvers had no presentation-layer caller | `tools/ephemeris/houses.js` gained `quadrantCuspsFromDate()`, dispatching to whichever of the 8 systems is requested; `astro-core.js` gained `houseForCusps()`, generalizing the existing whole/equal placement logic to an arbitrary 12-cusp array; `computeNatal()` routes every house-placement call site through both, falling back to Whole exactly per `POLAR_FALLBACK_POLICY` (polar latitude) or offline (module missing) — the same pattern the Ascendant fix established. The picker in `app.jsx` now offers all 9. **Not** touched: the picker still lives inside `TweaksPanel`, which stays behind the host-only `__activate_edit_mode` gate — an earlier adversarial pass on this same audit already adjudicated that gate as a deliberate, disclosed product decision (the LLM toggle got its own always-reachable control on the landing page precisely *because* the maintainer chose to carve that one setting out; house system was not similarly carved out here, and doing so unilaterally would be a UX call beyond "the backend now honors what the picker already offers"). |
+| — (found via the lint fix below, not in the original audit) | **A real crash**: `session.jsx` called a bare `primeSpeech()` at 3 call sites (voice on/off toggle, "tap to unblock," "speak now"); no `primeSpeech` was defined anywhere in the repo. `voiceOn` defaults to `false`, so no test or prior review ever exercised the path — the first user to click a voice control with narration enabled would have hit `ReferenceError: primeSpeech is not defined`. `voice.jsx`'s `useVoice()` gained `prime()` — the same gesture-unlock `retrigger()` already did, without also forcing an utterance, which is what each call site actually needed. Regression-tested with a minimal hook rig (no React-render infrastructure exists in this repo) asserting `prime()` does not call `speechSynthesis.speak` while `retrigger()` still does. |
+
+**§4's JSX lint carve-out — closed.** `eslint.config.mjs` excluded all 22
+`project/*.jsx` files with the stated reason "no parser is configured for
+it" — stale: flat-config ESLint's default parser handles JSX natively via
+`parserOptions.ecmaFeatures.jsx`. The real obstacle was `no-undef`: these
+files are classic `<script>` tags sharing one global namespace (not ES
+modules), so a symbol defined in one file reads as "not defined" in every
+other. Fixed by mechanically scanning all 22 files for their top-level
+bindings (not hand-typed — see the regeneration command now committed in
+`eslint.config.mjs`'s own comment) and declaring that ~280-name set as
+`globals` for the block, with `no-redeclare`'s documented `builtinGlobals:
+false` escape hatch so each file's own top-level declarations don't trip
+over the same names being globals. This is what surfaced the `primeSpeech`
+crash above, plus 26 smaller findings (dead code, an unused-but-still-
+passed `chart` prop, two `catch (err)` bindings nobody read, a stray regex
+escape, two stale `eslint-disable` comments) — all fixed. `no-empty` keeps
+`allowEmptyCatch: true` for this layer's `try { speechSynthesis.X(); }
+catch {}` convention (a deliberate best-effort pattern, not a swallowed
+bug). `npm run lint` now covers 98 files, up from 69, including every
+`.jsx` file, at 0 errors.
+
+**Still open, deliberately, after this pass:** the polar Ascendant (§6,
+unchanged — still a design question, not a bug), the LICENSE decision
+(§4, unchanged — a legal choice for the repo owner, not something to pick
+unilaterally), the `gastDeg` sub-arcsecond accuracy upgrade (§4,
+unchanged — would need external reference data to validate against, which
+this pass did not have access to; a low-quality "improvement" without
+verification infrastructure could make the documented accuracy claim
+*less* honest, not more), NorthNode/Chiron/Lilith staying synthetic in
+REAL mode (§4 — Chiron has no available closed-form or local ephemeris
+source; NorthNode/Lilith's existing linear-rate model was checked against
+the standard secular formulas' J2000 phase and period and found already
+close, so re-deriving it was low-value for the risk), the polar house
+warning's own reachability (a product-gating question, same reasoning as
+quadrant houses' picker above), and all of §5 (the standing mathematical
+register — open by design, not code).
+
+## 8. Verdict
 
 The remediation plan did what it said, and the honesty culture in this repo is
 unusually good — most of §4 exists because the project wrote it down itself.
 What the plan's "all 29 complete" did not cover is that **WP-11's deliverable
 never reached the product**: a verified solver was built, tested to 12.5″, and
 left unplugged behind a 100°-wrong approximation that no test compared against
-it. That is now fixed, along with eight other items, and the gate that should
-have caught it exists. The framework is not "100% complete" in the sense its
+it. That is now fixed, along with sixteen further items across two passes —
+including a real crash that had been sitting in the shipped voice-narration
+path since before this audit began, found only because turning lint on for
+the JSX layer was itself one of the items being completed — and the gates
+that should have caught each one now exist. The framework is not "100%
+complete" in the sense its
 status documents implied — §4 and §5 still stand, by design — but no chart it
 renders is silently wrong any more.

@@ -883,6 +883,52 @@ export function ascMcFromDate(date, latDeg, lngDeg) {
   return ascMc(jdUt1, ttFromUtc(jdUt1), latDeg, lngDeg);
 }
 
+// Dispatch table for the 8 quadrant house systems this module computes with
+// a real (jdUt1, jdTt, latDeg, lngDeg) solver, keyed exactly as
+// POLAR_FALLBACK_POLICY and project/validate.js's SYSTEM_LABELS already key
+// them — that table and this one were built together in WP-19 but the
+// presentation layer never had a caller to route through it. Porphyry,
+// Vehlow, and Equal-from-MC are deliberately excluded: they belong to the
+// exact-core/registry track (src/core/variants.js marks Porphyry "PROVEN",
+// a different admissibility class from these 8 "LEDGER" systems), not this
+// float dispatcher.
+const QUADRANT_CUSP_FNS = {
+  placidus: placidusCusps,
+  koch: kochCusps,
+  regiomontanus: regiomontanusCusps,
+  campanus: campanusCusps,
+  alcabitius: alcabitiusCusps,
+  topocentric: topocentricCusps,
+  meridian: meridianCusps,
+  morinus: morinusCusps,
+};
+
+/**
+ * The 12 house-cusp longitudes (float degrees, [0,360), cusps[0]=house 1)
+ * for one of the 8 quadrant systems above, computed for a JS Date the
+ * browser presentation layer already holds — the same convenience
+ * `ascMcFromDate()` gives the angles alone.
+ *
+ * @param {string} systemKey - one of the QUADRANT_CUSP_FNS keys.
+ * @param {Date} date - the birth/chart instant (UTC-based).
+ * @param {number} latDeg - geographic latitude, degrees, north positive.
+ * @param {number} lngDeg - geographic longitude, degrees, EAST positive.
+ * @returns {number[]} 12 cusp longitudes.
+ * @throws {PolarLatitudeError} for the 6 "hard" systems beyond
+ *   POLAR_LATITUDE_LIMIT_DEG (Meridian and Morinus never throw — see
+ *   POLAR_FALLBACK_POLICY's header comment on why they have no latitude
+ *   dependence at all).
+ * @throws {Error} if systemKey is not one of QUADRANT_CUSP_FNS's keys.
+ */
+export function quadrantCuspsFromDate(systemKey, date, latDeg, lngDeg) {
+  const fn = QUADRANT_CUSP_FNS[systemKey];
+  if (!fn) {
+    throw new Error(`quadrantCuspsFromDate: unknown system "${systemKey}" — expected one of ${Object.keys(QUADRANT_CUSP_FNS).join(", ")}`);
+  }
+  const jdUt1 = date.getTime() / 86400000 + 2440587.5;
+  return fn(jdUt1, ttFromUtc(jdUt1), latDeg, lngDeg);
+}
+
 // The publish was previously the policy table ALONE, on the reasoning that
 // the browser build did not compute quadrant houses. That left astro.jsx's
 // self-disclaimed "not a real solver" ascendant as the only ASC any page
@@ -905,6 +951,7 @@ if (typeof window !== "undefined") {
     meridianCusps,
     morinusCusps,
     porphyryCuspsFloat,
+    quadrantCuspsFromDate,
     PolarLatitudeError,
     POLAR_FALLBACK_POLICY,
   };

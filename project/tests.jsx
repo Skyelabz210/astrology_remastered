@@ -565,7 +565,7 @@ const SUITES = [
               dateISO: `${String(y).padStart(4,"0")}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}T${String(h).padStart(2,"0")}:00:00Z`,
               lat, lng, houseSystem: "whole", sect: "auto",
             });
-          } catch (e) { thrown++; }
+          } catch { thrown++; }
         }
         return expect(thrown).toBe(0);
       }],

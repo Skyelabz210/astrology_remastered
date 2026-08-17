@@ -5,8 +5,6 @@
 // their files up automatically once they exist, no edit needed here).
 //
 // Deliberately excluded:
-//   · project/*.jsx           — Babel-standalone JSX, not valid plain JS syntax;
-//                                no parser is configured for it here.
 //   · project/vendor/**       — third-party vendored code (arrives with WP-17),
 //                                not ours to lint.
 //   · project/*.js at the project root EXCEPT core-shim.js — api-ref.js,
@@ -19,6 +17,37 @@
 //     tooling-only package, so they stay unlinted for now. core-shim.js IS an
 //     ES module (import/export, `typeof window` guard) and lints clean, so it
 //     is included.
+//
+// project/*.jsx — no longer excluded. It used to be, on the reasoning
+// "Babel-standalone JSX, not valid plain JS syntax; no parser is configured
+// for it here" — true as far as it went, but flat-config ESLint's default
+// parser (espree) parses JSX natively once `parserOptions.ecmaFeatures.jsx`
+// is set; no separate JSX parser package was ever actually needed. See
+// docs/COMPLETION_AUDIT.md §4 ("lint excludes the whole JSX layer... 'lint
+// is clean' covers 69 files and none of the browser application code") for
+// why this was worth revisiting.
+//
+// The real obstacle was `no-undef`: these 22 files are classic <script>
+// tags sharing one global namespace (not ES modules — Babel-standalone
+// transpiles JSX to React.createElement but does not change module scope),
+// so a symbol defined in one file and used in another reads as "not
+// defined" to a file-at-a-time linter. JSX_GLOBALS below is every top-level
+// function/const/let/var/class binding across all of project/*.jsx,
+// generated mechanically (not hand-maintained) by scanning the files
+// themselves — see the regeneration command in its own comment. This keeps
+// no-undef genuinely meaningful (a real typo — a name matching nothing
+// anywhere — still fails) rather than either disabling the rule (silently
+// losing the exact class of bug it found the first time it ran: session.jsx
+// called a bare `primeSpeech()` that was never defined anywhere, a
+// guaranteed ReferenceError crash the instant a user clicked voice
+// controls) or hand-declaring ~280 names one at a time (error-prone in a
+// way a mechanical scan is not). Declaring a file's own top-level names as
+// globals for itself would normally trip `no-redeclare`; `builtinGlobals:
+// false` below is the documented escape hatch for exactly this shape of
+// setup. `no-empty`'s `allowEmptyCatch` covers this layer's
+// `try { window.speechSynthesis.X(); } catch {}` convention (voice.jsx,
+// landing.jsx) — a deliberate "best-effort, the Speech API is unreliable
+// across browsers" pattern, not a swallowed bug.
 //
 // Invocation note: `files`/`ignores` globs below are resolved relative to
 // process.cwd() at the moment eslint runs — NOT relative to this file's own
@@ -61,13 +90,96 @@ const NODE_GLOBALS = { ...ES_GLOBALS, ...globals.node };
 // instead of pulling in the full browser global set.
 const TEST_GLOBALS = { ...NODE_GLOBALS, location: "readonly" };
 
+// Every top-level function/const/let/var/class binding across all of
+// project/*.jsx, plus React/ReactDOM (loaded from a CDN <script> tag) and
+// the window.<Name> namespace objects the non-jsx dual-environment modules
+// publish (AstroCore, Astronomy, Contrast, HCRM_CORE, Houses, HousesPolicy,
+// TzResolve, Validate — accessed bare in these files because a browser
+// promotes `window.X` assignments to global identifiers). See the comment
+// above the `ignores` block for why this list exists at all.
+//
+// Regenerate with (repo root, after any *.jsx file gains/loses a top-level
+// binding another file depends on):
+//   python3 -c '
+//   import re, glob
+//   names = set()
+//   decl = re.compile(r"^(?:function|async function)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*\(", re.M)
+//   const = re.compile(r"^(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=", re.M)
+//   klass = re.compile(r"^class\s+([A-Za-z_$][A-Za-z0-9_$]*)", re.M)
+//   destr = re.compile(r"^const\s*\{\s*([^}]+?)\s*\}\s*=", re.M)
+//   for f in sorted(glob.glob("project/*.jsx")):
+//       src = open(f, encoding="utf-8").read()
+//       names |= set(decl.findall(src)) | set(const.findall(src)) | set(klass.findall(src))
+//       for m in destr.finditer(src):
+//           for part in m.group(1).split(","):
+//               part = part.strip()
+//               if not part: continue
+//               alias = part.split(":")[1].strip() if ":" in part else part
+//               alias = alias.split("=")[0].strip()
+//               if re.match(r"^[A-Za-z_$][A-Za-z0-9_$]*$", alias): names.add(alias)
+//   print(",".join(sorted(names)))
+//   '
+// A newly-added cross-file symbol missing from this list is NOT a silent
+// gap: no-undef fails loudly, in CI, on the file that references it — fix
+// by adding the one name, not by disabling the rule.
+const JSX_GLOBALS = {
+  "$cardUseCallback": "readonly", "$cardUseRef": "readonly", "$cardUseState": "readonly", "$hUseEffect": "readonly", "$hUseMemo": "readonly", "$hUseState": "readonly",
+  "$haMemo": "readonly", "$haState": "readonly", "$hvEffect": "readonly", "$hvMemo": "readonly", "$hvState": "readonly", "$sUseEffect": "readonly", "$sUseMemo": "readonly",
+  "$sUseRef": "readonly", "$sUseState": "readonly", "$synUseEffect": "readonly", "$synUseMemo": "readonly", "$synUseState": "readonly", "$useEffect": "readonly",
+  "$useMemo": "readonly", "$useState": "readonly", "A11yChartTable": "readonly", "ARCSEC_CIRCLE": "readonly", "ARCSEC_SIGN": "readonly",
+  "ASPECT_FAMILY_SOURCE_TAG": "readonly", "ASPECT_FN": "readonly", "ASPECT_SYMBOL": "readonly", "App": "readonly", "AstroCore": "readonly", "Astronomy": "readonly",
+  "BODY_LEDGER": "readonly", "BOUNDARY_LANE_NAMES": "readonly", "BalanceBar": "readonly", "Boundary": "readonly", "CITIES": "readonly", "CardBack": "readonly",
+  "CarryPropagation": "readonly", "ChartStatusBanners": "readonly", "CinematicStage": "readonly", "ClassLegend": "readonly", "CompatibilityDial": "readonly",
+  "Contrast": "readonly", "CramState": "readonly", "DEFAULT_CITY_KEY": "readonly", "DEFAULT_SETTINGS": "readonly", "DIGNITY_SOURCE_TAG": "readonly",
+  "DIGNITY_STATEMENT": "readonly", "DOMICILE": "readonly", "DialRing": "readonly", "Domain": "readonly", "DotmatrixGlobe": "readonly", "ELEMENT_FN": "readonly",
+  "EXALT": "readonly", "EdgeGraph": "readonly", "ErrorBanner": "readonly", "ErrorBoundary": "readonly", "FIXTURE_BIRTH": "readonly", "GEAR_ANCHORS": "readonly",
+  "HAAB_MONTHS": "readonly", "HBoundary": "readonly", "HCRMApp": "readonly", "HCRMConsole": "readonly", "HCRM_ASPECTS": "readonly", "HCRM_BASIS": "readonly",
+  "HCRM_CORE": "readonly", "HCRM_DEFAULTS": "readonly", "HOUSE_FUNCTION": "readonly", "HOUSE_SHORT": "readonly", "HOUSE_TOPIC": "readonly", "Harness": "readonly",
+  "HcrmStatusBanners": "readonly", "Header": "readonly", "Heatmap": "readonly", "HelixViz": "readonly", "Houses": "readonly", "HousesPolicy": "readonly",
+  "KElimination": "readonly", "LEGACY_GEAR_INV_MOD": "readonly", "Landing": "readonly", "LatLngTweak": "readonly", "Ledger": "readonly", "LiveStatePanel": "readonly",
+  "MAYA_EPOCH_JD": "readonly", "MODALITY_FN": "readonly", "M_SAFE8": "readonly", "M_SHELL6": "readonly", "NatalTweaks": "readonly", "Odometer": "readonly",
+  "PLANET_FN": "readonly", "PLANET_GLYPH": "readonly", "PLANET_JOY": "readonly", "PLANET_ORDER": "readonly", "PLANET_PERIODS": "readonly", "PLANET_PHASE0": "readonly",
+  "PLANET_SIGNIFIES": "readonly", "POWER_WORD_TRANSFORMS": "readonly", "PRIME_ROLE": "readonly", "PhaseRing": "readonly", "Picker": "readonly", "PrimeLayer": "readonly",
+  "QUADRANT_HOUSE_SYSTEMS": "readonly", "QUALITY_SOURCE_TAG": "readonly", "REAL_EPHEMERIS_BODIES": "readonly", "React": "readonly", "ReactDOM": "readonly",
+  "ReadingSession": "readonly", "RowDetail": "readonly", "SHADOW_LANE_NAMES": "readonly", "SHELL6": "readonly", "SIGN_BODY": "readonly", "STYLE_PRESETS": "readonly",
+  "SUBSTRATE_NOTE": "readonly", "SUITES": "readonly", "SYN_ASPECTS": "readonly", "SYN_BODIES": "readonly", "SearchablePicker": "readonly", "SessionControls": "readonly",
+  "SessionHeader": "readonly", "SessionScreen": "readonly", "ShadowWheel": "readonly", "ShuffleAnimation": "readonly", "Signature": "readonly", "SpeakerIcon": "readonly",
+  "Spread": "readonly", "Stat": "readonly", "SubstrateTweaks": "readonly", "SuiteCard": "readonly", "SynAspectDetail": "readonly", "SynastryScreen": "readonly",
+  "SynastryView": "readonly", "Synthesis": "readonly", "SyntheticBadge": "readonly", "TRIP_DAY": "readonly", "TRIP_NIGHT": "readonly", "TRIP_PART": "readonly",
+  "TZOLKIN_SIGNS": "readonly", "ToolsMenu": "readonly", "TraditionalPanel": "readonly", "TweakButton": "readonly", "TweakColor": "readonly", "TweakLikeText": "readonly",
+  "TweakNumber": "readonly", "TweakRadio": "readonly", "TweakRow": "readonly", "TweakSection": "readonly", "TweakSelect": "readonly", "TweakSlider": "readonly",
+  "TweakText": "readonly", "TweakToggle": "readonly", "TweaksPanel": "readonly", "TzResolve": "readonly", "VISUAL_CLASSES": "readonly", "VOICE_PREF_KEYWORDS": "readonly",
+  "Validate": "readonly", "VisualTweaks": "readonly", "WordReveal": "readonly", "ZODIAC": "readonly", "ZodiacCard": "readonly", "__TWEAKS_STYLE": "readonly",
+  "__TwkCheck": "readonly", "__cache": "readonly", "__fail": "readonly", "__mod": "readonly", "__pass": "readonly", "__pending": "readonly", "__twkIsLight": "readonly",
+  "antiscion": "readonly", "applyPower": "readonly", "applyingPhase": "readonly", "approxAscendantDeg": "readonly", "approxMidheavenDeg": "readonly",
+  "ascendantDeg": "readonly", "aspectMeaning": "readonly", "aspectWeight": "readonly", "bodyEvents": "readonly", "buildBirthISO": "readonly", "buildCardPrompt": "readonly",
+  "buildChartPrompt": "readonly", "buildEdges": "readonly", "buildSynastryAspectPrompt": "readonly", "buildSynastryOverviewPrompt": "readonly", "cacheKey": "readonly",
+  "calendarRound": "readonly", "chartShape": "readonly", "chartSignature": "readonly", "cityKey": "readonly", "compatibilityScore": "readonly",
+  "computeAllLots": "readonly", "computeHCRM": "readonly", "computeLots": "readonly", "computeNatal": "readonly", "computeSynastry": "readonly",
+  "contraAntiscion": "readonly", "cramStep": "readonly", "criticalKind": "readonly", "crossAspects": "readonly", "crossReceptions": "readonly", "ctmState": "readonly",
+  "currentTransits": "readonly", "dateToJD": "readonly", "deckOrder": "readonly", "dedupeLanes": "readonly", "detectPatterns": "readonly", "dignityFor": "readonly",
+  "dignityMeaning": "readonly", "dwellFor": "readonly", "edgeEvents": "readonly", "edgeResiduePreservation": "readonly", "expect": "readonly", "faceRuler": "readonly",
+  "factorizeSmall": "readonly", "findCity": "readonly", "formatOffset": "readonly", "gearClass": "readonly", "haab": "readonly", "hcrmAngle": "readonly",
+  "houseForLongEqual": "readonly", "houseForSign": "readonly", "houseOverlays": "readonly", "houseTopic": "readonly", "interpretCard": "readonly",
+  "interpretChart": "readonly", "interpretSynastryAspect": "readonly", "interpretSynastryOverview": "readonly", "isJoyHit": "readonly", "isRetrograde": "readonly",
+  "isqrtN": "readonly", "kElimWinding": "readonly", "listVoices": "readonly", "lunarPhase": "readonly", "mayaLongCount": "readonly", "midheavenDeg": "readonly",
+  "mod360": "readonly", "nearestAspect": "readonly", "operatorClass": "readonly", "phaseSyndrome": "readonly", "planetDeclination": "readonly",
+  "planetLongitude": "readonly", "planetSignifies": "readonly", "planetSpeed": "readonly", "progressedAt": "readonly", "quadrantCuspsFor": "readonly",
+  "rankVoice": "readonly", "readingFor": "readonly", "realAngles": "readonly", "realEclipticLatitudeDeg": "readonly", "realEclipticLongitudeDeg": "readonly",
+  "realPlanetSpeedDegPerDay": "readonly", "receptionFor": "readonly", "registerRow": "readonly", "requireCore": "readonly", "residues": "readonly",
+  "residues8": "readonly", "rigorousFor": "readonly", "roman": "readonly", "runAllSuites": "readonly", "runSuite": "readonly", "shadowClusters": "readonly",
+  "speakNow": "readonly", "starIndex": "readonly", "stopSpeech": "readonly", "stripMd": "readonly", "suite": "readonly", "synAspect": "readonly",
+  "synastryCTM": "readonly", "syntheticCertificate": "readonly", "tcoPeriod": "readonly", "tcoPhase": "readonly", "termRuler": "readonly",
+  "tightAspectsFor": "readonly", "toArcsec": "readonly", "tzolkin": "readonly", "useAgentChartReading": "readonly", "useAgentReading": "readonly",
+  "useErrorBanner": "readonly", "useNow": "readonly", "useSynastryReading": "readonly", "useTweaks": "readonly", "useVoice": "readonly",
+};
+
 export default [
   {
     ignores: [
       "**/node_modules/**",
       "**/dist/**",
       "project/vendor/**",
-      "project/*.jsx",
       "project/*.js",
       "!project/core-shim.js",
     ],
@@ -155,6 +267,36 @@ export default [
       ecmaVersion: 2022,
       sourceType: "module",
       globals: { ...NODE_GLOBALS, window: "readonly" },
+    },
+  },
+  {
+    // See the comment above JSX_GLOBALS's declaration for the full
+    // rationale. sourceType "script" (not "module"): these 22 files use no
+    // import/export syntax anywhere — Babel-standalone transpiles the
+    // JSX, nothing here changes module scoping.
+    files: ["project/*.jsx"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "script",
+      parserOptions: { ecmaFeatures: { jsx: true } },
+      globals: { ...globals.browser, ...JSX_GLOBALS },
+    },
+    rules: {
+      // Every file in this global-namespace architecture re-declares its
+      // own top-level bindings, which are ALSO listed in JSX_GLOBALS so
+      // other files can reference them -- without this, every single one
+      // of those ~280 declarations would trip "already defined as a
+      // built-in global variable" — this is the rule's own documented
+      // escape hatch for exactly that shape of setup, not a blanket
+      // disable: a genuine redeclaration WITHIN one file (two `const x`
+      // at the same scope) is still caught.
+      "no-redeclare": ["error", { builtinGlobals: false }],
+      // voice.jsx/landing.jsx's `try { window.speechSynthesis.X(); }
+      // catch {}` is a deliberate "best-effort, the Speech API is
+      // unreliable across browsers" convention, not a swallowed bug —
+      // see voice.jsx's own header. Empty non-catch blocks (an accidental
+      // `if (x) {}`) are still flagged.
+      "no-empty": ["error", { allowEmptyCatch: true }],
     },
   },
 ];

@@ -346,7 +346,7 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
       <ChartStatusBanners chart={chart} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
       <Header chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} />
 
-      <Synthesis chart={chart} reading={chartReading} settings={settings} />
+      <Synthesis reading={chartReading} settings={settings} />
 
       <main className={`spread spread-${settings.spread}`}>
         {cards.map((card, i) => (
@@ -434,7 +434,7 @@ function Header({ chart, settings, setTweak, onBack }) {
   );
 }
 
-function Synthesis({ chart, reading, settings }) {
+function Synthesis({ reading, settings }) {
   if (!settings.agentOn) return null;
   return (
     <section className="syn">
@@ -554,9 +554,26 @@ function NatalTweaks({ t }) {
       <LatLngTweak label="Longitude" kind="lng" value={t.tweaks.lng} onValid={v => t.setTweak('lng', v)} />
       <TweakText label="Place" value={t.tweaks.placeLabel}
         onChange={v => t.setTweak('placeLabel', v)} />
+      {/* WP-11/WP-12 built and Swiss-Ephemeris-verified 8 quadrant house
+          solvers in tools/ephemeris/houses.js; this picker offered only the
+          first two options for as long as the project had them, because
+          nothing in the presentation layer ever called the other 8 — see
+          docs/COMPLETION_AUDIT.md §4. astro.jsx's computeNatal() now
+          dispatches through window.Houses.quadrantCuspsFromDate() for all
+          of them, falling back to Whole per POLAR_FALLBACK_POLICY above
+          |lat|=66.56° (or offline). The keys below must match
+          QUADRANT_HOUSE_SYSTEMS in astro.jsx exactly. */}
       <TweakRadio label="House system" value={t.tweaks.houseSystem} options={[
         { value: 'whole', label: 'Whole' },
         { value: 'equal', label: 'Equal' },
+        { value: 'placidus', label: 'Placidus' },
+        { value: 'koch', label: 'Koch' },
+        { value: 'regiomontanus', label: 'Regiomontanus' },
+        { value: 'campanus', label: 'Campanus' },
+        { value: 'alcabitius', label: 'Alcabitius' },
+        { value: 'topocentric', label: 'Topocentric' },
+        { value: 'meridian', label: 'Meridian' },
+        { value: 'morinus', label: 'Morinus' },
       ]} onChange={v => t.setTweak('houseSystem', v)} />
       <TweakRadio label="Sect" value={t.tweaks.sect} options={[
         { value: 'auto',  label: 'Auto'  },

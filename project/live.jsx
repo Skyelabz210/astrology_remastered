@@ -73,7 +73,7 @@ function LiveStatePanel({ chart }) {
 
         <div className="cl-card">
           <h4>Helix · z vs θ</h4>
-          <HelixViz syndrome={data.ctm.syndromeDeg} ageYears={data.ctm.ageYears} />
+          <HelixViz syndrome={data.ctm.syndromeDeg} />
         </div>
       </div>
 
@@ -128,7 +128,7 @@ function LiveStatePanel({ chart }) {
 
 // Small helix viz: orthographic side view of the cylinder, current point
 // glowing. Static but feels alive because z accumulates each second.
-function HelixViz({ syndrome, ageYears }) {
+function HelixViz({ syndrome }) {
   const W = 280, H = 160;
   const turns = 6;
   const points = [];

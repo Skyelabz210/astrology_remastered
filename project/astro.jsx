@@ -178,6 +178,13 @@ if (typeof window !== "undefined") {
   window.ascendantIsExactAt = function (date, lat, lng) {
     return realAngles(date, lat, lng) !== null;
   };
+  // Same shape, for the 8 quadrant house systems: does window.Houses
+  // actually produce cusps for this (system, instant, latitude), or would
+  // computeNatal fall back to Whole? Used by app.jsx's polar banner and by
+  // tests; the fallback logic itself lives once, in quadrantCuspsFor().
+  window.quadrantHousesAvailableAt = function (systemKey, date, lat, lng) {
+    return quadrantCuspsFor(systemKey, date, lat, lng) !== null;
+  };
 }
 
 const REAL_EPHEMERIS_BODIES = new Set([
@@ -238,7 +245,7 @@ function planetLongitude(planet, jd) {
   if (window.Astronomy && REAL_EPHEMERIS_BODIES.has(planet)) {
     try {
       return mod360(realEclipticLongitudeDeg(planet, jd));
-    } catch (err) {
+    } catch {
       // Fall through to the synthetic model on any real-ephemeris failure
       // (e.g. a corrupt/partial vendor load) rather than throwing mid-chart.
     }
@@ -291,10 +298,15 @@ function approxMidheavenDeg(date, lng) {
   return mod360(mc * 180 / Math.PI);
 }
 
-function midheavenDeg(date, lng, lat) {
-  // MC is latitude-independent, so pass 0 when the caller has no latitude —
-  // which also keeps this below ascMc()'s polar guard and lets the MC stay
-  // exact even at latitudes where the Ascendant falls back.
+function midheavenDeg(date, lng) {
+  // MC is latitude-independent, so this always calls realAngles() with
+  // latitude 0 — which also keeps it below ascMc()'s polar guard, letting
+  // the MC stay exact even where the Ascendant falls back. There was a
+  // third `lat` parameter here; nothing in the body ever read it (real
+  // callers pass birth.lat positionally, which then silently went
+  // nowhere) — removed rather than left as a documented-but-ignored trap
+  // for the next reader, per eslint's no-unused-vars catching it once the
+  // *.jsx layer was actually linted.
   const real = realAngles(date, 0, lng);
   return real ? real.mcDeg : approxMidheavenDeg(date, lng);
 }
@@ -379,6 +391,23 @@ function realAngles(date, lat, lng) {
   }
 }
 
+// Same shape as realAngles() above, for one of the 8 quadrant house
+// systems. Returns the 12-cusp array, or null when the real solver
+// declined (module missing, or PolarLatitudeError — POLAR_FALLBACK_POLICY's
+// declared fallback for every "hard" system is Whole, applied by the one
+// caller in computeNatal). Any other thrown error is a real fault and is
+// not swallowed here either.
+function quadrantCuspsFor(systemKey, date, lat, lng) {
+  const H = typeof window !== "undefined" ? window.Houses : null;
+  if (!H || typeof H.quadrantCuspsFromDate !== "function") return null;
+  try {
+    return H.quadrantCuspsFromDate(systemKey, date, lat, lng);
+  } catch (e) {
+    if (H.PolarLatitudeError && e instanceof H.PolarLatitudeError) return null;
+    throw e;
+  }
+}
+
 // Whole-sign houses: ASC sign is house 1, then forward.
 function houseForSign(signIdx, ascSignIdx) { return AstroCore.houseForSign(signIdx, ascSignIdx); }
 
@@ -406,7 +435,7 @@ function planetSpeed(name, jd) {
   if (window.Astronomy && REAL_EPHEMERIS_BODIES.has(name) && jd !== undefined) {
     try {
       return realPlanetSpeedDegPerDay(name, jd);
-    } catch (err) {
+    } catch {
       // fall through to the synthetic constant rate below
     }
   }
@@ -438,11 +467,20 @@ function criticalKind(signIdx, degInSign) { return AstroCore.criticalKind(signId
 // computeNatal — derives everything visible from the natal inputs
 // ──────────────────────────────────────────────────────────────────────
 
+// The 8 quadrant systems this presentation layer can compute a real cusp
+// array for, matching tools/ephemeris/houses.js's QUADRANT_CUSP_FNS keys —
+// the same 8 keys POLAR_FALLBACK_POLICY and validate.js's SYSTEM_LABELS
+// already carried before any caller routed through them.
+const QUADRANT_HOUSE_SYSTEMS = new Set([
+  "placidus", "koch", "regiomontanus", "campanus",
+  "alcabitius", "topocentric", "meridian", "morinus",
+]);
+
 function computeNatal(birth) {
   const date = new Date(birth.dateISO);
   const jd = dateToJD(date);
   const asc = ascendantDeg(date, birth.lat, birth.lng);
-  const mc  = midheavenDeg(date, birth.lng, birth.lat);
+  const mc  = midheavenDeg(date, birth.lng);
   const desc = mod360(asc + 180);
   const ic   = mod360(mc  + 180);
   const ascSignIdx = Math.floor(asc / 30);
@@ -450,6 +488,32 @@ function computeNatal(birth) {
   // WP-21: day/night sect determination (AstroCore.sectIsDay) — see this
   // file's header. Byte-identical to the pre-WP-21 inline ternary.
   const isDayChart = AstroCore.sectIsDay(planetLongitude("Sun", jd), asc, birth.sect);
+
+  // Quadrant houses (Placidus, Koch, ...). houses.js's cusp functions were
+  // built and Swiss-Ephemeris-verified in WP-11/WP-12 but never had a
+  // presentation-layer caller — the shipped house picker offered only
+  // Whole/Equal even though 8 more systems were sitting fully computed and
+  // tested one function call away. See docs/COMPLETION_AUDIT.md §4.
+  //
+  // POLAR_FALLBACK_POLICY's own declared fallback for every "hard" quadrant
+  // system is "WholeSign" — honored here exactly, not re-decided. A missing
+  // window.Houses module (offline/failed load) degrades the same way, for
+  // the same reason astro.jsx's own ASC/MC fallback exists: a page missing
+  // a script tag should render an approximate chart, not a blank one.
+  let houseSystemActual = birth.houseSystem;
+  let houseCusps = null;
+  if (QUADRANT_HOUSE_SYSTEMS.has(birth.houseSystem)) {
+    houseCusps = quadrantCuspsFor(birth.houseSystem, date, birth.lat, birth.lng);
+    if (!houseCusps) houseSystemActual = "whole"; // POLAR_FALLBACK_POLICY / offline fallback
+  }
+  // Single dispatcher for all 3 house-placement call sites below, so the
+  // quadrant/whole/equal choice is made once per chart, not per point.
+  const houseOf = (lon, sign) => {
+    if (houseCusps) return AstroCore.houseForCusps(lon, houseCusps);
+    return houseSystemActual === "whole"
+      ? houseForSign(sign, ascSignIdx)
+      : houseForLongEqual(lon, asc);
+  };
 
   const planets = PLANET_ORDER.map(p => {
     const lon  = planetLongitude(p, jd);
@@ -465,9 +529,7 @@ function computeNatal(birth) {
       arcsec,
       speed: planetSpeed(p, jd),
       retrograde: isRetrograde(p, jd),
-      house: birth.houseSystem === "whole"
-        ? houseForSign(sign, ascSignIdx)
-        : houseForLongEqual(lon, asc),
+      house: houseOf(lon, sign),
       dignity: dignityFor(p, sign),
       residues: residues(arcsec),
       declination: planetDeclination(lon, realEclipticLatitudeDeg(p, jd)),
@@ -489,10 +551,23 @@ function computeNatal(birth) {
       arcsec: snLon * 3600,
       speed: -nn.speed,
       retrograde: true,
-      house: birth.houseSystem === "whole"
-        ? houseForSign(snSign, ascSignIdx)
-        : houseForLongEqual(snLon, asc),
-      dignity: dignityFor("Sun", snSign), // nodes don't have dignity; placeholder
+      house: houseOf(snLon, snSign),
+      // dignityFor("SouthNode", snSign) is what this line calls now. It
+      // used to call dignityFor("Sun", snSign), which is a real defect, not
+      // a documented approximation: the Sun's DOMICILE/EXALT rows made the
+      // South Node read as "domicile" in Leo, "exaltation" in Aries,
+      // "detriment" in Aquarius, and "fall" in Libra — a fabricated,
+      // non-neutral classical dignity a node does not classically carry.
+      // dignityFor() already falls through to {kind:"neutral", score:0} for
+      // any planet name absent from DOMICILE/EXALT (see astro-core.js), and
+      // neither table has a "SouthNode" or "NorthNode" entry, so calling it
+      // with the node's own name is both correct and requires no new
+      // fallback path — every consumer of `.dignity` already renders
+      // "neutral" sensibly, since most planets are neutral in most signs.
+      // NorthNode was never affected: it is one of PLANET_ORDER, so it
+      // already flows through the same generic, already-correct call above
+      // (`dignity: dignityFor(p, sign)`).
+      dignity: dignityFor("SouthNode", snSign),
       residues: residues(snLon * 3600),
       declination: planetDeclination(snLon), // nodes lie on the ecliptic: β ≡ 0
       criticalDegree: criticalKind(snSign, snLon - snSign * 30),
@@ -506,9 +581,7 @@ function computeNatal(birth) {
     const ruler   = planets.find(p => p.name === sign.ruler);
     const principal = tenants[0] ?? ruler;
     const dignity   = dignityFor(principal.name, idx);
-    const house     = birth.houseSystem === "whole"
-      ? houseForSign(idx, ascSignIdx)
-      : houseForLongEqual(idx * 30 + 15, asc);
+    const house     = houseOf(idx * 30 + 15, idx);
 
     // Full Ptolemaic dignity table — triplicity, term, face
     const tripLord = isDayChart ? TRIP_DAY[sign.element] : TRIP_NIGHT[sign.element];
@@ -686,14 +759,40 @@ function computeNatal(birth) {
     planet: p.name, declination: p.declination,
   }));
 
-  // ───── Void-of-course Moon (simple heuristic) ─────
-  // Next Moon aspect or sign change. We just compute days to next sign change.
+  // ───── Void-of-course Moon ─────
+  // Classical VOC: the Moon makes no more major-aspect perfection before it
+  // changes sign. Days to that sign change, from the Moon's own speed:
   const moonDegInSign = moon.lon - moon.sign * 30;
   const moonSpeedDay = Math.abs(moon.speed); // ~13.18°/day
   const daysToNextSignChange = (30 - moonDegInSign) / moonSpeedDay;
-  // Crude: if no major aspect within orb to any planet → voc
-  const moonHasAspect = aspectGrid.some(a => (a.a === "Moon" || a.b === "Moon") && ["Conjunction","Opposition","Trine","Square","Sextile"].includes(a.aspect));
-  const voidOfCourse = { isVoc: !moonHasAspect, daysToNextSignChange };
+  // This previously read "any aspect within orb, applying OR separating,
+  // to any planet -> not VOC," which is not what void-of-course means: a
+  // separating aspect is one the Moon has already left behind, and does
+  // not keep it "in aspect" going forward. That let a Moon read as
+  // not-VOC for hours or days after its last real aspect had perfected —
+  // see docs/COMPLETION_AUDIT.md §3 item 10. VOC now follows only
+  // APPLYING major aspects (aspectGrid's own applyingPhase() result,
+  // fixed to a 1-minute integration step by an earlier correctness pass —
+  // see astro-core.js's APPLYING_PHASE_STEP_DAYS), which is what the
+  // definition actually asks about: aspects still to come, not ones
+  // already exact and receding.
+  //
+  // Still an approximation, not the full classical test: it does not check
+  // whether each applying aspect would perfect BEFORE daysToNextSignChange
+  // above — that needs numerical root-finding per aspect (when does this
+  // pair's separation hit exactly 0/60/90/120/180?), which this
+  // single-instant aspect grid does not attempt. A chart reading "not VOC"
+  // here could still be genuinely VOC if its one remaining applying aspect
+  // would perfect only after the Moon has already changed sign. Narrowing
+  // that gap needs the same kind of forward integration
+  // tools/ephemeris/produce-ledger.mjs already does for retrograde
+  // stations, applied per-aspect — out of scope for this pass.
+  const moonApplyingAspect = aspectGrid.some(a =>
+    (a.a === "Moon" || a.b === "Moon") &&
+    a.phase === "applying" &&
+    ["Conjunction","Opposition","Trine","Square","Sextile"].includes(a.aspect)
+  );
+  const voidOfCourse = { isVoc: !moonApplyingAspect, daysToNextSignChange };
 
   return {
     jd,
@@ -704,6 +803,12 @@ function computeNatal(birth) {
     ascSignIdx,
     mcSignIdx,
     isDayChart,
+    // houseSystemActual differs from birth.houseSystem exactly when a
+    // requested quadrant system fell back to Whole per
+    // POLAR_FALLBACK_POLICY (polar latitude) or window.Houses being
+    // unavailable (offline/failed module load) — see the dispatch above.
+    houseSystemActual,
+    houseCusps,
     planets,
     cards,
     lots,
