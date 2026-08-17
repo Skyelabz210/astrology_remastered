@@ -174,7 +174,9 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
 function CardBack({ card, chart, settings, active }) {
   const reading  = readingFor(card, chart);   // synchronous fallback / skeleton
   const math     = rigorousFor(card, chart);
-  const agent    = useAgentReading(card, chart, active && settings.agentOn !== false);
+  // `=== true`, not `!== false`: DEFAULT_SETTINGS.agentOn is opt-in now, so a
+  // settings object that simply lacks the key must read as OFF.
+  const agent    = useAgentReading(card, chart, active && settings.agentOn === true);
 
   return (
     <div className="zc-back-inner">

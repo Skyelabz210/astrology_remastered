@@ -36,12 +36,19 @@ import { dirname, join } from "node:path";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
 const astroSrc = readFileSync(join(ROOT, "astro.jsx"), "utf8");
+// Every HTML page that loads astro.jsx also loads tools/ephemeris/houses.js as
+// a module tag BEFORE it, so window.Houses is populated by the time
+// computeNatal() runs and the REAL ascMc() solver is the live ASC/MC path.
+// The sandbox mirrors that load order; without it these suites would silently
+// exercise the ~109deg-wrong fallback the browser never uses.
+const housesModule = await import("../../tools/ephemeris/houses.js");
 const vendorSrc = readFileSync(join(ROOT, "vendor", "astronomy.browser.min.js"), "utf8");
 const astroCoreModule = await import("../../src/present/astro-core.js");
 
 function makeSandbox() {
   const sandbox = {};
   sandbox.window = sandbox; // top-level `window.X = ...` resolves here, same as astro-ephemeris.test.js
+  sandbox.Houses = housesModule;
   sandbox.AstroCore = astroCoreModule;
   vm.createContext(sandbox);
   vm.runInContext(vendorSrc, sandbox, { filename: "astronomy.browser.min.js" });
@@ -91,9 +98,27 @@ export function run() {
 
   // ── Suite 9: Sect classification — day chart iff Sun above horizon ───
   {
+    // This assertion used to read `c.isDayChart === true || c.isDayChart ===
+    // false` — satisfied by any boolean, so it asserted nothing while its name
+    // promised a specific outcome. It was written when the ASC came from
+    // astro.jsx's ~109°-wrong approximation, where no stable outcome could be
+    // pinned. With the real ascMc() solver wired in, the configuration is
+    // determinate, so the real outcome is pinned along with its derivation.
+    //
+    // At this instant, lat/lng 0/0: ASC 187.09° (Libra), Sun 0.88° (Aries).
+    // The Sun sits 173.8° counterclockwise from the ASC — short of the 180°
+    // Descendant, so it is still BELOW the horizon → night chart. Whole-sign
+    // houses put it in H7 (Aries is the 7th sign from Libra) even though it
+    // has not yet crossed the horizon; sect follows the true elevation, not
+    // the whole-sign house number, and that divergence is the point here.
     const c = computeNatal({ dateISO: FIXTURE_BIRTH.dateISO, lat: 0, lng: 0, houseSystem: "whole", sect: "auto" });
-    t("Sun directly above ASC → night chart (in H1)",
-      c.isDayChart === true || c.isDayChart === false, "either is allowed for synthetic");
+    const sunLon = c.planets.find((p) => p.name === "Sun").lon;
+    const elong = ((sunLon - c.asc) % 360 + 360) % 360;
+    t("Sun 173.8° past ASC (below horizon) → night chart",
+      c.isDayChart === false, `isDayChart=${c.isDayChart} elong=${elong.toFixed(2)}°`);
+    t("sect follows true elevation, not the whole-sign house",
+      elong > 90 && elong < 180 && c.planets.find((p) => p.name === "Sun").house === 7,
+      `elong=${elong.toFixed(2)}° house=${c.planets.find((p) => p.name === "Sun").house}`);
   }
   {
     const c = computeNatal({ ...FIXTURE_BIRTH, sect: "day" });

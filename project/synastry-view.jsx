@@ -8,7 +8,9 @@ const { useState: $synUseState, useMemo: $synUseMemo, useEffect: $synUseEffect }
 
 function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
   const syn = $synUseMemo(() => computeSynastry(chartA, chartB), [chartA, chartB]);
-  const agentOn = settings.agentOn !== false;
+  // `=== true`, not `!== false`: DEFAULT_SETTINGS.agentOn is opt-in now, so a
+  // settings object that simply lacks the key must read as OFF.
+  const agentOn = settings.agentOn === true;
   const reading = useSynastryReading(syn, agentOn);
   const [selectedHit, setSelectedHit] = $synUseState(null);
 

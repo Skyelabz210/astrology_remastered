@@ -31,11 +31,14 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   }, []);
 
   const current = cards[pos];
-  const agentOn = settings.agentOn !== false;
+  // `=== true`, not `!== false`: DEFAULT_SETTINGS.agentOn is opt-in now, so a
+  // settings object that simply lacks the key must read as OFF.
+  const agentOn = settings.agentOn === true;
   const agent   = useAgentReading(current, chart, agentOn && shuffled && !!current);
   // Local, non-AI fallback — used whenever the agent is off (or errors),
   // so turning the "Agent interpreter" off degrades to a real reading
-  // instead of the bare element/modality/dignity placeholder.
+  // instead of the bare element/modality/dignity placeholder. With the
+  // opt-in default this is now the ORDINARY path, not the exception.
   const localReading = $sUseMemo(() => current && readingFor(current, chart), [current, chart]);
 
   // Voice

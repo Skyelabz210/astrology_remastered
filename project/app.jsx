@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS = /*EDITMODE-BEGIN*/{
   "glow":        0.85,
   "specular":    0.8,
   "rigorous":    false,
-  "agentOn":     true,
+  "agentOn":     false,
   "spread":      "grid",
   "primeLayer":  false,
   "orbScale":    1.0,
