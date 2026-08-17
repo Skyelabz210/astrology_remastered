@@ -12,7 +12,7 @@
 // The wrapper handles perspective + tilt via CSS custom properties so the
 // browser composites on the GPU. No re-renders per mousemove.
 
-const { useRef: $cardUseRef, useState: $cardUseState, useCallback: $cardUseCallback, useEffect: $cardUseEffect } = React;
+const { useRef: $cardUseRef, useState: $cardUseState, useCallback: $cardUseCallback } = React;
 
 function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
   const wrap = $cardUseRef(null);

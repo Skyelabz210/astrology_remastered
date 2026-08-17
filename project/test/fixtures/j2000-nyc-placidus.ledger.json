@@ -1,0 +1,492 @@
+[
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#Sun",
+    "body": "Sun",
+    "longitude_arcsec": "1009327",
+    "source": {
+      "kind": "astronomy-engine",
+      "name": "2.1.19",
+      "checksum": "7466b3540a56456ef42fabd026e5c71094cf9441b2e88906acb9b0167536abe8"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "geocentric apparent ecliptic-of-date longitude (aberration on, astronomy-engine 2.1.19 GeoVector+Ecliptic); observer lat=40.7128 lng=-74.006 (not used in this geocentric computation; carried for provenance and future topocentric consumers)"
+    },
+    "meta": {
+      "jd_tt": 2451545.000738971,
+      "delta_t_seconds": 63.847089569816944,
+      "speed_arcsec_per_day": "3670",
+      "retrograde": false
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#Moon",
+    "body": "Moon",
+    "longitude_arcsec": "803966",
+    "source": {
+      "kind": "astronomy-engine",
+      "name": "2.1.19",
+      "checksum": "79c60f86bae1a70d3c1412b8980e0972c729f1021ed1b4a08ae20bed6c308b57"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "geocentric apparent ecliptic-of-date longitude (aberration on, astronomy-engine 2.1.19 GeoVector+Ecliptic); observer lat=40.7128 lng=-74.006 (not used in this geocentric computation; carried for provenance and future topocentric consumers)"
+    },
+    "meta": {
+      "jd_tt": 2451545.000738971,
+      "delta_t_seconds": 63.847089569816944,
+      "speed_arcsec_per_day": "43279",
+      "retrograde": false
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#Mercury",
+    "body": "Mercury",
+    "longitude_arcsec": "978800",
+    "source": {
+      "kind": "astronomy-engine",
+      "name": "2.1.19",
+      "checksum": "feb161bc3de8933553ec27f39f873c60863fd81eb6f81f59f31d71fc32c430a2"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "geocentric apparent ecliptic-of-date longitude (aberration on, astronomy-engine 2.1.19 GeoVector+Ecliptic); observer lat=40.7128 lng=-74.006 (not used in this geocentric computation; carried for provenance and future topocentric consumers)"
+    },
+    "meta": {
+      "jd_tt": 2451545.000738971,
+      "delta_t_seconds": 63.847089569816944,
+      "speed_arcsec_per_day": "5603",
+      "retrograde": false
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#Venus",
+    "body": "Venus",
+    "longitude_arcsec": "869635",
+    "source": {
+      "kind": "astronomy-engine",
+      "name": "2.1.19",
+      "checksum": "080ea12f4462da0a255b312e46f371570f1b4aa4411774d3a98cd8c9c4e7def3"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "geocentric apparent ecliptic-of-date longitude (aberration on, astronomy-engine 2.1.19 GeoVector+Ecliptic); observer lat=40.7128 lng=-74.006 (not used in this geocentric computation; carried for provenance and future topocentric consumers)"
+    },
+    "meta": {
+      "jd_tt": 2451545.000738971,
+      "delta_t_seconds": 63.847089569816944,
+      "speed_arcsec_per_day": "4353",
+      "retrograde": false
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#Mars",
+    "body": "Mars",
+    "longitude_arcsec": "1180670",
+    "source": {
+      "kind": "astronomy-engine",
+      "name": "2.1.19",
+      "checksum": "00500de5c651ce1b4678f5ab25b0704d408f6053e20f9c7b371f6d6a6fc2dc66"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "geocentric apparent ecliptic-of-date longitude (aberration on, astronomy-engine 2.1.19 GeoVector+Ecliptic); observer lat=40.7128 lng=-74.006 (not used in this geocentric computation; carried for provenance and future topocentric consumers)"
+    },
+    "meta": {
+      "jd_tt": 2451545.000738971,
+      "delta_t_seconds": 63.847089569816944,
+      "speed_arcsec_per_day": "2792",
+      "retrograde": false
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#Jupiter",
+    "body": "Jupiter",
+    "longitude_arcsec": "90915",
+    "source": {
+      "kind": "astronomy-engine",
+      "name": "2.1.19",
+      "checksum": "d5a489785d1126aabf9901a1b2034d1927a3d977deceed5feda5f87d4da93e91"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "geocentric apparent ecliptic-of-date longitude (aberration on, astronomy-engine 2.1.19 GeoVector+Ecliptic); observer lat=40.7128 lng=-74.006 (not used in this geocentric computation; carried for provenance and future topocentric consumers)"
+    },
+    "meta": {
+      "jd_tt": 2451545.000738971,
+      "delta_t_seconds": 63.847089569816944,
+      "speed_arcsec_per_day": "147",
+      "retrograde": false
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#Saturn",
+    "body": "Saturn",
+    "longitude_arcsec": "145426",
+    "source": {
+      "kind": "astronomy-engine",
+      "name": "2.1.19",
+      "checksum": "80f1f06742de7d3003d53b8fa48dc54a82d8353bf71d5ba70802c2f0a08ee087"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "geocentric apparent ecliptic-of-date longitude (aberration on, astronomy-engine 2.1.19 GeoVector+Ecliptic); observer lat=40.7128 lng=-74.006 (not used in this geocentric computation; carried for provenance and future topocentric consumers)"
+    },
+    "meta": {
+      "jd_tt": 2451545.000738971,
+      "delta_t_seconds": 63.847089569816944,
+      "speed_arcsec_per_day": "-72",
+      "retrograde": true
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#Uranus",
+    "body": "Uranus",
+    "longitude_arcsec": "1133302",
+    "source": {
+      "kind": "astronomy-engine",
+      "name": "2.1.19",
+      "checksum": "43469bd6a7a5804a02fc051922ad41f8ef450976469e30308f170c53eabd8f83"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "geocentric apparent ecliptic-of-date longitude (aberration on, astronomy-engine 2.1.19 GeoVector+Ecliptic); observer lat=40.7128 lng=-74.006 (not used in this geocentric computation; carried for provenance and future topocentric consumers)"
+    },
+    "meta": {
+      "jd_tt": 2451545.000738971,
+      "delta_t_seconds": 63.847089569816944,
+      "speed_arcsec_per_day": "181",
+      "retrograde": false
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#Neptune",
+    "body": "Neptune",
+    "longitude_arcsec": "1091504",
+    "source": {
+      "kind": "astronomy-engine",
+      "name": "2.1.19",
+      "checksum": "a11fbb59fba35b2d04462a3cc24385045dd6635adbae1640e77518d7e374b0e3"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "geocentric apparent ecliptic-of-date longitude (aberration on, astronomy-engine 2.1.19 GeoVector+Ecliptic); observer lat=40.7128 lng=-74.006 (not used in this geocentric computation; carried for provenance and future topocentric consumers)"
+    },
+    "meta": {
+      "jd_tt": 2451545.000738971,
+      "delta_t_seconds": 63.847089569816944,
+      "speed_arcsec_per_day": "128",
+      "retrograde": false
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#Pluto",
+    "body": "Pluto",
+    "longitude_arcsec": "905237",
+    "source": {
+      "kind": "astronomy-engine",
+      "name": "2.1.19",
+      "checksum": "69eea54bf50f36c4771ec64726221fedf1eaa173557010bdc495468d28d9c4ce"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "geocentric apparent ecliptic-of-date longitude (aberration on, astronomy-engine 2.1.19 GeoVector+Ecliptic); observer lat=40.7128 lng=-74.006 (not used in this geocentric computation; carried for provenance and future topocentric consumers)"
+    },
+    "meta": {
+      "jd_tt": 2451545.000738971,
+      "delta_t_seconds": 63.847089569816944,
+      "speed_arcsec_per_day": "127",
+      "retrograde": false
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#ASC",
+    "body": "ASC",
+    "house_system": "placidus",
+    "longitude_arcsec": "987265",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "bdaa83632cf1002bf503026926c7fb5f7ff32e25d076a9a4f7032abf17cd2246"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#MC",
+    "body": "MC",
+    "house_system": "placidus",
+    "longitude_arcsec": "750490",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "23ac9dce1517b4210a8b01426d846aa66bf935b079a9ca242fa7bfbb2ba47fa9"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_1",
+    "body": "CUSP_1",
+    "house_system": "placidus",
+    "longitude_arcsec": "987265",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "a33cbc562bee2c23615582cb808dd30daf5c7c853653c0dd40a799c260286006"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_2",
+    "body": "CUSP_2",
+    "house_system": "placidus",
+    "longitude_arcsec": "1130656",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "78c498c042db4bb5822c2e005d6d451c6b330a1f9ac2f5ee8f090884e2cc22bb"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_3",
+    "body": "CUSP_3",
+    "house_system": "placidus",
+    "longitude_arcsec": "1280104",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "6e3b151449183c8a8acb94020cb3df4cf73563d27ca7ef7ca5337c820d2ff688"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_4",
+    "body": "CUSP_4",
+    "house_system": "placidus",
+    "longitude_arcsec": "102490",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "78df9237cf302217fed1bbfc3430547ee2bf0e7bddf907b2e3a09348b9864395"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_5",
+    "body": "CUSP_5",
+    "house_system": "placidus",
+    "longitude_arcsec": "191657",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "b7533f3d8e079b329078d24572bf76dbf7d06c4222034db7ff749f0fa4ca6b32"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_6",
+    "body": "CUSP_6",
+    "house_system": "placidus",
+    "longitude_arcsec": "266089",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "4c18ccd2beb19819f8e48a76980e42dea0d8ada825c56ca44b5a40d55c45775d"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_7",
+    "body": "CUSP_7",
+    "house_system": "placidus",
+    "longitude_arcsec": "339265",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "c4eb549501bf30dab5e282a35fe0bd4b491987eba376039077a2b892a4d8bb4e"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_8",
+    "body": "CUSP_8",
+    "house_system": "placidus",
+    "longitude_arcsec": "482656",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "f3dc5adab51ec8b633dce49ce93ec1856157af099cb67b50296d8d2e5e0b2156"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_9",
+    "body": "CUSP_9",
+    "house_system": "placidus",
+    "longitude_arcsec": "632104",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "d0432dbe5845d4631b0e13d6ff65c66c8fcdafd44c76c73f9f974c6c0c5495b2"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_10",
+    "body": "CUSP_10",
+    "house_system": "placidus",
+    "longitude_arcsec": "750490",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "de018e827f41917daad4c8062fe4e45860637be683694f11322404498646750a"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_11",
+    "body": "CUSP_11",
+    "house_system": "placidus",
+    "longitude_arcsec": "839657",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "e3dfc766c17b795590c2cfc6b47e92a812bc59aa3f7b4c76dafbb1c443f8315f"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  },
+  {
+    "ledger_version": "hcrm-ephemeris-ledger-v1",
+    "event_id": "2000-01-01T12:00:00.000Z#placidus#CUSP_12",
+    "body": "CUSP_12",
+    "house_system": "placidus",
+    "longitude_arcsec": "914089",
+    "source": {
+      "kind": "hcrm-house-solver",
+      "name": "houses.js+timescale.js",
+      "checksum": "be16a590a77bad9d96e45cefd041400ca8a2a9315cd00a2861760f6696ff9920"
+    },
+    "certificate": {
+      "status": "IMPORTED_INTEGER_LEDGER",
+      "notes": "placidus house cusp (project/tools/ephemeris/houses.js, mean-obliquity/GAST timescale from timescale.js); observer lat=40.7128 lng=-74.006"
+    },
+    "meta": {
+      "jd_tt": 2451545.0007392806,
+      "delta_t_seconds": 63.87384384870529
+    }
+  }
+]

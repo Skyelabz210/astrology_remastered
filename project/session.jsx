@@ -52,7 +52,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
 
   // Called inside the button onClick — satisfies gesture requirement.
   const handleVoiceToggle = React.useCallback(() => {
-    primeSpeech();
+    voice.prime && voice.prime();
     const next = !settings.voiceOn;
     setTweak("voiceOn", next);
     if (next && agent.text) {
@@ -61,7 +61,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
     } else {
       stopSpeech();
     }
-  }, [settings.voiceOn, agent.text, voice.retrigger, setTweak]);
+  }, [settings.voiceOn, agent.text, voice.retrigger, voice.prime, setTweak]);
 
   // Pre-warm next
   const nextCard = cards[pos + 1];
@@ -94,7 +94,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         voiceSpeaking={voice.speaking}
         voiceBlocked={voice.blocked}
         onToggleVoice={handleVoiceToggle}
-        onUnblockVoice={() => { primeSpeech(); voice.unblock && voice.unblock(); }}
+        onUnblockVoice={() => { voice.prime && voice.prime(); voice.unblock && voice.unblock(); }}
         agentOn={agentOn}
         onToggleAgent={() => setTweak('agentOn', !agentOn)}
       />
@@ -113,7 +113,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
             voiceSpeaking={voice.speaking}
             onSpeakNow={() => {
               if (!settings.voiceOn) setTweak("voiceOn", true);
-              primeSpeech();
+              voice.prime && voice.prime();
               if (agent.text) speakNow(agent.text, {
                 style: settings.voiceStyle || "jedi",
                 voiceName: settings.voiceName,

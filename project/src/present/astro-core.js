@@ -410,6 +410,25 @@ export function houseForLongEqual(lon, ascDeg) {
   return Math.floor(mod360(lon - ascDeg) / 30) + 1;
 }
 
+// Quadrant houses (Placidus, Koch, Regiomontanus, ...) from a real 12-cusp
+// array — cusps[0] is house 1's start longitude (the Ascendant), cusps[1]
+// house 2's, ... cusps[11] house 12's, each the standard convention
+// tools/ephemeris/houses.js's cusp functions already return. House i owns
+// the arc from cusps[i-1] forward (wrapping through 360°) up to, but not
+// including, cusps[i mod 12] — the same "which arc contains this point"
+// rule houseForLongEqual applies to a uniform 30° grid, generalized to an
+// arbitrary (non-uniform, quadrant) cusp spacing.
+export function houseForCusps(lon, cusps) {
+  const x = mod360(lon);
+  for (let i = 0; i < 12; i++) {
+    const start = mod360(cusps[i]);
+    const end = mod360(cusps[(i + 1) % 12]);
+    const arc = mod360(end - start) || 360; // 0-width arc reads as a full circle, not "nothing"
+    if (mod360(x - start) < arc) return i + 1;
+  }
+  return 12; // unreachable for a well-formed 12-cusp array; documents intent over a silent undefined
+}
+
 // CRT residues — pure integer arithmetic on arcseconds
 export function residues(arcsec) {
   // arcsec is a Number for our purposes (max 1_296_000)
@@ -443,7 +462,7 @@ if (typeof window !== "undefined") {
     antiscion, contraAntiscion,
     lunarPhase,
     chartShape,
-    houseForSign, houseForLongEqual,
+    houseForSign, houseForLongEqual, houseForCusps,
     residues,
   };
 }

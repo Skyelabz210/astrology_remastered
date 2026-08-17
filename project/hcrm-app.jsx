@@ -2,7 +2,7 @@
 // Reuses the landing entry (date/time/place pickers + globe) to produce a
 // chart, then mounts the register console.
 
-const { useState: $haState, useMemo: $haMemo, useEffect: $haEffect } = React;
+const { useState: $haState, useMemo: $haMemo } = React;
 
 const HCRM_DEFAULTS = /*EDITMODE-BEGIN*/{
   "dateISO":     "1980-10-21T17:31:00-04:00",

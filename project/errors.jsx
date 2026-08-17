@@ -36,7 +36,6 @@ class ErrorBoundary extends React.Component {
     return { error };
   }
   componentDidCatch(error, info) {
-    // eslint-disable-next-line no-console
     console.error(`ErrorBoundary${this.props.name ? ` (${this.props.name})` : ""} caught a render error:`, error, info);
   }
   render() {
@@ -74,7 +73,6 @@ function useErrorBanner() {
 
   const pushError = React.useCallback((err, context) => {
     const message = (err && err.message) || String(err);
-    // eslint-disable-next-line no-console
     console.error(context ? `[${context}]` : "[error]", err);
     setBanners((prev) => [
       ...prev,

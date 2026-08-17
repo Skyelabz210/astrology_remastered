@@ -51,7 +51,7 @@ const POWER_WORD_TRANSFORMS = [
 function applyPower(text) {
   let s = text;
   for (const [re, rep] of POWER_WORD_TRANSFORMS) s = s.replace(re, rep);
-  s = s.replace(/(^|\.\s+|\!\s+|\?\s+)([SsDdZz])/g, (m, p, ch) => p + ch + ch + ch);
+  s = s.replace(/(^|\.\s+|!\s+|\?\s+)([SsDdZz])/g, (m, p, ch) => p + ch + ch + ch);
   return s;
 }
 
@@ -82,7 +82,7 @@ function speakNow(text, { style = "jedi", voiceName, rate, pitch } = {}) {
   const sentences = effText.replace(/\s+/g, " ")
     .match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g) || [effText];
 
-  sentences.forEach((s, i) => {
+  sentences.forEach((s) => {
     const u = new SpeechSynthesisUtterance(s.trim());
     u.rate = effRate; u.pitch = effPitch; u.volume = 1;
     if (chosen) { u.voice = chosen; u.lang = chosen.lang; }
@@ -160,7 +160,23 @@ function useVoice({ text, enabled, style, voiceName, playing }) {
     // speaking state will be cleared by utterance onend
   }, [text, style, voiceName, preset.rate, preset.pitch, supported]);
 
-  return { supported, speaking, blocked, retrigger };
+  // prime: the same gesture-unlock retrigger() does, WITHOUT speaking.
+  // session.jsx calls this from click handlers that need to satisfy the
+  // browser's gesture requirement now so a LATER async speak() call (e.g.
+  // the auto-speak effect above, once `text` arrives) is not silently
+  // blocked — retrigger() conflates that with "and speak this text right
+  // now," which is wrong for a handler that decides separately whether to
+  // speak immediately. Was previously called as a bare `primeSpeech()`
+  // with no such export existing anywhere in the file, a ReferenceError
+  // waiting to fire the first time a voice control was actually clicked —
+  // see docs/COMPLETION_AUDIT.md's completion follow-up.
+  const prime = React.useCallback(() => {
+    if (!supported) return;
+    primedRef.current = true;
+    setBlocked(false);
+  }, [supported]);
+
+  return { supported, speaking, blocked, retrigger, prime };
 }
 
 Object.assign(window, { useVoice, listVoices, speakNow, stopSpeech, STYLE_PRESETS });
