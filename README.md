@@ -33,6 +33,7 @@ The banner above is machine-checked by [`scripts/check-claims.mjs`](scripts/chec
 | [`project/docs/EXECUTION_PLAN.md`](project/docs/EXECUTION_PLAN.md) | The 29-work-package plan that built the architecture described below. |
 | [`project/docs/EXECUTION_STATUS.md`](project/docs/EXECUTION_STATUS.md) | Live status of every package — what actually landed, including an unresolved item flagged for the repo owner (see [Presentation layer](#presentation-layer) below). |
 | [`project/docs/INPUTS_OUTPUTS.md`](project/docs/INPUTS_OUTPUTS.md) | Field reference for every exported function/class/constant across core, ledger, producer, houses, and timescale. |
+| [`project/docs/CRAM_QMNF_PROOF_COMPENDIUM.md`](project/docs/CRAM_QMNF_PROOF_COMPENDIUM.md) | The twelve core CRAM/QMNF arithmetic identities, with three corrections to the circulated draft, each swept exhaustively by `project/test/proof-compendium.test.js`. |
 
 ---
 
