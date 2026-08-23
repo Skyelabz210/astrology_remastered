@@ -397,6 +397,84 @@ export async function synthesize({
   return await res.arrayBuffer();
 }
 
+/**
+ * Decode base64 without assuming which runtime we are in: browsers have
+ * `atob`, Node has `Buffer`. The with-timestamps endpoint returns audio as
+ * base64 inside JSON (it has to — the alignment travels in the same
+ * response), so this is the only place the two have to be bridged.
+ */
+function base64ToArrayBuffer(b64) {
+  if (typeof atob === "function") {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+  if (typeof Buffer !== "undefined") {
+    const buf = Buffer.from(b64, "base64");
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  }
+  throw new ElevenLabsError("no base64 decoder available", { code: "no_decoder" });
+}
+
+/**
+ * POST /v1/text-to-speech/{voiceId}/with-timestamps — the same synthesis as
+ * `synthesize()`, plus per-character timing.
+ *
+ * This is what makes a whole-chart reading playable rather than a stack of
+ * separate clips: `alignment.character_start_times_seconds` gives the time
+ * at which each character of the submitted text is spoken, so a caller
+ * holding character ranges for each section (narrative.jsx's segments) can
+ * follow the voice exactly — advancing the deck when the narration actually
+ * reaches that sign, not when a timer guesses it has.
+ *
+ * Returns `{ audio: ArrayBuffer, alignment, normalizedAlignment }`.
+ * `alignment` can legitimately be absent on some models; callers must have
+ * a duration-based fallback rather than assuming it is there.
+ */
+export async function synthesizeWithTimestamps({
+  apiKey,
+  voiceId,
+  text,
+  modelId = DEFAULT_MODEL_ID,
+  outputFormat = DEFAULT_OUTPUT_FORMAT,
+  voiceSettings,
+  fetchImpl,
+  signal,
+} = {}) {
+  if (!apiKey) throw new ElevenLabsError("No ElevenLabs API key configured.", { code: "no_key" });
+  if (!voiceId) throw new ElevenLabsError("No ElevenLabs voice ID resolved.", { code: "no_voice" });
+  const body = String(text || "").trim();
+  if (!body) throw new ElevenLabsError("Nothing to speak.", { code: "empty_text" });
+
+  const doFetch = pickFetch(fetchImpl);
+  const url = `${ELEVEN_API_BASE}/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps`
+    + `?output_format=${encodeURIComponent(outputFormat)}`;
+  const res = await doFetch(url, {
+    method: "POST",
+    headers: {
+      "xi-api-key": apiKey,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    },
+    body: JSON.stringify({
+      text: body,
+      model_id: modelId,
+      voice_settings: voiceSettings || voiceSettingsFor("jedi"),
+    }),
+    signal,
+  });
+  if (!res.ok) throw await failureFrom(res);
+  const payload = await res.json();
+  const b64 = payload && (payload.audio_base64 || payload.audioBase64);
+  if (!b64) throw new ElevenLabsError("ElevenLabs returned no audio.", { code: "no_audio" });
+  return {
+    audio: base64ToArrayBuffer(b64),
+    alignment: (payload && payload.alignment) || null,
+    normalizedAlignment: (payload && payload.normalized_alignment) || null,
+  };
+}
+
 // Browser publication — see this file's header for the load-order contract.
 if (typeof window !== "undefined") {
   window.ElevenLabs = {
@@ -419,5 +497,6 @@ if (typeof window !== "undefined") {
     searchSharedVoices,
     resolveVoiceId,
     synthesize,
+    synthesizeWithTimestamps,
   };
 }

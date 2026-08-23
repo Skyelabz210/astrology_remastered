@@ -372,6 +372,216 @@ export async function run() {
       JSON.stringify(rig.writes.status.map(x => x && x.state)));
   }
 
+  // ── the whole chart as one narrative ─────────────────────────────────
+  // speakNarrative() is the difference between a reading you trigger twelve
+  // times and one you press play on. What has to hold: every segment is
+  // reported, in order, with the card it belongs to, on BOTH providers —
+  // because the deck follows those reports, and a fallback that stopped
+  // reporting them would leave the cards frozen while the voice ran on.
+  function narrativeFixture(n = 4) {
+    const segments = [];
+    let text = "";
+    for (let i = 0; i < n; i++) {
+      const body = `Segment number ${i}, spoken in its turn, at some length so the chunker has something to work with.`;
+      if (i > 0) text += "\n\n";
+      const start = text.length;
+      text += body;
+      segments.push({ index: i, kind: i === 0 ? "opening" : "card", cardIdx: i === 0 ? null : i - 1,
+                      title: `Segment ${i}`, text: body, start, end: text.length });
+    }
+    return { text, segments };
+  }
+
+  /** voice.jsx reads narrative.jsx's helpers as script-scope globals. */
+  function withNarrativeHelpers(sandbox) {
+    sandbox.NARRATIVE_MAX_CHARS = 4500;
+    sandbox.chunkNarrative = (segments, maxChars) => {
+      const chunks = [];
+      let cur = null;
+      for (const seg of segments) {
+        const add = cur ? 2 + seg.text.length : seg.text.length;
+        if (cur && cur.text.length + add > maxChars) { chunks.push(cur); cur = null; }
+        if (!cur) cur = { segments: [], text: "", offsets: [] };
+        if (cur.segments.length) cur.text += "\n\n";
+        const start = cur.text.length;
+        cur.text += seg.text;
+        cur.segments.push(seg);
+        cur.offsets.push({ index: seg.index, cardIdx: seg.cardIdx, start, end: cur.text.length });
+      }
+      if (cur && cur.segments.length) chunks.push(cur);
+      return chunks;
+    };
+    sandbox.segmentTimingsFromAlignment = (chunk, alignment) => {
+      const starts = alignment && alignment.character_start_times_seconds;
+      if (!Array.isArray(starts) || !starts.length) return null;
+      const at = (i) => starts[Math.max(0, Math.min(starts.length - 1, i))];
+      return chunk.offsets.map(o => ({ index: o.index, cardIdx: o.cardIdx, startSec: at(o.start), endSec: at(o.end - 1) }));
+    };
+    sandbox.segmentTimingsFromDuration = (chunk, dur) => {
+      if (!Number.isFinite(dur) || dur <= 0) return null;
+      const per = dur / chunk.text.length;
+      return chunk.offsets.map(o => ({ index: o.index, cardIdx: o.cardIdx, startSec: o.start * per, endSec: o.end * per }));
+    };
+    return sandbox;
+  }
+
+  /** A sandbox whose <audio> element can be driven forward in fake time. */
+  function narrationSandbox({ eleven, timestamps = true }) {
+    const calls = { speak: [], synth: [], timestamped: [] };
+    const listeners = {};
+    const audio = {
+      src: "", currentTime: 0, duration: 30,
+      play() { return Promise.resolve(); },
+      pause() {},
+      addEventListener: (ev, fn) => { (listeners[ev] || (listeners[ev] = [])).push(fn); },
+      removeEventListener: (ev, fn) => { listeners[ev] = (listeners[ev] || []).filter(f => f !== fn); },
+    };
+    const emit = (ev) => (listeners[ev] || []).slice().forEach(fn => fn());
+    const sandbox = {};
+    sandbox.window = sandbox;
+    sandbox.React = {
+      useState: (init) => [typeof init === "function" ? init() : init, () => {}],
+      useRef: (init) => ({ current: init }),
+      useEffect: (fn) => fn(),
+      useCallback: (fn) => fn,
+    };
+    sandbox.speechSynthesis = {
+      cancel: () => {}, speak: (u) => { calls.speak.push(u); if (u.onstart) u.onstart(); if (u.onend) u.onend(); },
+      pause: () => {}, resume: () => {}, getVoices: () => [], onvoiceschanged: null,
+    };
+    sandbox.SpeechSynthesisUtterance = function (t2) { this.text = t2; };
+    sandbox.Audio = function () { return audio; };
+    sandbox.Blob = function () {};
+    sandbox.URL = { createObjectURL: () => `blob:${calls.synth.length}-${calls.timestamped.length}`, revokeObjectURL: () => {} };
+    sandbox.ElevenLabs = eleven ? eleven(calls, timestamps) : undefined;
+    if (!eleven) delete sandbox.ElevenLabs;
+    withNarrativeHelpers(sandbox);
+    vm.createContext(sandbox);
+    vm.runInContext(voiceSrc, sandbox, { filename: "voice.jsx" });
+    return { sandbox, calls, audio, emit };
+  }
+
+  const narrationEleven = (calls, timestamps) => ({
+    ...workingEleven({ synthesize: [] }),
+    synthesize: async (args) => { calls.synth.push(args); return new ArrayBuffer(8); },
+    synthesizeWithTimestamps: async (args) => {
+      calls.timestamped.push(args);
+      if (!timestamps) throw new Error("with-timestamps not available on this plan.");
+      const per = 30 / args.text.length;
+      return {
+        audio: new ArrayBuffer(8),
+        alignment: { character_start_times_seconds: args.text.split("").map((_, i) => i * per) },
+        normalizedAlignment: null,
+      };
+    },
+  });
+
+  {
+    const { sandbox, calls, audio, emit } = narrationSandbox({ eleven: narrationEleven });
+    const seen = [];
+    const narrative = narrativeFixture(4);
+    const handle = sandbox.speakNarrative(narrative, {
+      style: "jedi", provider: "elevenlabs", onSegment: (s) => seen.push(s),
+    });
+    t("speakNarrative returns a handle naming the provider",
+      handle && handle.provider === "elevenlabs" && typeof handle.stop === "function");
+    t("the handle can hold and resume the reading",
+      typeof handle.pause === "function" && typeof handle.resume === "function");
+    await tick(); await tick(); await tick();
+    t("the whole narrative goes out as ONE request, not one per segment",
+      calls.timestamped.length === 1, `${calls.timestamped.length} requests`);
+    t("that request carries every segment's words",
+      calls.timestamped[0] && narrative.segments.every(s => calls.timestamped[0].text.includes(s.text)));
+    t("it asks for timestamps rather than plain audio",
+      calls.timestamped.length === 1 && calls.synth.length === 0);
+
+    // Drive playback forward and watch the segments being reported. The
+    // four segments split a 30-second clip evenly, so these times land one
+    // inside each.
+    audio.currentTime = 0; emit("loadedmetadata"); emit("timeupdate");
+    for (const time of [3, 10, 18, 26]) { audio.currentTime = time; emit("timeupdate"); }
+    t("every segment is reported as the voice reaches it",
+      seen.length === 4, JSON.stringify(seen.map(s => s.index)));
+    t("segments are reported in order",
+      seen.every((s, i) => s.index === i), JSON.stringify(seen.map(s => s.index)));
+    t("each report names the card the deck should show",
+      seen[0].cardIdx === null && seen[1].cardIdx === 0 && seen[3].cardIdx === 2,
+      JSON.stringify(seen.map(s => s.cardIdx)));
+    t("a segment is not reported twice for the same position",
+      new Set(seen.map(s => s.index)).size === seen.length);
+  }
+  {
+    // Seeking forward must land the deck on the segment the voice is
+    // ACTUALLY in, not replay every segment it skipped over — the deck
+    // shows where the reading is, not where it has been.
+    const { sandbox, audio, emit } = narrationSandbox({ eleven: narrationEleven });
+    const seen = [];
+    sandbox.speakNarrative(narrativeFixture(4), {
+      style: "jedi", provider: "elevenlabs", onSegment: (s) => seen.push(s),
+    });
+    await tick(); await tick(); await tick();
+    audio.currentTime = 0; emit("loadedmetadata");
+    audio.currentTime = 26; emit("timeupdate");
+    t("seeking forward reports only the segment now playing",
+      seen.length === 2 && seen[0].index === 0 && seen[1].index === 3,
+      JSON.stringify(seen.map(s => s.index)));
+  }
+  {
+    // No timestamps from the model: the same segments must still be
+    // reported, timed against the clip's own duration.
+    const { sandbox, calls, audio, emit } = narrationSandbox({ eleven: narrationEleven, timestamps: false });
+    const seen = [];
+    sandbox.speakNarrative(narrativeFixture(3), { style: "jedi", provider: "elevenlabs", onSegment: (s) => seen.push(s) });
+    await tick(); await tick(); await tick();
+    t("a model without timestamps falls back to plain synthesis",
+      calls.synth.length === 1, `${calls.synth.length} plain requests`);
+    audio.duration = 30; audio.currentTime = 0; emit("loadedmetadata");
+    for (const time of [11, 21, 29]) { audio.currentTime = time; emit("timeupdate"); }
+    t("segments are still reported, timed against the clip duration",
+      seen.length === 3 && seen.every((s, i) => s.index === i),
+      JSON.stringify(seen.map(s => s.index)));
+  }
+  {
+    // ElevenLabs unreachable entirely: the browser engine narrates the same
+    // segments, so the deck still follows.
+    const { sandbox, calls } = narrationSandbox({ eleven: null });
+    const seen = [];
+    const statuses = [];
+    sandbox.speakNarrative(narrativeFixture(4), {
+      style: "jedi", provider: "elevenlabs",
+      onSegment: (s) => seen.push(s), onStatus: (s) => statuses.push(s),
+    });
+    await tick(); await tick();
+    t("with no ElevenLabs at all the browser engine narrates",
+      calls.speak.length === 4, `${calls.speak.length} utterances`);
+    t("one utterance per segment, so each start is an exact cue",
+      seen.length === 4 && seen.every((s, i) => s.index === i));
+  }
+  {
+    const { sandbox, calls } = narrationSandbox({
+      eleven: (calls2) => ({ ...narrationEleven(calls2, false),
+        synthesize: async () => { throw new Error("Quota exceeded."); } }),
+    });
+    const seen = [], statuses = [];
+    sandbox.speakNarrative(narrativeFixture(3), {
+      style: "jedi", provider: "elevenlabs",
+      onSegment: (s) => seen.push(s), onStatus: (s) => statuses.push(s),
+    });
+    await tick(); await tick(); await tick();
+    t("a failed narration falls back to the browser engine mid-flight",
+      calls.speak.length === 3, `${calls.speak.length} utterances`);
+    t("the fallback still reports every segment, so the deck keeps following",
+      seen.length === 3 && seen.every((s, i) => s.index === i));
+    t("and the reason is reported once",
+      statuses.some(s => s.state === "fallback" && /browser voice/i.test(s.message)),
+      JSON.stringify(statuses.map(s => s.state)));
+  }
+  {
+    const { sandbox } = narrationSandbox({ eleven: narrationEleven });
+    t("an empty narrative starts nothing", sandbox.speakNarrative({ segments: [] }, {}) === null);
+    t("a missing narrative starts nothing", sandbox.speakNarrative(null, {}) === null);
+  }
+
   // ── the browser voice picker ─────────────────────────────────────────
   {
     // The configured voice name is an ElevenLabs voice, so on the fallback

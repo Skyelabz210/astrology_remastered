@@ -10,7 +10,7 @@ of 1,296,000; every lane is a BigInt residue; every claim is either exhaustively
 swept or explicitly marked open.
 
 ```
-5457/5457 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+5533/5533 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 **Before taking any claim below at face value, read:**
@@ -196,6 +196,34 @@ fail — no key, unresolvable voice, refused request, network down, blocked
 playback — falls back to the browser voice rather than going silent; that
 fallback is what `project/test/present/voice-provider.test.js` exists to
 pin.
+
+#### The chart plays as one narrative
+
+A reading is not twelve things to trigger one at a time. `narrative.jsx`
+composes the whole chart as a single piece — an opening that places the
+nativity (date, place, sect, rising sign, lunar phase, chart shape), the
+twelve signs in deck order, and a closing that names what the shape came to
+— and `voice.jsx`'s `speakNarrative()` plays it end to end.
+
+The deck follows the voice rather than a timer. Each segment carries its
+character range within the joined text; ElevenLabs' `with-timestamps`
+endpoint returns a start time per character, so the card on screen changes
+when the narration actually reaches that sign. Where a model returns no
+alignment, the same ranges scale against the clip's measured duration; on
+the browser fallback each segment is its own utterance and the cue comes
+from its `onstart`, which is exact. Long narratives are split into
+request-sized chunks at segment boundaries — never mid-sentence — and the
+next chunk is synthesized while the current one plays.
+
+Because playback is driven by the audio element's own clock, pausing and
+resuming keep the deck in sync for free: the reading holds mid-sentence and
+the card holds with it. Stepping by hand stops the narration rather than
+fighting it.
+
+The page shows the sentence being spoken, not the source-tagged per-card
+table underneath it — those say different things, one written for the ear
+and one for the eye, and showing one while hearing the other made the
+reading feel like two apps at once. The table returns when narration stops.
 
 #### The default chart
 
@@ -597,6 +625,7 @@ project/
     AUDIT_REMEDIATION_PLAN.md  the original external audit
   eclipses.js          eclipse series, greatest-eclipse/sub-body coordinates, natal contacts
   elevenlabs.js        ElevenLabs TTS provider for the reading voice (Nerissa)
+  narrative.jsx        the whole chart composed as one continuous spoken narrative
   tzresolve.js         DST-aware wall-clock → UTC instant resolution
   validate.js          birth-input validation, polar house-system warnings
   *.jsx, *.html        the presentation layer — chart UI, HCRM register console

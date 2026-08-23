@@ -31,6 +31,7 @@ isolation, tests, and claim-status tagging.
 | Console / reading UI | `*.html`, `*-view.jsx` | SCAFFOLD | presentation |
 | Eclipse series + geophysics | `eclipses.js`, `eclipse-view.jsx` | FLOAT PRESENTATION · verified against the vendored ephemeris by geometric invariant (zenith over every sublunar point; Sun above the horizon at every greatest-eclipse point, 1970–2030) | presentation |
 | Voice narration (ElevenLabs + SpeechSynthesis) | `elevenlabs.js`, `voice.jsx` | SCAFFOLD / PRESENTATION · no bearing on any chart value | presentation |
+| Whole-chart narrative | `narrative.jsx` | PRESENTATION · composed only from computed chart values; inherits readings.jsx's unknown-birth-time gate (no house or Ascendant language), asserted in test/present/narrative.test.js | presentation |
 | Number core | `cram-int.js` | exact (BigInt) | number engine |
 
 ## Axioms

@@ -70,9 +70,20 @@ export async function run() {
   // ── the crash itself: primeSpeech must be gone from session.jsx ───────
   t("session.jsx no longer calls the undefined primeSpeech()",
     !/\bprimeSpeech\s*\(/.test(sessionSrc));
+  // The three original crash sites — the voice on/off toggle, the
+  // "tap to unblock" control, and "speak now" — plus any gesture handler
+  // added since that also has to unlock the audio engines before an async
+  // speak (the whole-chart narration's start handler is one). The check is
+  // "at least the three, and every one of them calls the real function",
+  // not an exact count: pinning the count would fail the next time a
+  // legitimate new click handler primes, which is the behavior we WANT.
+  // What must never come back is a call to a `primeSpeech` that does not
+  // exist — asserted separately above.
   const primeCallSites = [...sessionSrc.matchAll(/voice\.prime\s*&&\s*voice\.prime\s*\(\)/g)];
-  t("session.jsx's 3 former primeSpeech() call sites now call the real voice.prime()",
-    primeCallSites.length === 3, `found ${primeCallSites.length} occurrences`);
+  t("session.jsx's former primeSpeech() call sites all call the real voice.prime()",
+    primeCallSites.length >= 3, `found ${primeCallSites.length} occurrences`);
+  t("every gesture handler that starts an async speak primes first",
+    /startNarration\s*=\s*React\.useCallback\([\s\S]{0,400}?voice\.prime/.test(sessionSrc));
 
   // ── voice.jsx: useVoice() actually exports prime() ────────────────────
   {

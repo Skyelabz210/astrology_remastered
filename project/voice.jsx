@@ -351,6 +351,272 @@ function stopSpeech() {
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// continuous narration — the whole chart as one piece
+// ──────────────────────────────────────────────────────────────────────
+//
+// The card-at-a-time path above speaks one reading and stops. This one
+// takes narrative.jsx's segmented chart narrative and plays it end to end,
+// reporting which segment the voice has actually REACHED so the deck can
+// follow it rather than run on a parallel timer.
+//
+// How "reached" is known differs by provider, and neither is a guess:
+//   · ElevenLabs — character-level timestamps from the with-timestamps
+//     endpoint turn each segment's character range into a start time, and a
+//     `timeupdate` listener on the audio element compares playback position
+//     against them. Using the element's own clock (rather than setTimeout)
+//     means pausing, resuming and seeking all keep the deck in sync for
+//     free. Where a model returns no alignment, the same ranges are scaled
+//     against the clip's measured duration instead.
+//   · SpeechSynthesis — one utterance per segment, chained; the segment is
+//     reported from that utterance's own `onstart`, which is exact.
+//
+// Long narratives are split into request-sized chunks at SEGMENT
+// boundaries (never mid-sentence — a chunk edge is audible), and the next
+// chunk is synthesized while the current one plays, so the seam between
+// them is the length of a network round trip that already happened.
+
+const __narration = { seq: 0, cache: new Map() };
+const NARRATION_CACHE_MAX = 8;
+
+function narrationCacheKey(text, voiceId, modelId, settings) {
+  return [voiceId, modelId, settings.speed, settings.stability, settings.style, text.length, text.slice(0, 120)].join("|");
+}
+
+/** Synthesize one chunk and work out when each of its segments is spoken. */
+async function renderNarrationChunk(chunk, ctx) {
+  const key = narrationCacheKey(chunk.text, ctx.voiceId, ctx.modelId, ctx.settings);
+  const cached = __narration.cache.get(key);
+  if (cached) return { ...cached, timings: cached.timings || segmentTimingsFromAlignmentSafe(chunk, cached.alignment) };
+
+  let audio, alignment = null;
+  try {
+    const out = await ctx.EL.synthesizeWithTimestamps({
+      apiKey: ctx.apiKey, voiceId: ctx.voiceId, text: chunk.text,
+      modelId: ctx.modelId, voiceSettings: ctx.settings,
+    });
+    audio = out.audio;
+    alignment = out.normalizedAlignment || out.alignment;
+  } catch (err) {
+    // A model or plan without the timestamps endpoint must not cost the
+    // whole narration — fall back to plain synthesis and time the segments
+    // against the clip's duration instead.
+    if (err && (err.code === "no_key" || err.code === "no_voice")) throw err;
+    audio = await ctx.EL.synthesize({
+      apiKey: ctx.apiKey, voiceId: ctx.voiceId, text: chunk.text,
+      modelId: ctx.modelId, voiceSettings: ctx.settings,
+    });
+  }
+  const url = window.URL.createObjectURL(new Blob([audio], { type: "audio/mpeg" }));
+  const entry = { url, alignment, timings: segmentTimingsFromAlignmentSafe(chunk, alignment) };
+  __narration.cache.set(key, entry);
+  while (__narration.cache.size > NARRATION_CACHE_MAX) {
+    const oldest = __narration.cache.keys().next().value;
+    const stale = __narration.cache.get(oldest);
+    __narration.cache.delete(oldest);
+    try { window.URL.revokeObjectURL(stale.url); } catch { /* already revoked */ }
+  }
+  return entry;
+}
+
+function segmentTimingsFromAlignmentSafe(chunk, alignment) {
+  if (!alignment || typeof segmentTimingsFromAlignment !== "function") return null;
+  try { return segmentTimingsFromAlignment(chunk, alignment); } catch { return null; }
+}
+
+/** Play one rendered chunk, reporting segments as the voice reaches them. */
+function playNarrationChunk(chunk, entry, ctx) {
+  return new Promise((resolve, reject) => {
+    const a = elevenAudioElement();
+    if (!a) { reject(new Error("no audio element available")); return; }
+    let timings = entry.timings;
+    let announced = -1;
+
+    const announce = () => {
+      if (!timings || !timings.length) return;
+      const now = a.currentTime + 0.06;   // a beat of lead so the card is up as the words land
+      let hit = -1;
+      for (let i = 0; i < timings.length; i++) {
+        if (now >= timings[i].startSec) hit = i; else break;
+      }
+      if (hit >= 0 && hit !== announced) {
+        announced = hit;
+        if (ctx.onSegment) ctx.onSegment(timings[hit]);
+      }
+    };
+    const onMeta = () => {
+      // No alignment came back: scale the character ranges against the
+      // clip's real duration, which is only knowable once metadata loads.
+      if (!timings && typeof segmentTimingsFromDuration === "function") {
+        timings = segmentTimingsFromDuration(chunk, a.duration);
+      }
+      announce();
+    };
+    const cleanup = () => {
+      a.removeEventListener("timeupdate", announce);
+      a.removeEventListener("loadedmetadata", onMeta);
+      a.removeEventListener("ended", onEnded);
+      a.removeEventListener("error", onError);
+    };
+    const onEnded = () => { cleanup(); resolve(); };
+    const onError = () => { cleanup(); reject(new Error("narration playback failed")); };
+
+    a.addEventListener("timeupdate", announce);
+    a.addEventListener("loadedmetadata", onMeta);
+    a.addEventListener("ended", onEnded);
+    a.addEventListener("error", onError);
+
+    try { a.pause(); } catch { /* nothing playing */ }
+    a.src = entry.url;
+    const started = a.play();
+    if (started && typeof started.then === "function") {
+      started.then(() => { if (ctx.onStatus) ctx.onStatus({ state: "speaking", message: "" }); announce(); },
+        (err) => { cleanup(); reject(err); });
+    } else {
+      announce();
+    }
+  });
+}
+
+async function speakNarrativeEleven(narrative, opts, state) {
+  const EL = elevenModule();
+  if (!EL) throw new Error("ElevenLabs module not loaded");
+  const style = opts.style || "jedi";
+  const preset = STYLE_PRESETS[style] || STYLE_PRESETS.jedi;
+  const apiKey = EL.readKey();
+  const settings = EL.voiceSettingsFor(style, opts.rate ?? preset.rate);
+  const modelId = opts.elevenModel || EL.DEFAULT_MODEL_ID;
+  const say = (s, message) => { if (opts.onStatus) opts.onStatus({ state: s, message }); };
+
+  say("resolving", "resolving voice…");
+  const resolved = await EL.resolveVoiceId({
+    apiKey,
+    name: opts.voiceName || EL.DEFAULT_VOICE_NAME,
+    voiceId: opts.elevenVoiceId || "",
+  });
+  if (state.cancelled) return null;
+
+  const maxChars = (typeof NARRATIVE_MAX_CHARS === "number") ? NARRATIVE_MAX_CHARS : 4500;
+  const chunks = chunkNarrative(narrative.segments, maxChars);
+  const ctx = {
+    EL, apiKey, settings, modelId, voiceId: resolved.voiceId,
+    onSegment: opts.onSegment, onStatus: opts.onStatus,
+  };
+
+  say("synthesizing", `synthesizing the reading with ${resolved.name || opts.voiceName}…`);
+  let pending = renderNarrationChunk(chunks[0], ctx);
+  for (let i = 0; i < chunks.length; i++) {
+    const entry = await pending;
+    if (state.cancelled) return null;
+    // Start the NEXT chunk rendering before playing this one, so the seam
+    // between them costs nothing.
+    pending = (i + 1 < chunks.length) ? renderNarrationChunk(chunks[i + 1], ctx) : null;
+    await playNarrationChunk(chunks[i], entry, ctx);
+    if (state.cancelled) return null;
+  }
+  say("idle", "");
+  if (opts.onEnd) opts.onEnd();
+  return VOICE_PROVIDER_ELEVEN;
+}
+
+function speakNarrativeBrowser(narrative, opts, state) {
+  if (typeof window === "undefined" || typeof window.speechSynthesis === "undefined") return null;
+  const style = opts.style || "jedi";
+  const preset = STYLE_PRESETS[style] || STYLE_PRESETS.jedi;
+  const voices = listVoices();
+  const chosen = pickBrowserVoice(voices, opts.voiceName);
+  try { window.speechSynthesis.cancel(); } catch {}
+
+  narrative.segments.forEach((seg, i) => {
+    const effText = preset.power ? applyPower(seg.text) : seg.text;
+    const u = new SpeechSynthesisUtterance(effText);
+    u.rate = preset.rate; u.pitch = preset.pitch; u.volume = 1;
+    if (chosen) { u.voice = chosen; u.lang = chosen.lang; }
+    u.onstart = () => {
+      if (state.cancelled) return;
+      if (opts.onSegment) opts.onSegment({ index: seg.index, cardIdx: seg.cardIdx });
+      if (i === 0 && opts.onStatus) opts.onStatus({ state: "speaking", message: "" });
+    };
+    if (i === narrative.segments.length - 1) {
+      u.onend = () => { if (!state.cancelled && opts.onEnd) opts.onEnd(); };
+    }
+    try { window.speechSynthesis.speak(u); } catch {}
+  });
+  return VOICE_PROVIDER_BROWSER;
+}
+
+/**
+ * Play a whole chart narrative, start to finish.
+ *
+ * `narrative` is narrative.jsx's `{ text, segments }`. `opts.onSegment` is
+ * called with `{ index, cardIdx }` each time the voice reaches a new
+ * segment — that is the hook the deck follows. Returns a handle with
+ * `stop()`; call it from a click handler, having primed the engines in the
+ * same gesture, exactly as with speakNow().
+ *
+ * As everywhere else here, an ElevenLabs failure falls back to the browser
+ * engine rather than going silent — the fallback narrates the same segments
+ * in the same order, so the deck still follows.
+ */
+function speakNarrative(narrative, opts = {}) {
+  if (!narrative || !narrative.segments || !narrative.segments.length) return null;
+  const state = { cancelled: false };
+  const provider = resolveProvider(opts.provider);
+  __narration.seq += 1;
+  const generation = __narration.seq;
+  const guard = () => { state.cancelled = state.cancelled || generation !== __narration.seq; return state.cancelled; };
+
+  const handle = {
+    provider,
+    stop() {
+      state.cancelled = true;
+      stopSpeech();
+    },
+    /**
+     * Hold the reading where it is. Both engines resume from the same
+     * point — the audio element from its own clock, SpeechSynthesis from
+     * the middle of the current utterance — so pausing does not cost the
+     * listener the sign they were on, and the deck stays where the voice
+     * stopped rather than continuing without it.
+     */
+    pause() {
+      const a = __eleven.audio;
+      if (a) { try { a.pause(); } catch { /* not playing */ } }
+      try {
+        if (typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined") {
+          window.speechSynthesis.pause();
+        }
+      } catch {}
+    },
+    resume() {
+      const a = __eleven.audio;
+      if (a && a.src && a.src !== SILENT_WAV) {
+        try { const p = a.play(); if (p && p.catch) p.catch(() => {}); } catch { /* not resumable */ }
+      }
+      try {
+        if (typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined") {
+          window.speechSynthesis.resume();
+        }
+      } catch {}
+    },
+  };
+
+  if (provider === VOICE_PROVIDER_ELEVEN) {
+    stopBrowserSpeech();
+    speakNarrativeEleven(narrative, opts, state).catch((err) => {
+      if (guard()) return;
+      const raw = (err && err.message) || "ElevenLabs narration unavailable";
+      const message = /[.!?]$/.test(raw) ? raw : `${raw}.`;
+      if (opts.onStatus) opts.onStatus({ state: "fallback", message: `${message} Using the browser voice.` });
+      handle.provider = speakNarrativeBrowser(narrative, opts, state) || VOICE_PROVIDER_BROWSER;
+    });
+    return handle;
+  }
+  stopEleven();
+  speakNarrativeBrowser(narrative, opts, state);
+  return handle;
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // useVoice
 // ──────────────────────────────────────────────────────────────────────
 
@@ -512,6 +778,7 @@ function useVoice({ text, enabled, style, voiceName, playing, provider, elevenVo
 
 Object.assign(window, {
   useVoice, listVoices, speakNow, stopSpeech, STYLE_PRESETS,
+  speakNarrative, speakNarrativeEleven, speakNarrativeBrowser,
   speakEleven, speakBrowser, resolveProvider, elevenReady, primeElevenAudio,
   VOICE_PROVIDER_ELEVEN, VOICE_PROVIDER_BROWSER, DEFAULT_VOICE_PROVIDER,
 });

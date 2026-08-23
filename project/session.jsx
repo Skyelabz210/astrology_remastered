@@ -24,6 +24,17 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   const [playing,  setPlaying]  = $sUseState(true);
   const [shuffled, setShuffled] = $sUseState(false);
 
+  // ── continuous narration ────────────────────────────────────────────
+  // The chart plays as ONE narrative rather than twelve separately-
+  // triggered readings: narrative.jsx composes an opening, the signs in
+  // deck order, and a closing into a single piece; voice.jsx speaks it
+  // end to end and reports which segment the voice has actually reached;
+  // the deck follows THAT rather than a parallel dwell timer.
+  const [narrating,    setNarrating]    = $sUseState(false);
+  const [narrationSeg, setNarrationSeg] = $sUseState(0);
+  const [narrationStatus, setNarrationStatus] = $sUseState({ state: "idle", message: "" });
+  const narrationRef = $sUseRef(null);
+
   // Shuffle intro
   $sUseEffect(() => {
     const t = setTimeout(() => setShuffled(true), 1800);
@@ -60,13 +71,63 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
     return localReading.body.map(line => line.text).join(" ");
   }, [agent.text, localReading]);
 
+  // The whole-chart narrative. Rebuilt only when the chart itself changes:
+  // it is the same piece from the first play to the last, so a re-render
+  // must not hand the player a different object mid-reading.
+  //
+  // `agentTexts` passes through whatever the Agent interpreter has ALREADY
+  // produced (agent.jsx's own cache), keyed by card index — a card the
+  // agent has interpreted narrates in its words, every other card in
+  // narrative.jsx's locally-composed ones. Nothing new is fetched to build
+  // this: composing the whole chart through the agent would mean twelve
+  // sequential LLM round trips before the first word, and would send birth
+  // data for cards the reader never asked about.
+  const narrative = $sUseMemo(() => {
+    if (typeof buildChartNarrative !== "function") return null;
+    let agentTexts = null;
+    if (agentOn && typeof __cache !== "undefined" && typeof cacheKey === "function") {
+      agentTexts = {};
+      order.forEach((idx) => {
+        const card = chart.cards[idx];
+        if (!card) return;
+        try {
+          const hit = __cache.get(cacheKey(card));
+          if (hit) agentTexts[idx] = hit;
+        } catch { /* cache shape changed — fall back to local text */ }
+      });
+    }
+    return buildChartNarrative(chart, { agentTexts });
+  }, [chart, order, agentOn, agent.text]);
+
+  // Where each narrative segment puts the deck. Segments that are not a
+  // card (the opening, the closing) leave the current card alone.
+  const showSegment = React.useCallback((seg) => {
+    if (!seg) return;
+    setNarrationSeg(seg.index);
+    if (seg.cardIdx == null) return;
+    const at = order.indexOf(seg.cardIdx);
+    if (at >= 0) setPos(at);
+  }, [order]);
+
+  const stopNarration = React.useCallback(() => {
+    if (narrationRef.current) {
+      try { narrationRef.current.stop(); } catch { /* already stopped */ }
+      narrationRef.current = null;
+    }
+    setNarrating(false);
+  }, []);
+
   // Voice. `provider`/`elevenVoiceId`/`elevenModel` select the ElevenLabs
   // reading voice (default "Nerissa"); voice.jsx falls back to the
   // browser's SpeechSynthesis whenever ElevenLabs cannot serve, so these
   // being unset or unusable degrades rather than silences the narration.
   const voice = useVoice({
     text:          spokenText,
-    enabled:       !!settings.voiceOn,
+    // While the whole chart is playing as one narrative, the per-card
+    // auto-speak is disabled outright — two speakers on one audio element
+    // is not a race worth having, and the narration already covers this
+    // card. It resumes the moment narration stops.
+    enabled:       !!settings.voiceOn && !narrating,
     style:         settings.voiceStyle || "jedi",
     voiceName:     settings.voiceName,
     provider:      settings.voiceProvider,
@@ -75,18 +136,47 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
     playing,
   });
 
+  // Start the whole chart playing, from the top or from the card on screen.
+  // MUST be called inside a click handler: voice.prime() unlocks both
+  // engines in that gesture so the asynchronous ElevenLabs playback that
+  // follows a second or two later is not refused as autoplay.
+  const startNarration = React.useCallback((fromSegment = 0) => {
+    if (!narrative || !narrative.segments.length) return;
+    voice.prime && voice.prime();
+    stopSpeech();
+    const rest = fromSegment > 0
+      ? { text: narrative.text, segments: narrative.segments.slice(fromSegment) }
+      : narrative;
+    setNarrating(true);
+    setNarrationSeg(rest.segments[0] ? rest.segments[0].index : 0);
+    setPlaying(true);
+    narrationRef.current = speakNarrative(rest, {
+      style:         settings.voiceStyle || "jedi",
+      voiceName:     settings.voiceName,
+      provider:      settings.voiceProvider,
+      elevenVoiceId: settings.elevenVoiceId,
+      elevenModel:   settings.elevenModel,
+      onSegment:     showSegment,
+      onStatus:      setNarrationStatus,
+      onEnd:         () => { narrationRef.current = null; setNarrating(false); },
+    });
+  }, [narrative, voice.prime, settings.voiceStyle, settings.voiceName, settings.voiceProvider,
+      settings.elevenVoiceId, settings.elevenModel, showSegment]);
+
   // Called inside the button onClick — satisfies gesture requirement.
+  //
+  // Turning the voice ON starts the whole chart playing, because that is
+  // what the control now means: this reading is one continuous piece, not
+  // twelve things to trigger one at a time.
   const handleVoiceToggle = React.useCallback(() => {
     voice.prime && voice.prime();
     const next = !settings.voiceOn;
     setTweak("voiceOn", next);
-    if (next && spokenText) {
-      // speak immediately in this gesture
-      voice.retrigger && voice.retrigger(spokenText);
-    } else {
-      stopSpeech();
-    }
-  }, [settings.voiceOn, spokenText, voice.retrigger, voice.prime, setTweak]);
+    if (!next) { stopNarration(); stopSpeech(); return; }
+    if (narrative && narrative.segments.length) startNarration(narrationSeg);
+    else if (spokenText) voice.retrigger && voice.retrigger(spokenText);
+  }, [settings.voiceOn, spokenText, narrative, narrationSeg, startNarration, stopNarration,
+      voice.retrigger, voice.prime, setTweak]);
 
   // Pre-warm next
   const nextCard = cards[pos + 1];
@@ -94,17 +184,26 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
     if (agentOn && nextCard) interpretCard(nextCard, chart).catch(() => {});
   }, [agentOn, nextCard && nextCard.idx]);
 
-  // Auto-advance
+  // Auto-advance — the fallback pacing for when the chart is NOT being
+  // narrated as one piece. While it is, the voice's own position drives the
+  // deck (showSegment), and a second timer moving `pos` underneath it would
+  // desynchronise the card from the words.
   $sUseEffect(() => {
+    if (narrating) return;
     if (!playing || !shuffled || !current || !spokenText) return;
     const words = spokenText.split(/\s+/).length;
     const dwell = dwellFor(current, words);
     const t = setTimeout(() => setPos(p => Math.min(cards.length - 1, p + 1)), dwell);
     return () => clearTimeout(t);
-  }, [pos, playing, shuffled, spokenText, current && current.idx, settings.voiceOn]);
+  }, [pos, playing, shuffled, spokenText, current && current.idx, settings.voiceOn, narrating]);
 
-  const onPrev = () => { setPos(p => Math.max(0, p - 1)); };
-  const onNext = () => { setPos(p => Math.min(cards.length - 1, p + 1)); };
+  // Stepping by hand means the reader wants THIS card, not the running
+  // reading — so the narration yields rather than dragging the deck back.
+  const onPrev = () => { stopNarration(); setPos(p => Math.max(0, p - 1)); };
+  const onNext = () => { stopNarration(); setPos(p => Math.min(cards.length - 1, p + 1)); };
+
+  // Leaving the session must not leave a voice running behind it.
+  $sUseEffect(() => () => { stopNarration(); stopSpeech(); }, [stopNarration]);
 
   if (!current) return null;
 
@@ -136,8 +235,15 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
             total={cards.length}
             voiceOn={settings.voiceOn}
             voiceSpeaking={voice.speaking}
-            voiceStatus={voice.status}
+            voiceStatus={narrating ? narrationStatus : voice.status}
             spokenText={spokenText}
+            narrating={narrating}
+            narrationSeg={narrationSeg}
+            narrationTotal={narrative ? narrative.segments.length : 0}
+            narrationSegment={narrating && narrative ? narrative.segments[narrationSeg] : null}
+            onPlayWholeChart={() => startNarration(0)}
+            onResumeWholeChart={() => startNarration(narrationSeg)}
+            onStopNarration={stopNarration}
             onSpeakNow={() => {
               if (!settings.voiceOn) setTweak("voiceOn", true);
               voice.prime && voice.prime();
@@ -156,9 +262,20 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         <SessionControls
           pos={pos} total={cards.length} cards={cards}
           playing={playing}
-          onPlay={() => setPlaying(p => !p)}
+          narrating={narrating}
+          onPlay={() => {
+            // While the chart is being narrated, play/pause means the
+            // READING pauses — the voice holds mid-sentence and the deck
+            // holds with it — not "stop advancing the cards on a timer".
+            const next = !playing;
+            setPlaying(next);
+            if (narrating && narrationRef.current) {
+              if (next) narrationRef.current.resume();
+              else narrationRef.current.pause();
+            }
+          }}
           onPrev={onPrev} onNext={onNext}
-          onPick={i => { setPos(i); setPlaying(false); }}
+          onPick={i => { stopNarration(); setPos(i); setPlaying(false); }}
         />
       )}
     </div>
@@ -168,7 +285,10 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
 // ──────────────────────────────────────────────────────────────────────
 // CINEMATIC STAGE
 // ──────────────────────────────────────────────────────────────────────
-function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, pos, total, voiceOn, voiceSpeaking, voiceStatus, onSpeakNow }) {
+function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, pos, total,
+                         voiceOn, voiceSpeaking, voiceStatus, narrating, narrationSeg,
+                         narrationTotal, narrationSegment, onPlayWholeChart, onResumeWholeChart,
+                         onStopNarration, onSpeakNow }) {
   const p = card.principal;
 
   return (
@@ -188,13 +308,27 @@ function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, po
         <div className="cs-card-meta">
           <span className="cs-pos">{String(pos + 1).padStart(2,"0")} / {String(total).padStart(2,"0")}</span>
           <span className="cs-planet-glyph">{p.glyph}</span>
-          <span className="cs-title">{p.name} in {card.name}</span>
+          <span className="cs-title">
+            {narrating && narrationSegment && narrationSegment.cardIdx == null
+              ? narrationSegment.title
+              : `${p.name} in ${card.name}`}
+          </span>
           {p.retrograde && <span className="cs-retro">℞</span>}
           <span className="cs-house">{timeUnknown ? "House —" : `House ${roman(card.house)}`}</span>
           <span className="cs-dig cs-dig-{card.dignity.kind}">{card.dignity.kind}</span>
         </div>
 
         <div className="cs-body">
+          {/* While the chart is being read as one narrative, the page shows
+              the SENTENCE THE VOICE IS SPEAKING, revealed word by word,
+              rather than the source-tagged per-card table underneath. The
+              two say different things — the narrative is written for the
+              ear, the table for the eye — and showing one while hearing the
+              other makes the reading feel like two apps at once. The table
+              comes back the moment narration stops. */}
+          {narrating && narrationSegment ? (
+            <WordReveal text={narrationSegment.text} resonance={card.resonance} />
+          ) : (<>
           {agent.loading && (
             <div className="cs-loading">
               <span className="cs-loading-dot" />
@@ -214,17 +348,41 @@ function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, po
               ))}
             </div>
           )}
+          </>)}
         </div>
 
-        {voiceOn && !voiceSpeaking && spokenText && (
-          <button className="cs-unblock" onClick={onSpeakNow}>
-            ♪ speak this reading
-          </button>
-        )}
-        {!voiceOn && (
-          <button className="cs-unblock cs-unblock-dim" onClick={onSpeakNow}>
-            ♪ tap to hear this reading
-          </button>
+        {/* The whole chart, as one piece. This is the primary control now:
+            the reading is a single continuous narrative, and these buttons
+            start, hold and leave it. Every one of them is a real click
+            handler, which is what lets voice.jsx unlock both audio engines
+            in the same gesture — see its header on why that matters. */}
+        {narrating ? (
+          <div className="cs-narration">
+            <button className="cs-unblock" onClick={onStopNarration}>
+              ■ stop the reading
+            </button>
+            {narrationTotal > 0 && (
+              <span className="cs-narration-pos">
+                reading {Math.min(narrationSeg + 1, narrationTotal)} of {narrationTotal}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="cs-narration">
+            <button className="cs-unblock" onClick={onPlayWholeChart}>
+              ▶ play the whole chart
+            </button>
+            {narrationSeg > 0 && (
+              <button className="cs-unblock cs-unblock-dim" onClick={onResumeWholeChart}>
+                ⏵ resume from here
+              </button>
+            )}
+            {spokenText && (
+              <button className="cs-unblock cs-unblock-dim" onClick={onSpeakNow}>
+                ♪ just this sign
+              </button>
+            )}
+          </div>
         )}
 
         <div className="cs-resonance">
@@ -357,11 +515,18 @@ function SpeakerIcon({ active }) {
   );
 }
 
-function SessionControls({ pos, total, cards, playing, onPlay, onPrev, onNext, onPick }) {
+function SessionControls({ pos, total, cards, playing, narrating, onPlay, onPrev, onNext, onPick }) {
+  // The play control's LABEL changes with what it actually does: while the
+  // chart is being read as one narrative it holds the voice mid-sentence,
+  // and calling that "pause" without saying what pauses would be vague at
+  // exactly the moment a screen-reader user needs it to be precise.
+  const playLabel = narrating
+    ? (playing ? "Pause the reading" : "Resume the reading")
+    : (playing ? "Pause" : "Play");
   return (
-    <footer className="rs-controls">
+    <footer className={`rs-controls ${narrating ? "is-narrating" : ""}`}>
       <button className="rs-ctrl" onClick={onPrev} disabled={pos === 0} aria-label="Previous card">‹</button>
-      <button className="rs-ctrl rs-ctrl-play" onClick={onPlay} aria-label={playing ? "Pause" : "Play"} aria-pressed={playing}>{playing ? "▮▮" : "▶"}</button>
+      <button className="rs-ctrl rs-ctrl-play" onClick={onPlay} aria-label={playLabel} aria-pressed={playing}>{playing ? "▮▮" : "▶"}</button>
       <button className="rs-ctrl" onClick={onNext} disabled={pos >= total - 1} aria-label="Next card">›</button>
       <div className="rs-dots" role="group" aria-label="Jump to card">
         {cards.map((c, i) => (
