@@ -88,7 +88,8 @@ jobs:
   #
   # WP-22 ported every browser-only UI-logic suite (tests.jsx, ~155
   # assertions across astro-core/astro.jsx/readings.jsx/time.jsx coverage)
-  # into project/test/present/*.test.js. project/test/run.js (see its own
+  # into project/test/present/*.test.js, and later work added more there
+  # (eclipses, the ElevenLabs voice provider, the default-nativity coupling). project/test/run.js (see its own
   # header) DISCOVERS every *.test.js file under project/test/ recursively
   # — including test/present/** — and runs it as part of the plain `npm
   # test` invocation core-tests already performs. There is no separate
@@ -102,8 +103,8 @@ jobs:
   # assertion fails, or (b) require inventing a new filtering mechanism in
   # test/run.js for CI-visibility purposes only, which is scope core-tests
   # doesn't need. Given that, ui-logic coverage is reported as part of
-  # core-tests's normal output (each discovered suite, including the four
-  # present/*.test.js files, gets its own pass/fail line — see the
+  # core-tests's normal output (each discovered suite, including every
+  # present/*.test.js file, gets its own pass/fail line — see the
   # `discovered N suites: ...` log line and per-suite `ok/FAIL` rows core-
   # tests already prints), so failures there are exactly as visible as any
   # other suite's failure, no additional job needed.

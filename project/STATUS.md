@@ -29,6 +29,8 @@ isolation, tests, and claim-status tagging.
 | Ledger import + schema | `src/ledger/` | DEFINED | evidence inputs |
 | Synthetic ephemeris | `src/demo/` (`astro.jsx`) | SCAFFOLD / PRESENTATION | UI / layout testing only |
 | Console / reading UI | `*.html`, `*-view.jsx` | SCAFFOLD | presentation |
+| Eclipse series + geophysics | `eclipses.js`, `eclipse-view.jsx` | FLOAT PRESENTATION · verified against the vendored ephemeris by geometric invariant (zenith over every sublunar point; Sun above the horizon at every greatest-eclipse point, 1970–2030) | presentation |
+| Voice narration (ElevenLabs + SpeechSynthesis) | `elevenlabs.js`, `voice.jsx` | SCAFFOLD / PRESENTATION · no bearing on any chart value | presentation |
 | Number core | `cram-int.js` | exact (BigInt) | number engine |
 
 ## Axioms

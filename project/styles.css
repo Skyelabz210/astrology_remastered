@@ -1210,6 +1210,18 @@ body::before {
   font-family: var(--mono); font-size: 10px; letter-spacing: 0.10em; color: var(--ink-dim);
 }
 .cs-voice-state.is-on { color: oklch(0.85 0.06 30); animation: pulse 1.8s ease-in-out infinite; }
+/* Why the voice changed, shown inline beside the speaking indicator — see
+   the comment at its call site in session.jsx. Dimmed and wrappable: it is
+   a sentence ("ElevenLabs rejected the API key. Using the browser voice."),
+   not a one-glyph status. */
+.cs-voice-note {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+  max-width: 46ch;
+  line-height: 1.4;
+}
 .cs-unblock {
   display: inline-flex; align-items: center; gap: 8px;
   margin-top: 16px;
@@ -1847,6 +1859,40 @@ body::before {
 .tp-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .tp-table tr td.pos { color: oklch(0.78 0.10 145); }
 .tp-table tr td.neg { color: oklch(0.62 0.10 25); }
+
+/* ── eclipse panel (eclipse-view.jsx) ────────────────────────────────────
+   Reuses the classical-apparatus shell (.tp/.tp-card/.tp-table) so the
+   eclipse section reads as one more panel of the same instrument rather
+   than a bolted-on widget. Only what the eclipse tables genuinely need is
+   new: a wide, horizontally scrollable table (six columns, one of them a
+   coordinate pair), a small dimmed qualifier for the coordinate basis, and
+   the show-all toggle that sits inside a card heading. */
+.ec .tp-card { overflow-x: auto; }
+.ec .tp-row .v { text-align: right; margin-left: 12px; }
+.ec-table { min-width: 720px; }
+.ec-table td { vertical-align: top; }
+.ec-basis {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.ec-toggle {
+  float: right;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.ec-toggle:hover { color: var(--ink); border-color: var(--ink-dim); }
+.ec-toggle:focus-visible { outline: 2px solid var(--ink-dim); outline-offset: 2px; }
 .bal-bar {
   display: inline-block;
   width: 60px; height: 2px;

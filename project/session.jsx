@@ -41,12 +41,37 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   // opt-in default this is now the ORDINARY path, not the exception.
   const localReading = $sUseMemo(() => current && readingFor(current, chart), [current, chart]);
 
-  // Voice
+  // What the voice actually says, and what the deck's dwell timer measures.
+  //
+  // This used to be `agent.text` alone, which meant narration had nothing to
+  // speak whenever the Agent interpreter was off — and it IS off by default
+  // (DEFAULT_SETTINGS.agentOn is false, deliberately, so no birth data is
+  // sent anywhere unless the reader opts in). The screen was showing the
+  // local, non-AI reading in that case while the voice sat silent, and the
+  // deck never advanced either, because the auto-advance effect below was
+  // gated on the same missing `agent.text`.
+  //
+  // So: speak whatever is on screen. The local reading's `sourceTag`s are
+  // provenance labels for the eye ("Ptolemaic dignity table"), not part of
+  // the sentence, so only the `text` halves are joined.
+  const spokenText = $sUseMemo(() => {
+    if (agent.text) return agent.text;
+    if (!localReading || !localReading.body) return "";
+    return localReading.body.map(line => line.text).join(" ");
+  }, [agent.text, localReading]);
+
+  // Voice. `provider`/`elevenVoiceId`/`elevenModel` select the ElevenLabs
+  // reading voice (default "Nerissa"); voice.jsx falls back to the
+  // browser's SpeechSynthesis whenever ElevenLabs cannot serve, so these
+  // being unset or unusable degrades rather than silences the narration.
   const voice = useVoice({
-    text:      agent.text,
-    enabled:   !!settings.voiceOn,
-    style:     settings.voiceStyle || "jedi",
-    voiceName: settings.voiceName,
+    text:          spokenText,
+    enabled:       !!settings.voiceOn,
+    style:         settings.voiceStyle || "jedi",
+    voiceName:     settings.voiceName,
+    provider:      settings.voiceProvider,
+    elevenVoiceId: settings.elevenVoiceId,
+    elevenModel:   settings.elevenModel,
     playing,
   });
 
@@ -55,13 +80,13 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
     voice.prime && voice.prime();
     const next = !settings.voiceOn;
     setTweak("voiceOn", next);
-    if (next && agent.text) {
+    if (next && spokenText) {
       // speak immediately in this gesture
-      voice.retrigger && voice.retrigger(agent.text);
+      voice.retrigger && voice.retrigger(spokenText);
     } else {
       stopSpeech();
     }
-  }, [settings.voiceOn, agent.text, voice.retrigger, voice.prime, setTweak]);
+  }, [settings.voiceOn, spokenText, voice.retrigger, voice.prime, setTweak]);
 
   // Pre-warm next
   const nextCard = cards[pos + 1];
@@ -71,12 +96,12 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
 
   // Auto-advance
   $sUseEffect(() => {
-    if (!playing || !shuffled || !current || !agent.text) return;
-    const words = agent.text.split(/\s+/).length;
+    if (!playing || !shuffled || !current || !spokenText) return;
+    const words = spokenText.split(/\s+/).length;
     const dwell = dwellFor(current, words);
     const t = setTimeout(() => setPos(p => Math.min(cards.length - 1, p + 1)), dwell);
     return () => clearTimeout(t);
-  }, [pos, playing, shuffled, agent.text, current && current.idx, settings.voiceOn]);
+  }, [pos, playing, shuffled, spokenText, current && current.idx, settings.voiceOn]);
 
   const onPrev = () => { setPos(p => Math.max(0, p - 1)); };
   const onNext = () => { setPos(p => Math.min(cards.length - 1, p + 1)); };
@@ -111,12 +136,17 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
             total={cards.length}
             voiceOn={settings.voiceOn}
             voiceSpeaking={voice.speaking}
+            voiceStatus={voice.status}
+            spokenText={spokenText}
             onSpeakNow={() => {
               if (!settings.voiceOn) setTweak("voiceOn", true);
               voice.prime && voice.prime();
-              if (agent.text) speakNow(agent.text, {
-                style: settings.voiceStyle || "jedi",
-                voiceName: settings.voiceName,
+              if (spokenText) speakNow(spokenText, {
+                style:         settings.voiceStyle || "jedi",
+                voiceName:     settings.voiceName,
+                provider:      settings.voiceProvider,
+                elevenVoiceId: settings.elevenVoiceId,
+                elevenModel:   settings.elevenModel,
               });
             }}
           />
@@ -138,7 +168,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
 // ──────────────────────────────────────────────────────────────────────
 // CINEMATIC STAGE
 // ──────────────────────────────────────────────────────────────────────
-function CinematicStage({ card, timeUnknown, agent, localReading, pos, total, voiceOn, voiceSpeaking, onSpeakNow }) {
+function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, pos, total, voiceOn, voiceSpeaking, voiceStatus, onSpeakNow }) {
   const p = card.principal;
 
   return (
@@ -186,7 +216,7 @@ function CinematicStage({ card, timeUnknown, agent, localReading, pos, total, vo
           )}
         </div>
 
-        {voiceOn && !voiceSpeaking && agent && agent.text && (
+        {voiceOn && !voiceSpeaking && spokenText && (
           <button className="cs-unblock" onClick={onSpeakNow}>
             ♪ speak this reading
           </button>
@@ -206,6 +236,16 @@ function CinematicStage({ card, timeUnknown, agent, localReading, pos, total, vo
             <span className={`cs-voice-state ${voiceSpeaking ? "is-on" : ""}`}>
               {voiceSpeaking ? "▶ speaking" : "♪"}
             </span>
+          )}
+          {/* Why the voice sounds different than expected — the only place
+              a reader finds out mid-reading that the ElevenLabs request was
+              refused and the browser engine took over. Silence with no
+              explanation is the failure mode this avoids. */}
+          {voiceOn && voiceStatus && (voiceStatus.state === "fallback" || voiceStatus.state === "error") && (
+            <span className="cs-voice-note" role="status">{voiceStatus.message}</span>
+          )}
+          {voiceOn && voiceStatus && voiceStatus.state === "synthesizing" && (
+            <span className="cs-voice-note">{voiceStatus.message}</span>
           )}
         </div>
       </div>

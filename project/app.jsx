@@ -2,29 +2,52 @@
 
 const { useMemo: $useMemo, useState: $useState, useEffect: $useEffect } = React;
 
+// The default chart this app opens on is the owner's own nativity —
+// 21 October 1980, 17:31 EDT, Fort Liberty (Bragg), NC (35.1408°N,
+// 79.0058°W) — not a generic sample date. The same instant and place are
+// HCRM_DEFAULTS in hcrm-app.jsx, the landing form's initial pickers in
+// landing.jsx, and DEFAULT_CITY_KEY in cities.jsx;
+// test/present/defaults.test.js asserts all four agree, so editing one
+// alone fails the suite rather than silently splitting the app's idea of
+// "the default chart" four ways.
+//
+// The voice defaults name the ElevenLabs reading voice: provider
+// "elevenlabs", voice "Nerissa" (resolved to an ElevenLabs voice ID at
+// runtime by name — see elevenlabs.js on why no ID is hard-coded here).
+// `voiceOn` ships true so a reading narrates in that voice by default;
+// that costs nothing and sends nothing until an ElevenLabs API key is
+// stored, because with no key voice.jsx falls back to the browser's own
+// offline SpeechSynthesis. The key itself is deliberately NOT a setting —
+// it lives in localStorage only, so useTweaks()'s __edit_mode_set_keys
+// postMessage can never write it back into this file.
 const DEFAULT_SETTINGS = /*EDITMODE-BEGIN*/{
-  "dateISO":     "1990-03-21T12:30:00-06:00",
-  "lat":         29.4241,
-  "lng":         -98.4936,
-  "placeLabel":  "San Antonio · TX",
-  "timeUnknown": false,
-  "houseSystem": "whole",
-  "sect":        "auto",
-  "tilt":        14,
-  "iridescence": 0.85,
-  "noise":       0.42,
-  "glow":        0.85,
-  "specular":    0.8,
-  "rigorous":    false,
-  "agentOn":     false,
-  "spread":      "grid",
-  "primeLayer":  false,
-  "orbScale":    1.0,
-  "harmonic":    7,
-  "showAspects": true,
-  "voiceOn":     false,
-  "voiceStyle":  "jedi",
-  "voiceName":   ""
+  "dateISO":       "1980-10-21T17:31:00-04:00",
+  "lat":           35.1408,
+  "lng":           -79.0058,
+  "placeLabel":    "Fort Liberty (Bragg) · NC",
+  "timeUnknown":   false,
+  "houseSystem":   "whole",
+  "sect":          "auto",
+  "tilt":          14,
+  "iridescence":   0.85,
+  "noise":         0.42,
+  "glow":          0.85,
+  "specular":      0.8,
+  "rigorous":      false,
+  "agentOn":       false,
+  "spread":        "grid",
+  "primeLayer":    false,
+  "orbScale":      1.0,
+  "harmonic":      7,
+  "showAspects":   true,
+  "voiceOn":       true,
+  "voiceStyle":    "jedi",
+  "voiceProvider": "elevenlabs",
+  "voiceName":     "Nerissa",
+  "elevenVoiceId": "",
+  "elevenModel":   "eleven_multilingual_v2",
+  "eclipseOrb":    2.5,
+  "eclipseWindow": 2
 }/*EDITMODE-END*/;
 
 // Render-time error boundary — errors.jsx's ErrorBoundary (WP-19), wrapped
@@ -368,6 +391,14 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
 
       <TraditionalPanel chart={chart} />
 
+      {/* Eclipses: the prenatal pair, every eclipse across the life with
+          its contacts to this chart, and the geophysical coordinate of
+          each one. Guarded on the component actually being loaded — the
+          panel lives in its own <script> tag (eclipse-view.jsx), same
+          convention A11yChartTable above uses, so a page that omits the
+          tag renders the rest of the spread instead of throwing. */}
+      {typeof window !== "undefined" && window.EclipsePanel && <EclipsePanel chart={chart} settings={settings} />}
+
       <LiveStatePanel chart={chart} />
 
       {settings.primeLayer && <PrimeLayer chart={chart} />}
@@ -536,7 +567,7 @@ function NatalTweaks({ t }) {
   };
   const setTime = (s) => {
     if (!s || !/^\d{2}:\d{2}$/.test(s)) return;
-    const d2 = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : "1990-03-21";
+    const d2 = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : "1980-10-21";
     t.setTweak('dateISO', `${d2}T${s}:00Z`);
   };
   return (
@@ -596,8 +627,109 @@ function VisualTweaks({ t }) {
   );
 }
 
+/**
+ * ElevenLabs controls.
+ *
+ * The API key is the one piece of state here that is NOT a tweak, and that
+ * is deliberate: useTweaks()'s setTweak posts every change to the host via
+ * `__edit_mode_set_keys`, which persists settings back into app.jsx's
+ * DEFAULT_SETTINGS block — a secret must never travel that path. It is held
+ * in component state, written straight to localStorage by elevenlabs.js,
+ * and displayed masked.
+ */
+function ElevenLabsTweaks({ t }) {
+  const EL = (typeof window !== "undefined" && window.ElevenLabs) ? window.ElevenLabs : null;
+  const [key, setKey] = $useState(() => (EL ? EL.readKey() : ""));
+  const [editingKey, setEditingKey] = $useState(false);
+  const [draftKey, setDraftKey] = $useState("");
+  const [probe, setProbe] = $useState(null);
+
+  if (!EL) {
+    return (
+      <TweakRow label="ElevenLabs" value="not loaded">
+        <span style={{ color: "var(--ink-dim)" }}>elevenlabs.js is not on this page</span>
+      </TweakRow>
+    );
+  }
+
+  const saveKey = (value) => {
+    EL.writeKey(null, value);
+    setKey(EL.readKey());
+    setEditingKey(false);
+    setDraftKey("");
+    setProbe(null);
+  };
+
+  // Resolve the configured voice NAME to an ElevenLabs voice ID against the
+  // stored key, and report what happened — the one place a reader can find
+  // out WHY narration fell back to the browser voice.
+  const resolve = () => {
+    setProbe({ state: "working", message: "asking ElevenLabs…" });
+    EL.resolveVoiceId({
+      apiKey: EL.readKey(),
+      name: t.tweaks.voiceName || EL.DEFAULT_VOICE_NAME,
+      voiceId: t.tweaks.elevenVoiceId || "",
+      force: true,
+    }).then((r) => {
+      setProbe({
+        state: "ok",
+        message: r.needsAdd
+          ? `found "${r.name}" in the public Voice Library — add it to your ElevenLabs account if narration is refused`
+          : `resolved "${r.name}" (${r.source})`,
+        voiceId: r.voiceId,
+      });
+    }).catch((e) => {
+      setProbe({ state: "error", message: (e && e.message) || "resolution failed" });
+    });
+  };
+
+  return (
+    <>
+      <TweakRow label="ElevenLabs key" value={key ? EL.maskKey(key) : "not set"}>
+        {editingKey ? (
+          <>
+            <TweakButton label="save" onClick={() => saveKey(draftKey)} />
+            <TweakButton label="cancel" secondary onClick={() => { setEditingKey(false); setDraftKey(""); }} />
+          </>
+        ) : (
+          <>
+            <TweakButton label={key ? "replace" : "add key"} onClick={() => setEditingKey(true)} />
+            {key ? <TweakButton label="forget" secondary onClick={() => saveKey("")} /> : null}
+          </>
+        )}
+      </TweakRow>
+      {editingKey && (
+        <TweakText label="paste key" value={draftKey} placeholder="sk_…" onChange={setDraftKey} />
+      )}
+      <TweakText label="Voice name" value={t.tweaks.voiceName || ""} placeholder="Nerissa"
+        onChange={v => t.setTweak('voiceName', v)} />
+      <TweakText label="Voice ID override" value={t.tweaks.elevenVoiceId || ""} placeholder="(resolved by name)"
+        onChange={v => t.setTweak('elevenVoiceId', v)} />
+      <TweakSelect label="TTS model" value={t.tweaks.elevenModel || "eleven_multilingual_v2"}
+        options={[
+          { value: "eleven_multilingual_v2", label: "multilingual v2 · quality" },
+          { value: "eleven_turbo_v2_5",      label: "turbo v2.5 · faster" },
+          { value: "eleven_flash_v2_5",      label: "flash v2.5 · fastest" },
+        ]}
+        onChange={v => t.setTweak('elevenModel', v)} />
+      <TweakRow label="Voice check" value={probe ? probe.state : (key ? "ready" : "no key")}>
+        <TweakButton label="resolve voice" onClick={resolve} />
+        {probe && <span style={{ color: probe.state === "error" ? "var(--neg, #d66)" : "var(--ink-dim)" }}>{probe.message}</span>}
+      </TweakRow>
+      <TweakRow label="Egress" value={key ? "on when narrating" : "none"}>
+        <span style={{ color: "var(--ink-dim)" }}>
+          {key
+            ? "With a key stored, the reading text is sent to api.elevenlabs.io to be spoken. No birth data, chart, or placements go with it."
+            : "No key stored — narration uses the browser's offline voice and nothing leaves this page."}
+        </span>
+      </TweakRow>
+    </>
+  );
+}
+
 function SubstrateTweaks({ t }) {
   const voices = (typeof window !== "undefined" && window.listVoices) ? window.listVoices() : [];
+  const provider = t.tweaks.voiceProvider || "elevenlabs";
   return (
     <TweakSection label="Substrate · reading">
       <TweakToggle label="Agent interpreter"             value={t.tweaks.agentOn}    onChange={v => t.setTweak('agentOn', v)} />
@@ -612,8 +744,15 @@ function SubstrateTweaks({ t }) {
           ]}
           onChange={v => t.setTweak('voiceStyle', v)} />
       )}
-      {t.tweaks.voiceOn && voices.length > 0 && (
-        <TweakSelect label="Voice" value={t.tweaks.voiceName || voices[0].name}
+      {t.tweaks.voiceOn && (
+        <TweakRadio label="Voice engine" value={provider} options={[
+          { value: 'elevenlabs', label: 'ElevenLabs · Nerissa' },
+          { value: 'browser',    label: 'Browser · offline' },
+        ]} onChange={v => t.setTweak('voiceProvider', v)} />
+      )}
+      {t.tweaks.voiceOn && provider === 'elevenlabs' && <ElevenLabsTweaks t={t} />}
+      {t.tweaks.voiceOn && provider === 'browser' && voices.length > 0 && (
+        <TweakSelect label="System voice" value={t.tweaks.voiceName || voices[0].name}
           options={voices.slice(0, 16).map(v => ({ value: v.name, label: `${v.name} · ${v.lang}` }))}
           onChange={v => t.setTweak('voiceName', v)} />
       )}
@@ -621,6 +760,10 @@ function SubstrateTweaks({ t }) {
       <TweakToggle label="Reveal Prime Resonance layer"  value={t.tweaks.primeLayer} onChange={v => t.setTweak('primeLayer', v)} />
       <TweakSlider label="Orb scale" value={t.tweaks.orbScale} min={0.3} max={2.0} step={0.05}
         onChange={v => t.setTweak('orbScale', Number(v))} />
+      <TweakSlider label="Eclipse orb" value={t.tweaks.eclipseOrb ?? 2.5} min={0.5} max={6} step={0.25} unit="°"
+        onChange={v => t.setTweak('eclipseOrb', Number(v))} />
+      <TweakSlider label="Eclipse look-ahead" value={t.tweaks.eclipseWindow ?? 2} min={1} max={10} step={1} unit=" yr"
+        onChange={v => t.setTweak('eclipseWindow', Number(v))} />
       <TweakSelect label="Harmonic" value={t.tweaks.harmonic} options={[
         { value: 7,  label: '7 — septile'   },
         { value: 11, label: '11 — shadow'   },
