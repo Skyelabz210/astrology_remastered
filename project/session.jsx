@@ -172,7 +172,12 @@ function CinematicStage({ card, timeUnknown, agent, localReading, pos, total, vo
               <span className="cs-loading-dot" style={{animationDelay:"0.6s"}} />
             </div>
           )}
-          {agent.error && <p className="cs-error">interpreter unavailable — reading from local fallback</p>}
+          {agent.unavailable && (
+            <p className="cs-note">
+              the agent interpreter is not offered on this host — the reading below is the local one
+            </p>
+          )}
+          {agent.error && <p className="cs-error">interpreter call failed — reading from local fallback</p>}
           {agent.text && <WordReveal text={agent.text} resonance={card.resonance} />}
           {!agent.loading && !agent.text && localReading && (
             <div className="cs-local-reading">

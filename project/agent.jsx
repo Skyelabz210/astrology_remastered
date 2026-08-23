@@ -208,7 +208,44 @@ function buildChartPrompt(chart) {
   ].join("\n");
 }
 
+// ─────────────────────── host capability ───────────────────────
+//
+// `window.claude.complete` is injected by the Claude artifact host. It does not
+// exist anywhere else — not on a Lovable/static deploy, not when these files are
+// opened straight from disk, not in a plain browser tab. Calling it blind threw
+// `Cannot read properties of undefined (reading 'complete')` deep inside a
+// promise, which surfaced to the user as "interpreter unavailable" on every
+// host but one, with no hint that the feature simply is not offered there.
+//
+// So probe first. A host that does not provide the interpreter is the ORDINARY
+// case and is reported as `unavailable`, distinct from `error` — a real failure
+// of a call that could have worked. The local reading is a genuine reading, not
+// a degraded one, and the UI says so.
+
+/**
+ * Does this host provide the agent interpreter?
+ * @returns {boolean} true only when window.claude.complete is callable.
+ */
+function agentAvailable() {
+  return typeof window !== "undefined"
+    && !!window.claude
+    && typeof window.claude.complete === "function";
+}
+
+/** The state the hooks report on a host with no interpreter. */
+const AGENT_UNAVAILABLE = Object.freeze({
+  loading: false, text: null, error: null, unavailable: true,
+});
+
+/** @throws {Error} when the host provides no interpreter. */
+function requireAgent() {
+  if (!agentAvailable()) {
+    throw new Error("no agent interpreter on this host (window.claude.complete is absent)");
+  }
+}
+
 async function interpretCard(card, chart) {
+  requireAgent();
   const key = cacheKey(card);
   if (__cache.has(key)) return __cache.get(key);
   if (__pending.has(key)) return __pending.get(key);
@@ -231,6 +268,7 @@ async function interpretCard(card, chart) {
 }
 
 async function interpretChart(chart) {
+  requireAgent();
   const key = "chart:" + chart.jd.toFixed(3) + ":" + chart.birth.lat + ":" + chart.birth.lng;
   if (__cache.has(key)) return __cache.get(key);
   if (__pending.has(key)) return __pending.get(key);
@@ -255,6 +293,7 @@ function useAgentReading(card, chart, active) {
   const [state, setState] = React.useState({ loading: false, text: null, error: null });
   React.useEffect(() => {
     if (!active || !card || !chart) return;
+    if (!agentAvailable()) { setState(AGENT_UNAVAILABLE); return; }
     const key = cacheKey(card);
     if (__cache.has(key)) {
       setState({ loading: false, text: __cache.get(key), error: null });
@@ -275,6 +314,7 @@ function useAgentChartReading(chart, active) {
   const [state, setState] = React.useState({ loading: false, text: null, error: null });
   React.useEffect(() => {
     if (!active || !chart) return;
+    if (!agentAvailable()) { setState(AGENT_UNAVAILABLE); return; }
     setState({ loading: true, text: null, error: null });
     let cancelled = false;
     interpretChart(chart).then(
@@ -343,6 +383,7 @@ function buildSynastryOverviewPrompt(syn) {
 }
 
 async function interpretSynastryOverview(syn) {
+  requireAgent();
   const key = "syn:" + syn.chartA.jd.toFixed(2) + ":" + syn.chartB.jd.toFixed(2);
   if (__cache.has(key)) return __cache.get(key);
   if (__pending.has(key)) return __pending.get(key);
@@ -359,6 +400,7 @@ async function interpretSynastryOverview(syn) {
 }
 
 async function interpretSynastryAspect(hit, syn) {
+  requireAgent();
   const key = "synasp:" + syn.chartA.jd.toFixed(2) + ":" + syn.chartB.jd.toFixed(2) + ":" + hit.a + ":" + hit.b + ":" + hit.aspect;
   if (__cache.has(key)) return __cache.get(key);
   if (__pending.has(key)) return __pending.get(key);
@@ -378,6 +420,7 @@ function useSynastryReading(syn, active) {
   const [state, setState] = React.useState({ loading: false, text: null, error: null });
   React.useEffect(() => {
     if (!active || !syn) return;
+    if (!agentAvailable()) { setState(AGENT_UNAVAILABLE); return; }
     setState({ loading: true, text: null, error: null });
     let cancelled = false;
     interpretSynastryOverview(syn).then(
@@ -390,6 +433,7 @@ function useSynastryReading(syn, active) {
 }
 
 Object.assign(window, {
+  agentAvailable,
   interpretCard, interpretChart, useAgentReading, useAgentChartReading,
   buildCardPrompt, buildChartPrompt,
   interpretSynastryOverview, interpretSynastryAspect, useSynastryReading,
