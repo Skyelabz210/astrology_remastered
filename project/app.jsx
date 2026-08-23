@@ -3,10 +3,10 @@
 const { useMemo: $useMemo, useState: $useState, useEffect: $useEffect } = React;
 
 const DEFAULT_SETTINGS = /*EDITMODE-BEGIN*/{
-  "dateISO":     "1990-03-21T12:30:00-06:00",
-  "lat":         29.4241,
-  "lng":         -98.4936,
-  "placeLabel":  "San Antonio · TX",
+  "dateISO":     "1980-10-21T17:31:00-04:00",
+  "lat":         35.1408,
+  "lng":         -79.0058,
+  "placeLabel":  "Fort Liberty (Bragg) · NC",
   "timeUnknown": false,
   "houseSystem": "whole",
   "sect":        "auto",

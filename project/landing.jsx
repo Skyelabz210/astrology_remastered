@@ -1,5 +1,6 @@
 // landing.jsx — Astrology Remastered landing screen.
-// Strict pickers (native selects, no free text). Default: San Antonio · TX.
+// Strict pickers (native selects, no free text). Default: the preloaded
+// subject — Fort Liberty (Bragg) · NC, 21 Oct 1980, 5:31 PM EDT.
 
 function Picker({ label, value, options, onChange, wide, disabled }) {
   return (
@@ -145,11 +146,15 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
   const pad = (n) => String(n).padStart(2, "0");
   const currentYear = new Date().getFullYear();
 
-  const [year,     setYear]     = React.useState(initial?.year     ?? 1990);
-  const [month,    setMonth]    = React.useState(initial?.month    ?? 3);
+  // Fallbacks are the PRELOADED SUBJECT — the chart the app opens on when no
+  // `initial` is threaded through. Keep in step with app.jsx's DEFAULT_SETTINGS
+  // and hcrm-app.jsx's HCRM_DEFAULTS; test/preloaded-subject.test.js fails if
+  // the three ever name different people.
+  const [year,     setYear]     = React.useState(initial?.year     ?? 1980);
+  const [month,    setMonth]    = React.useState(initial?.month    ?? 10);
   const [day,      setDay]      = React.useState(initial?.day      ?? 21);
-  const [hour12,   setHour12]   = React.useState(initial?.hour12   ?? 12);
-  const [minute,   setMinute]   = React.useState(initial?.minute   ?? 30);
+  const [hour12,   setHour12]   = React.useState(initial?.hour12   ?? 5);
+  const [minute,   setMinute]   = React.useState(initial?.minute   ?? 31);
   const [meridiem, setMeridiem] = React.useState(initial?.meridiem ?? "PM");
   const [place,    setPlace]    = React.useState(initial?.place    ?? DEFAULT_CITY_KEY);
   const [subjectName, setSubjectName] = React.useState(initial?.subjectName ?? (isPartner ? "" : "You"));

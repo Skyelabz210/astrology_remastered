@@ -367,7 +367,12 @@ const CITIES = [
   { name: "Suva",         region: "FJ", lat: -18.1248, lng:  178.4501, off: 12, tz: "Pacific/Fiji" },
 ];
 
-const DEFAULT_CITY_KEY = "San Antonio · TX";
+// The preloaded subject's birthplace. app.jsx's DEFAULT_SETTINGS,
+// hcrm-app.jsx's HCRM_DEFAULTS and landing.jsx's picker fallbacks must all
+// name this same person — those three are literal blocks (two of them are
+// EDITMODE blocks a host rewrites on disk, so they cannot be computed from
+// here) and test/preloaded-subject.test.js asserts they agree.
+const DEFAULT_CITY_KEY = "Fort Liberty (Bragg) · NC";
 
 function cityKey(c) { return `${c.name} · ${c.region}`; }
 function findCity(key) { return CITIES.find(c => cityKey(c) === key) || CITIES[0]; }
