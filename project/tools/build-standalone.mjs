@@ -80,9 +80,25 @@ import * as esbuild from "esbuild";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, ".."); // project/
-const SOURCE_HTML = path.join(PROJECT_ROOT, "HCRM Console.html");
+// Which page to bundle. Defaults to the console, but the parse-don't-hardcode
+// strategy above means any page in project/ that lists its own assets works:
+//   node tools/build-standalone.mjs "Resonance Spread.html" resonance-spread.html
+// The second argument is the output filename inside dist/; omit it and the
+// source page's own name is slugified.
+const [ARG_PAGE, ARG_OUT] = process.argv.slice(2);
+const SOURCE_PAGE = ARG_PAGE || "HCRM Console.html";
+const SOURCE_HTML = path.join(PROJECT_ROOT, SOURCE_PAGE);
 const OUT_DIR = path.join(PROJECT_ROOT, "dist");
-const OUT_FILE = path.join(OUT_DIR, "standalone.html");
+const OUT_NAME =
+  ARG_OUT ||
+  (ARG_PAGE
+    ? path.basename(SOURCE_PAGE, ".html").toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".html"
+    : "standalone.html");
+const OUT_FILE = path.join(OUT_DIR, OUT_NAME);
+
+if (!existsSync(SOURCE_HTML)) {
+  throw new Error(`No such page in project/: ${SOURCE_PAGE}`);
+}
 
 const REACT_VERSION = "18.3.1"; // must match the version pinned on the live page
 

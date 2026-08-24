@@ -38,7 +38,8 @@ degree, `Math.*`, or similar) in that file.
   emits schema-conformant ledger entries), `houses.js` (WP-11/12),
   `fetch-horizons.mjs` (WP-09, reference-vector regeneration; not run in CI).
 - `build-standalone.mjs` (WP-25) — regenerates a single-file, offline-openable
-  `dist/standalone.html` from the live `HCRM Console.html` page. See below.
+  bundle from any live page in `project/`. Defaults to `HCRM Console.html`
+  -> `dist/standalone.html`; takes a page argument for the others. See below.
 
 ## build-standalone.mjs (WP-25)
 
@@ -54,13 +55,19 @@ tags need network access.
 Run from `project/`:
 
 ```sh
-node tools/build-standalone.mjs
+node tools/build-standalone.mjs                                          # HCRM Console.html -> dist/standalone.html
+node tools/build-standalone.mjs "Resonance Spread.html" resonance-spread.html
 ```
 
-This reads `HCRM Console.html` and, walking its `<link>`/`<script>` tags in
-document order (so it tracks whatever the live page actually loads — nothing
-about the asset list is hardcoded), inlines everything into
-`project/dist/standalone.html` (git-ignored, per the root `.gitignore`
+The first argument is the page to bundle, the second the filename to write
+inside `dist/`; omit the second and the page name is slugified. `Resonance
+Spread.html` is the reading app, and its bundle is the copy to hand someone
+who has no way to serve the directory over HTTP.
+
+This reads the source page and, walking its `<link>`/`<script>` tags in
+document order (so it tracks whatever that page actually loads — nothing
+about the asset list is hardcoded), inlines everything into the output file
+under `project/dist/` (git-ignored, per the root `.gitignore`
 `dist/` rule from WP-01 — re-run the build after pulling changes, don't
 expect a stale copy to be committed):
 
