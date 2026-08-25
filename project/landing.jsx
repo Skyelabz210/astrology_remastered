@@ -263,6 +263,12 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
       dateISO,
       lat: city.lat,
       lng: city.lng,
+      // Birth city's IANA zone, so headers can echo the birth instant in the
+      // BIRTH PLACE's own clock rather than whatever zone the viewing device
+      // happens to be in. null when the city carries only a legacy fixed
+      // offset — displays then fall back to the device zone, the pre-fix
+      // behavior.
+      tz: city.tz || null,
       placeLabel: `${city.name} · ${city.region}`,
       subjectName: (subjectName || "").trim() || (isPartner ? "Them" : "You"),
       timeUnknown,

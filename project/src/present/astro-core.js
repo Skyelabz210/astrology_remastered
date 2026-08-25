@@ -443,6 +443,46 @@ export function residues(arcsec) {
   };
 }
 
+
+// ──────────────────────────────────────────────────────────────────────
+// Birth-instant display formatting.
+//
+// A chart's dateISO is a UTC instant; the instant is what the solvers
+// consume and it is always correct. But a HEADER echoing that instant back
+// to the reader is a statement about the BIRTH PLACE's wall clock, and
+// `toLocaleTimeString(undefined, ...)` with no timeZone renders the
+// VIEWING DEVICE's zone instead. On any device whose zone differs from the
+// birth city's (a traveler, a relocated reader, a UTC-clocked container)
+// the header then shows a birth time the reader never typed — the chart
+// under it is right, and the caption calls it wrong. Found by driving the
+// bundled Resonance page headlessly in a UTC container: an entered
+// "5:31 PM San Antonio" rendered as "10:31 PM".
+//
+// `tz` is the birth city's IANA zone (landing.jsx now threads it through
+// the cast payload as `birth.tz`). Absent or invalid tz falls back to the
+// device zone — exactly the pre-fix behavior, never a throw.
+// ──────────────────────────────────────────────────────────────────────
+export function birthClockParts(dateISO, tz) {
+  const d = new Date(dateISO);
+  if (isNaN(d)) return { dateStr: "\u2014", timeStr: "\u2014" };
+  const dateOpts = { year: "numeric", month: "short", day: "numeric" };
+  const timeOpts = { hour: "2-digit", minute: "2-digit" };
+  if (tz) {
+    try {
+      return {
+        dateStr: d.toLocaleDateString(undefined, { ...dateOpts, timeZone: tz }),
+        timeStr: d.toLocaleTimeString(undefined, { ...timeOpts, timeZone: tz }),
+      };
+    } catch {
+      // Unknown zone name on this runtime — fall through to device zone.
+    }
+  }
+  return {
+    dateStr: d.toLocaleDateString(undefined, dateOpts),
+    timeStr: d.toLocaleTimeString(undefined, timeOpts),
+  };
+}
+
 // ──────────────────────────────────────────────────────────────────────
 // Browser bridge — see the file header for the load-order guarantee.
 // ──────────────────────────────────────────────────────────────────────
@@ -464,5 +504,6 @@ if (typeof window !== "undefined") {
     chartShape,
     houseForSign, houseForLongEqual, houseForCusps,
     residues,
+    birthClockParts,
   };
 }

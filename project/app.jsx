@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS = /*EDITMODE-BEGIN*/{
   "dateISO":       "1980-10-21T17:31:00-04:00",
   "lat":           35.1408,
   "lng":           -79.0058,
+  "tz":            "America/New_York",
   "placeLabel":    "Fort Liberty (Bragg) · NC",
   "timeUnknown":   false,
   "houseSystem":   "whole",
@@ -94,6 +95,7 @@ function App() {
       dateISO:     payload.dateISO,
       lat:         payload.lat,
       lng:         payload.lng,
+      tz:          payload.tz || null,
       placeLabel:  payload.placeLabel,
       timeUnknown: !!payload.timeUnknown,
     });
@@ -228,6 +230,7 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
     try {
       return computeNatal({
         dateISO: settings.dateISO, lat: settings.lat, lng: settings.lng,
+        tz: settings.tz || null,
         houseSystem: settings.houseSystem, sect: settings.sect,
         placeLabel: settings.placeLabel, subjectName: "You",
         timeUnknown: !!settings.timeUnknown,
@@ -240,6 +243,7 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
     try {
       return computeNatal({
         dateISO: partner.dateISO, lat: partner.lat, lng: partner.lng,
+        tz: partner.tz || null,
         houseSystem: settings.houseSystem, sect: settings.sect,
         placeLabel: partner.placeLabel, subjectName: partner.subjectName || "Them",
         timeUnknown: !!partner.timeUnknown,
@@ -291,6 +295,7 @@ function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOp
         dateISO: settings.dateISO,
         lat: settings.lat,
         lng: settings.lng,
+        tz: settings.tz || null,
         houseSystem: settings.houseSystem,
         sect: settings.sect,
         placeLabel: settings.placeLabel,
@@ -327,6 +332,7 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
         dateISO: settings.dateISO,
         lat: settings.lat,
         lng: settings.lng,
+        tz: settings.tz || null,
         houseSystem: settings.houseSystem,
         sect: settings.sect,
         placeLabel: settings.placeLabel,
@@ -413,9 +419,8 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
 }
 
 function Header({ chart, settings, setTweak, onBack }) {
-  const d = new Date(chart.birth.dateISO);
-  const dateStr = isNaN(d) ? "—" : d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
-  const timeStr = isNaN(d) ? "—" : d.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+  // Birth-place clock, not device clock — see AstroCore.birthClockParts.
+  const { dateStr, timeStr } = AstroCore.birthClockParts(chart.birth.dateISO, chart.birth.tz);
   const ascSign = ZODIAC[chart.ascSignIdx].name;
   return (
     <header className="hdr">
