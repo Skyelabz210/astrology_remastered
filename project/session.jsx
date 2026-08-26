@@ -203,6 +203,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         onOpenSpread={onOpenSpread}
         onOpenSynastry={onOpenSynastry}
         onBack={onBack}
+        onExport={() => exportReading(chart, cards)}
         voiceOn={settings.voiceOn}
         voiceSpeaking={voice.speaking}
         voiceBlocked={voice.blocked}
@@ -419,7 +420,7 @@ function ShuffleAnimation() {
   );
 }
 
-function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onBack,
+function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onBack, onExport,
                          voiceOn, voiceSpeaking, voiceBlocked, onToggleVoice,
                          agentOn, onToggleAgent }) {
   // Birth-place clock, not device clock — see AstroCore.birthClockParts.
@@ -461,6 +462,11 @@ function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onBack,
           <button className="hdr-pill hdr-pill-syn" onClick={onOpenSynastry}>synastry</button>
         )}
         <button className="hdr-pill" onClick={onOpenSpread}>full spread</button>
+        <button
+          className="hdr-pill"
+          onClick={onExport}
+          title="Save this reading as a Markdown file — everything already on screen, nothing regenerates"
+        >export</button>
       </div>
     </header>
   );

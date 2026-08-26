@@ -505,8 +505,133 @@ function useSynastryReading(syn, active) {
   return state;
 }
 
+// ── export: the reading as a file ─────────────────────────────────────
+//
+// The chart a person generated is theirs to keep. This turns the whole
+// spread — every card's reading, agent-interpreted where the cache has it
+// and locally composed where it does not, plus the chart-level synthesis
+// when one exists — into ONE Markdown document and hands it to the browser
+// as a download. Markdown deliberately: it opens as plain text absolutely
+// anywhere, and renders as a document in most places that matter.
+//
+// Everything reads from what is ALREADY on screen: the persisted cache and
+// readings.jsx's local composer. Exporting never triggers generation.
+
+/** The text a card shows right now, with its provenance. */
+function readingTextFor(card, chart) {
+  const hit = __cache.get(cacheKey(card, chart));
+  if (hit) return { text: hit, source: "agent" };
+  if (typeof readingFor === "function") {
+    try {
+      const local = readingFor(card, chart);
+      if (local && local.body && local.body.length) {
+        return { text: local.body.map((l) => l.text).join(" "), source: "local" };
+      }
+    } catch { /* a card the composer cannot read exports as absent */ }
+  }
+  return { text: "", source: "none" };
+}
+
+/** The whole reading, as one Markdown document. */
+function buildReadingMarkdown(chart, cards) {
+  const b = chart.birth || {};
+  let born = b.dateISO || "";
+  try {
+    if (typeof AstroCore !== "undefined" && AstroCore.birthClockParts) {
+      const { dateStr, timeStr } = AstroCore.birthClockParts(b.dateISO, b.tz);
+      born = chart.timeUnknown ? dateStr : `${dateStr} · ${timeStr}`;
+    }
+  } catch { /* raw ISO is a fine fallback */ }
+  const hnum = (h) => (typeof roman === "function" ? roman(h) : String(h));
+
+  const lines = [
+    "# Resonance — Natal Reading",
+    "",
+    `**Born** ${born}${b.placeLabel ? ` · ${b.placeLabel}` : ""}`,
+  ];
+  const facts = [];
+  if (typeof chart.isDayChart === "boolean") facts.push(`**Sect** ${chart.isDayChart ? "Day" : "Night"}`);
+  if (!chart.timeUnknown && typeof chart.asc === "number" && typeof ZODIAC !== "undefined" && ZODIAC[chart.ascSignIdx]) {
+    facts.push(`**Ascendant** ${chart.asc.toFixed(2)}° ${ZODIAC[chart.ascSignIdx].name}`);
+  }
+  if (!chart.timeUnknown && typeof chart.mc === "number" && typeof ZODIAC !== "undefined" && ZODIAC[chart.mcSignIdx]) {
+    facts.push(`**MC** ${chart.mc.toFixed(2)}° ${ZODIAC[chart.mcSignIdx].name}`);
+  }
+  if (chart.phase && chart.phase.phase) {
+    facts.push(`**Lunar phase** ${chart.phase.phase}`);
+  }
+  if (facts.length) lines.push(facts.join(" · "));
+  if (chart.timeUnknown) {
+    lines.push("", "*Birth time unknown — houses, Ascendant and Midheaven are not reliable on this chart.*");
+  }
+  lines.push("", "---");
+
+  let agentCount = 0;
+  cards.forEach((card, i) => {
+    const p = card.principal;
+    const { text, source } = readingTextFor(card, chart);
+    if (source === "agent") agentCount += 1;
+    lines.push(
+      "",
+      `## ${String(i + 1).padStart(2, "0")} · ${p.name}${p.retrograde ? " ℞" : ""} in ${card.name} — ${chart.timeUnknown ? "House —" : `House ${hnum(card.house)}`} · ${card.dignity.kind}`,
+      "",
+      text || "*No reading composed for this card.*",
+    );
+    if (source === "local") {
+      lines.push("", "*Composed locally from the classical tables.*");
+    }
+  });
+
+  const chartKey = "chart:" + chart.jd.toFixed(3) + ":" + b.lat + ":" + b.lng;
+  const synthesis = __cache.get(chartKey);
+  if (synthesis) {
+    lines.push("", "## The chart as one", "", synthesis);
+  }
+
+  lines.push(
+    "", "---", "",
+    `*Exported from Resonance. ${agentCount} of ${cards.length} readings are agent-interpreted; the rest are composed locally from the classical tables.*`,
+    "",
+  );
+  return lines.join("\n");
+}
+
+/** resonance-reading-1980-10-21.md */
+function exportFilename(chart) {
+  const iso = (chart && chart.birth && chart.birth.dateISO) || "";
+  const day = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : "chart";
+  return `resonance-reading-${day}.md`;
+}
+
+/**
+ * Hand `text` to the browser as a downloaded file. Pure client mechanics —
+ * a Blob, an object URL, a synthetic anchor click — nothing leaves the
+ * page. Returns false (never throws) on a host with no document.
+ */
+function downloadTextFile(filename, text, mime = "text/markdown") {
+  if (typeof window === "undefined" || !window.document || !window.URL || !window.Blob) return false;
+  try {
+    const blob = new window.Blob([text], { type: `${mime};charset=utf-8` });
+    const url = window.URL.createObjectURL(blob);
+    const a = window.document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    window.document.body.appendChild(a);
+    a.click();
+    window.document.body.removeChild(a);
+    setTimeout(() => { try { window.URL.revokeObjectURL(url); } catch { /* revoked */ } }, 1000);
+    return true;
+  } catch { return false; }
+}
+
+/** The button's one call: the reading on screen becomes a file. */
+function exportReading(chart, cards) {
+  return downloadTextFile(exportFilename(chart), buildReadingMarkdown(chart, cards));
+}
+
 Object.assign(window, {
   agentAvailable, remember, hydrateReadings, persistReadings,
+  readingTextFor, buildReadingMarkdown, exportFilename, downloadTextFile, exportReading,
   READINGS_STORE_KEY, READINGS_STORE_MAX,
   interpretCard, interpretChart, useAgentReading, useAgentChartReading,
   buildCardPrompt, buildChartPrompt,
