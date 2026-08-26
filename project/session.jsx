@@ -341,7 +341,11 @@ function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, po
               the agent interpreter is not offered on this host — the reading below is the local one
             </p>
           )}
-          {agent.error && <p className="cs-error">interpreter call failed — reading from local fallback</p>}
+          {agent.error && (
+            <p className="cs-error">
+              interpreter call failed — {agent.error} — reading from local fallback
+            </p>
+          )}
           {agent.text && <WordReveal text={agent.text} resonance={card.resonance} />}
           {!agent.loading && !agent.text && localReading && (
             <div className="cs-local-reading">

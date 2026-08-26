@@ -210,17 +210,25 @@ function buildChartPrompt(chart) {
 
 // ─────────────────────── host capability ───────────────────────
 //
-// `window.claude.complete` is injected by the Claude artifact host. It does not
-// exist anywhere else — not on a Lovable/static deploy, not when these files are
-// opened straight from disk, not in a plain browser tab. Calling it blind threw
-// `Cannot read properties of undefined (reading 'complete')` deep inside a
-// promise, which surfaced to the user as "interpreter unavailable" on every
-// host but one, with no hint that the feature simply is not offered there.
+// `window.claude.complete` is the interpreter INTERFACE, not a single host's
+// API. The Claude artifact host injects it directly. Other hosts may provide it
+// themselves: the Lovable deploy installs a shim over that same name which
+// routes to a server function on its AI gateway, so the legacy call sites below
+// need no per-host branching — they call the interface and the host decides
+// what backs it.
 //
-// So probe first. A host that does not provide the interpreter is the ORDINARY
-// case and is reported as `unavailable`, distinct from `error` — a real failure
-// of a call that could have worked. The local reading is a genuine reading, not
-// a degraded one, and the UI says so.
+// What no host guarantees is that it is there at all. Opened from disk, in a
+// plain browser tab, or under SSR before any shim has run, it is absent, and
+// calling it blind threw `Cannot read properties of undefined (reading
+// 'complete')` deep inside a promise. That surfaced as "interpreter
+// unavailable" with no hint the feature was simply not offered there.
+//
+// So probe first, and probe the INTERFACE rather than any particular provider.
+// A host that does not offer it is the ORDINARY case, reported as
+// `unavailable` — distinct from `error`, a real failure of a call that could
+// have worked, which is what a host-backed interpreter returns when its own
+// backend refuses (rate limit, exhausted credits, a bad key). The local reading
+// is a genuine reading, not a degraded one, and the UI says so.
 
 /**
  * Does this host provide the agent interpreter?
