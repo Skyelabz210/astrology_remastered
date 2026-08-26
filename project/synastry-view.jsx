@@ -70,7 +70,8 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
           </div>
           <div className="syn-reading-text">
             {reading.loading && <span className="syn-loading">reading the bond…</span>}
-            {reading.error && <span className="syn-error">interpreter offline</span>}
+            {reading.unavailable && <span className="syn-note">no agent interpreter on this host</span>}
+            {reading.error && <span className="syn-error">interpreter call failed</span>}
             {reading.text && <span>{reading.text}</span>}
           </div>
         </div>

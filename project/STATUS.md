@@ -33,15 +33,22 @@ isolation, tests, and claim-status tagging.
 | Voice narration (ElevenLabs + SpeechSynthesis) | `elevenlabs.js`, `voice.jsx` | SCAFFOLD / PRESENTATION · no bearing on any chart value | presentation |
 | Whole-chart narrative | `narrative.jsx` | PRESENTATION · composed only from computed chart values; inherits readings.jsx's unknown-birth-time gate (no house or Ascendant language), asserted in test/present/narrative.test.js | presentation |
 | Number core | `cram-int.js` | exact (BigInt) | number engine |
+| Proof compendium | `docs/CRAM_QMNF_PROOF_COMPENDIUM.md` | PROVEN T1–T10, T12 (`test/proof-compendium.test.js`) · ARGUED T11 · OPEN Lean formalization | evidence |
 
 ## Axioms
 
-A1 (exactness) and A2 (Garner retirement) are in force. **A3 (fixed immutable
-basis) is not** — it was imported from an external document, briefly made
-load-bearing, and has been withdrawn. A2 retires the mixed-radix cascade. The yield
-is O(1) and uncoupled: K-Elimination gives K, and the number is the pair (r, K).
-Fusing them into `r + K·M` is a radix composition and is confined to declared
-boundary projections.
+A1 (exactness) and A2 (lane independence preserved) are in force. **A3 (fixed
+immutable basis) is not** — it was imported from an external document, briefly
+made load-bearing, and has been withdrawn.
+
+**A2 preserves the truth of lane independence; it does not ban reconstruction.**
+The i.i.d. property of the residue space is the invariant. What A2 forbids is any
+operation that manufactures a non-invertible, data-dependent cross-lane
+dependency — which is exactly what the mixed-radix cascade does, and why A2
+retires Garner. The yield is O(1) and uncoupled: K-Elimination gives K, and the
+number is the pair (r, K). Fusing them into `r + K·M` is a radix composition —
+exact and legitimate, confined to declared boundary projections, and not counted
+as an operation of the tray.
 
 ## Hard gate
 

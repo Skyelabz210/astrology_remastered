@@ -203,8 +203,13 @@ function CardBack({ card, chart, settings, active }) {
               <span>interpreting substrate…</span>
             </div>
           )}
+          {agent.unavailable && (
+            <p className="zc-agent-note">
+              the agent interpreter is not offered on this host — the reading below is the local one.
+            </p>
+          )}
           {agent.error && (
-            <p className="zc-agent-error">agent unavailable — reading from local fallback.</p>
+            <p className="zc-agent-error">agent call failed — reading from local fallback.</p>
           )}
           {agent.text && <p className="zc-agent-text">{agent.text}</p>}
           {!agent.loading && !agent.text && reading.body.map((line, i) => (

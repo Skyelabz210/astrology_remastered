@@ -10,7 +10,7 @@ of 1,296,000; every lane is a BigInt residue; every claim is either exhaustively
 swept or explicitly marked open.
 
 ```
-5539/5539 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+5582/5582 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 **Before taking any claim below at face value, read:**
@@ -33,6 +33,7 @@ The banner above is machine-checked by [`scripts/check-claims.mjs`](scripts/chec
 | [`project/docs/EXECUTION_PLAN.md`](project/docs/EXECUTION_PLAN.md) | The 29-work-package plan that built the architecture described below. |
 | [`project/docs/EXECUTION_STATUS.md`](project/docs/EXECUTION_STATUS.md) | Live status of every package — what actually landed, including an unresolved item flagged for the repo owner (see [Presentation layer](#presentation-layer) below). |
 | [`project/docs/INPUTS_OUTPUTS.md`](project/docs/INPUTS_OUTPUTS.md) | Field reference for every exported function/class/constant across core, ledger, producer, houses, and timescale. |
+| [`project/docs/CRAM_QMNF_PROOF_COMPENDIUM.md`](project/docs/CRAM_QMNF_PROOF_COMPENDIUM.md) | The twelve core CRAM/QMNF arithmetic identities, with three corrections to the circulated draft, each swept exhaustively by `project/test/proof-compendium.test.js`. |
 
 ---
 

@@ -17,14 +17,22 @@ Every claim in this package carries exactly one status tag.
 
 ## Axioms actually in force
 
-A1 (exactness — integers/rationals only, no floating point) and A2 (Garner
-retirement — no mixed-radix cascade, no synthetic positional emission) are in
-force and are enforced by `test/no-float-core.test.js` and by the tower/radix
-separation in `src/core/fixture.js`.
+A1 (exactness — integers/rationals only, no floating point) and A2 (lane
+independence preserved — no non-invertible, data-dependent cross-lane
+dependency; hence no mixed-radix cascade and no synthetic positional emission)
+are in force and are enforced by `test/no-float-core.test.js` and by the
+tower/radix separation in `src/core/fixture.js`.
 
 **A3 (fixed immutable basis) is NOT in force.** It was imported from an external
 framework document and briefly made load-bearing in the P17 anchor argument.
 That premise is withdrawn; no claim in this package depends on it.
+
+**A2 is about preserving the truth of lane independence — not about banning
+reconstruction.** The invariant is i.i.d.; the prohibition is on operations that
+destroy it by coupling lanes non-invertibly. Garner's cascade does exactly that
+(digit *i* consumes digits *0..i−1*, which are other lanes' computed outputs), so
+A2 retires Garner. Reconstruction at a declared boundary is permitted and named
+as what it is — a radix composition, see the P20 correction below.
 
 **A2 retires Garner, not the yield.** The yield is O(1) and it does **not**
 couple: K-Elimination gives K, r is already there, and the number IS the pair
