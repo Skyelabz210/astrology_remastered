@@ -460,9 +460,8 @@ function ShuffleAnimation() {
 function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onBack,
                          voiceOn, voiceSpeaking, voiceBlocked, onToggleVoice,
                          agentOn, onToggleAgent }) {
-  const d = new Date(chart.birth.dateISO);
-  const dateStr = isNaN(d) ? "—" : d.toLocaleDateString(undefined, { year:"numeric", month:"short", day:"numeric" });
-  const timeStr = isNaN(d) ? "—" : d.toLocaleTimeString(undefined, { hour:"2-digit", minute:"2-digit" });
+  // Birth-place clock, not device clock — see AstroCore.birthClockParts.
+  const { dateStr, timeStr } = AstroCore.birthClockParts(chart.birth.dateISO, chart.birth.tz);
   return (
     <header className="rs-hdr">
       <div className="rs-hdr-l">
