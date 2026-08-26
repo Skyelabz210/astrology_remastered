@@ -1138,24 +1138,13 @@ body::before {
   margin: 0;
   text-wrap: pretty;
 }
-.cs-word {
-  display: inline;
-  opacity: 0;
-  animation: word-in 0.22s ease forwards;
-}
-@keyframes word-in {
-  from { opacity: 0; filter: blur(3px); transform: translateY(4px); }
-  to   { opacity: 1; filter: blur(0);  transform: translateY(0); }
-}
-.cs-word-live {
-  color: oklch(0.97 0.03 60);
-  text-shadow: 0 0 24px oklch(0.95 0.06 60 / 0.55);
-}
-.cs-cursor {
-  display: inline-block;
-  color: var(--ink-dim);
-  animation: rs-caret 0.7s steps(2, end) infinite;
-  margin-left: 2px;
+/* The reading fades in as ONE piece. The per-word reveal (.cs-word /
+   .cs-word-live) and the typing caret (.cs-cursor) are gone with the
+   typewriter itself — text is presented, not performed. */
+.cs-text-in { animation: cs-text-in 0.5s ease both; }
+@keyframes cs-text-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 .cs-loading {
   display: flex; gap: 12px; align-items: center;
@@ -2499,3 +2488,47 @@ body::before {
 }
 .err-banner-dismiss:hover { opacity: 1; }
 .landing-back { margin-right: 4px; }
+
+/* ============================================================
+   THE READING ON A PHONE
+   ============================================================
+   The desktop stage stacks 32px (.rs) + 48px (.cs) of side padding —
+   160px of chrome that left a ~230px text column on a 390px screen:
+   two or three words to a line, under a watermark glyph whose clamp()
+   floored at 320px, wider than the column it sat behind. Below 720px
+   the reading IS the page: chrome shrinks to a working minimum, the
+   text takes the width, the glyph scales with the viewport instead of
+   flooring above it, and the header folds to two rows instead of
+   squeezing three grid columns. */
+@media (max-width: 720px) {
+  .rs { padding: 12px 14px 16px; }
+
+  /* header: brand left, controls right, birth line on its own row */
+  .rs-hdr {
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "l r" "m m";
+    row-gap: 8px;
+    margin-bottom: 18px;
+  }
+  .rs-hdr-l    { grid-area: l; }
+  .rs-hdr-r    { grid-area: r; flex-wrap: wrap; }
+  .rs-hdr-meta { grid-area: m; white-space: normal; text-align: left; }
+  .hdr-voice-label { display: none; }  /* the speaker icon carries it */
+  .hdr-voice { padding: 7px 9px; }
+  .hdr-pill  { padding: 6px 10px; }
+
+  /* stage: the column takes the width */
+  .cs { padding: 18px 2px; min-height: 62vh; }
+  .cs-glyph { font-size: clamp(150px, 78vw, 320px); }
+  .cs-card-meta { gap: 10px; margin-bottom: 16px; row-gap: 6px; }
+  .cs-planet-glyph { font-size: 22px; }
+  .cs-title { font-size: 18px; }
+  .cs-body { min-height: 130px; }
+  .cs-text { font-size: 19px; line-height: 1.62; }
+  .cs-local-line { font-size: 16px; }
+  .cs-unblock { margin-top: 10px; padding: 9px 14px; }
+
+  /* controls: arrows tight, dots wrap instead of overflowing */
+  .rs-controls { margin-top: 16px; padding-top: 12px; gap: 10px; }
+  .rs-dots { margin-left: 8px; flex-wrap: wrap; row-gap: 8px; }
+}

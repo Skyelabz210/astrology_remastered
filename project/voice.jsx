@@ -288,6 +288,52 @@ function pickBrowserVoice(voices, voiceName) {
   return voices[0];
 }
 
+// ── iOS-safe queueing ─────────────────────────────────────────────────
+//
+// Two facts about SpeechSynthesis on iOS Safari shape everything below:
+//
+//   1. speak() only counts as gesture-authorised when SOME utterance has
+//      been spoken inside a real gesture. prime() below speaks a muted,
+//      blank utterance for exactly that reason.
+//   2. A bulk-queued backlog is unreliable: iOS is prone to speaking the
+//      first utterance and dropping the rest, and a dropped utterance
+//      fires no onend — which left "the voice reader doesn't work" as the
+//      visible symptom and a narration stuck mid-deck as the silent one.
+//
+// So utterances are fed to the engine ONE AT A TIME, each queued from the
+// previous one's onend. onerror advances too: one refused sentence must
+// not end the reading. Any onstart/onend/onerror a caller pre-set on an
+// utterance still runs — the chain wraps rather than replaces them.
+function speakChain(utterances, { isCancelled, onDone } = {}) {
+  let i = 0;
+  const step = () => {
+    if (isCancelled && isCancelled()) return;
+    if (i >= utterances.length) { if (onDone) onDone(); return; }
+    const u = utterances[i++];
+    const prevEnd = u.onend, prevErr = u.onerror;
+    u.onend  = (e) => { if (prevEnd) { try { prevEnd(e); } catch {} } step(); };
+    u.onerror = (e) => { if (prevErr) { try { prevErr(e); } catch {} } step(); };
+    try { window.speechSynthesis.speak(u); } catch { step(); }
+  };
+  step();
+}
+
+// Gesture-unlock for SpeechSynthesis: speak a muted, blank utterance while
+// the gesture is live. Inaudible, but it registers the gesture with the
+// engine so asynchronous speak() calls that follow (the auto-speak effect,
+// an ElevenLabs failure falling back mid-narration) are not silently
+// dropped as autoplay. (Corrected: prime() documented itself as unlocking
+// BOTH engines but only unlocked the shared <audio> element — the browser
+// voice was never gesture-registered, which is why it sat mute on iOS.)
+function primeBrowserSpeech() {
+  if (typeof window === "undefined" || typeof window.speechSynthesis === "undefined") return;
+  try {
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+  } catch { /* unlock is best-effort */ }
+}
+
 // Speak text through SpeechSynthesis — must be called inside a synchronous
 // user-gesture handler.
 function speakBrowser(text, { style = "jedi", voiceName, rate, pitch } = {}) {
@@ -304,12 +350,12 @@ function speakBrowser(text, { style = "jedi", voiceName, rate, pitch } = {}) {
   const sentences = effText.replace(/\s+/g, " ")
     .match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g) || [effText];
 
-  sentences.forEach((s) => {
+  speakChain(sentences.map((s) => {
     const u = new SpeechSynthesisUtterance(s.trim());
     u.rate = effRate; u.pitch = effPitch; u.volume = 1;
     if (chosen) { u.voice = chosen; u.lang = chosen.lang; }
-    try { window.speechSynthesis.speak(u); } catch {}
-  });
+    return u;
+  }));
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -526,7 +572,7 @@ function speakNarrativeBrowser(narrative, opts, state) {
   const chosen = pickBrowserVoice(voices, opts.voiceName);
   try { window.speechSynthesis.cancel(); } catch {}
 
-  narrative.segments.forEach((seg, i) => {
+  const utterances = narrative.segments.map((seg, i) => {
     const effText = preset.power ? applyPower(seg.text) : seg.text;
     const u = new SpeechSynthesisUtterance(effText);
     u.rate = preset.rate; u.pitch = preset.pitch; u.volume = 1;
@@ -536,10 +582,11 @@ function speakNarrativeBrowser(narrative, opts, state) {
       if (opts.onSegment) opts.onSegment({ index: seg.index, cardIdx: seg.cardIdx });
       if (i === 0 && opts.onStatus) opts.onStatus({ state: "speaking", message: "" });
     };
-    if (i === narrative.segments.length - 1) {
-      u.onend = () => { if (!state.cancelled && opts.onEnd) opts.onEnd(); };
-    }
-    try { window.speechSynthesis.speak(u); } catch {}
+    return u;
+  });
+  speakChain(utterances, {
+    isCancelled: () => state.cancelled,
+    onDone: () => { if (!state.cancelled && opts.onEnd) opts.onEnd(); },
   });
   return VOICE_PROVIDER_BROWSER;
 }
@@ -693,19 +740,23 @@ function useVoice({ text, enabled, style, voiceName, playing, provider, elevenVo
     const sentences = effText.replace(/\s+/g, " ")
       .match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g) || [effText];
     try { window.speechSynthesis.cancel(); } catch {}
-    sentences.forEach((s, i) => {
+    let cancelled = false;
+    speakChain(sentences.map((s, i) => {
       const u = new SpeechSynthesisUtterance(s.trim());
       u.rate = preset.rate; u.pitch = preset.pitch; u.volume = 1;
       if (chosen) { u.voice = chosen; u.lang = chosen.lang; }
-      if (i === 0) u.onstart = () => setSpeaking(true);
-      if (i === sentences.length - 1) u.onend = () => setSpeaking(false);
+      if (i === 0) u.onstart = () => { if (!cancelled) setSpeaking(true); };
       u.onerror = (e) => {
+        if (cancelled) return;
         setSpeaking(false);
         if (e && e.error === "not-allowed") { setBlocked(true); primedRef.current = false; }
       };
-      try { window.speechSynthesis.speak(u); } catch {}
+      return u;
+    }), {
+      isCancelled: () => cancelled,
+      onDone: () => { if (!cancelled) setSpeaking(false); },
     });
-    return () => { try { window.speechSynthesis.cancel(); } catch {} };
+    return () => { cancelled = true; try { window.speechSynthesis.cancel(); } catch {} };
   }, [supported, text, enabled, playing, style, voiceName, activeProvider, elevenVoiceId, elevenModel]);
 
   // Pause/resume. SpeechSynthesis has its own pause()/resume(); the shared
@@ -771,6 +822,7 @@ function useVoice({ text, enabled, style, voiceName, playing, provider, elevenVo
     primedRef.current = true;
     setBlocked(false);
     primeElevenAudio();
+    primeBrowserSpeech();
   }, [supported]);
 
   return { supported, speaking, blocked, retrigger, prime, provider: activeProvider, status };
@@ -778,6 +830,7 @@ function useVoice({ text, enabled, style, voiceName, playing, provider, elevenVo
 
 Object.assign(window, {
   useVoice, listVoices, speakNow, stopSpeech, STYLE_PRESETS,
+  speakChain, primeBrowserSpeech,
   speakNarrative, speakNarrativeEleven, speakNarrativeBrowser,
   speakEleven, speakBrowser, resolveProvider, elevenReady, primeElevenAudio,
   VOICE_PROVIDER_ELEVEN, VOICE_PROVIDER_BROWSER, DEFAULT_VOICE_PROVIDER,

@@ -8,6 +8,63 @@
 const __cache = new Map();
 const __pending = new Map();
 
+// ── the readings survive the page ─────────────────────────────────────
+//
+// A chart is generated ONCE and then explored. The cache above used to be
+// memory-only, so a reload discarded every reading the agent had already
+// produced and the whole spread re-fetched — twelve requests to regenerate
+// text the reader had literally just been shown. The cache is now written
+// through to localStorage and hydrated at load: reopening the app puts the
+// finished chart back on screen with no regeneration. Only genuinely new
+// work (a different birth entry, a partner chart, a synastry pair) fetches,
+// and none of it evicts the first chart — entries are capped FIFO at
+// STORE_MAX, chart-scoped by key, and a full or unavailable store (quota,
+// private mode) degrades to the in-memory session cache, never to a crash.
+const READINGS_STORE_KEY = "resonance.readings.v1";
+const READINGS_STORE_MAX = 400;
+
+function readingsStore() {
+  // Private-mode Safari can throw on the localStorage GETTER itself.
+  try {
+    if (typeof window !== "undefined" && window.localStorage) return window.localStorage;
+  } catch { /* no store on this host */ }
+  return null;
+}
+
+function hydrateReadings() {
+  const store = readingsStore();
+  if (!store) return;
+  try {
+    const raw = store.getItem(READINGS_STORE_KEY);
+    if (!raw) return;
+    const rows = JSON.parse(raw);
+    if (!Array.isArray(rows)) return;
+    for (const row of rows) {
+      if (Array.isArray(row) && typeof row[0] === "string" && typeof row[1] === "string") {
+        __cache.set(row[0], row[1]);
+      }
+    }
+  } catch { /* a corrupt store regenerates; it must never brick the app */ }
+}
+
+function persistReadings() {
+  const store = readingsStore();
+  if (!store) return;
+  try {
+    const rows = [...__cache.entries()].slice(-READINGS_STORE_MAX);
+    store.setItem(READINGS_STORE_KEY, JSON.stringify(rows));
+  } catch { /* quota or private mode: the session cache still works */ }
+}
+
+/** The single write path: every finished reading lands here. */
+function remember(key, text) {
+  __cache.set(key, text);
+  persistReadings();
+  return text;
+}
+
+hydrateReadings();
+
 // Strip any markdown the model returns despite instructions.
 function stripMd(text) {
   if (!text) return text;
@@ -26,11 +83,19 @@ function stripMd(text) {
     .trim();
 }
 
-function cacheKey(card) {
-  // Card + chart signature: index, principal, house, dignity, aspect, resonance
+function cacheKey(card, chart) {
+  // Card + chart signature: index, principal, house, dignity, aspect,
+  // resonance — PLUS the chart's own identity. The card fields alone were
+  // enough while the cache lived and died with the page; a persisted cache
+  // outlives the chart that filled it, and a reading must never follow a
+  // look-alike card into someone else's chart.
   const p = card.principal;
   const a = card.aspect;
+  const sig = chart
+    ? [chart.jd.toFixed(4), chart.birth.lat, chart.birth.lng, chart.timeUnknown ? 1 : 0].join(",")
+    : "nochart";
   return [
+    sig,
     card.idx, p.name, p.sign, p.house, p.retrograde ? 1 : 0,
     card.dignity.kind,
     a ? `${a.name}:${a.sep.toFixed(2)}` : "noasp",
@@ -254,7 +319,7 @@ function requireAgent() {
 
 async function interpretCard(card, chart) {
   requireAgent();
-  const key = cacheKey(card);
+  const key = cacheKey(card, chart);
   if (__cache.has(key)) return __cache.get(key);
   if (__pending.has(key)) return __pending.get(key);
 
@@ -263,7 +328,7 @@ async function interpretCard(card, chart) {
     try {
       const raw = await window.claude.complete(prompt);
       const clean = stripMd((raw || "").trim());
-      __cache.set(key, clean);
+      remember(key, clean);
       __pending.delete(key);
       return clean;
     } catch (err) {
@@ -285,7 +350,7 @@ async function interpretChart(chart) {
     try {
       const text = await window.claude.complete(prompt);
       const clean = stripMd((text || "").trim());
-      __cache.set(key, clean);
+      remember(key, clean);
       __pending.delete(key);
       return clean;
     } catch (err) {
@@ -302,7 +367,7 @@ function useAgentReading(card, chart, active) {
   React.useEffect(() => {
     if (!active || !card || !chart) return;
     if (!agentAvailable()) { setState(AGENT_UNAVAILABLE); return; }
-    const key = cacheKey(card);
+    const key = cacheKey(card, chart);
     if (__cache.has(key)) {
       setState({ loading: false, text: __cache.get(key), error: null });
       return;
@@ -314,7 +379,7 @@ function useAgentReading(card, chart, active) {
       (err)  => { if (!cancelled) setState({ loading: false, text: null, error: String(err && err.message || err) }); }
     );
     return () => { cancelled = true; };
-  }, [active, card && cacheKey(card)]);
+  }, [active, card && chart && cacheKey(card, chart)]);
   return state;
 }
 
@@ -400,7 +465,7 @@ async function interpretSynastryOverview(syn) {
     try {
       const text = await window.claude.complete(prompt);
       const clean = stripMd((text || "").trim());
-      __cache.set(key, clean); __pending.delete(key); return clean;
+      remember(key, clean); __pending.delete(key); return clean;
     } catch (err) { __pending.delete(key); throw err; }
   })();
   __pending.set(key, promise);
@@ -417,7 +482,7 @@ async function interpretSynastryAspect(hit, syn) {
     try {
       const text = await window.claude.complete(prompt);
       const clean = stripMd((text || "").trim());
-      __cache.set(key, clean); __pending.delete(key); return clean;
+      remember(key, clean); __pending.delete(key); return clean;
     } catch (err) { __pending.delete(key); throw err; }
   })();
   __pending.set(key, promise);
@@ -440,8 +505,134 @@ function useSynastryReading(syn, active) {
   return state;
 }
 
+// ── export: the reading as a file ─────────────────────────────────────
+//
+// The chart a person generated is theirs to keep. This turns the whole
+// spread — every card's reading, agent-interpreted where the cache has it
+// and locally composed where it does not, plus the chart-level synthesis
+// when one exists — into ONE Markdown document and hands it to the browser
+// as a download. Markdown deliberately: it opens as plain text absolutely
+// anywhere, and renders as a document in most places that matter.
+//
+// Everything reads from what is ALREADY on screen: the persisted cache and
+// readings.jsx's local composer. Exporting never triggers generation.
+
+/** The text a card shows right now, with its provenance. */
+function readingTextFor(card, chart) {
+  const hit = __cache.get(cacheKey(card, chart));
+  if (hit) return { text: hit, source: "agent" };
+  if (typeof readingFor === "function") {
+    try {
+      const local = readingFor(card, chart);
+      if (local && local.body && local.body.length) {
+        return { text: local.body.map((l) => l.text).join(" "), source: "local" };
+      }
+    } catch { /* a card the composer cannot read exports as absent */ }
+  }
+  return { text: "", source: "none" };
+}
+
+/** The whole reading, as one Markdown document. */
+function buildReadingMarkdown(chart, cards) {
+  const b = chart.birth || {};
+  let born = b.dateISO || "";
+  try {
+    if (typeof AstroCore !== "undefined" && AstroCore.birthClockParts) {
+      const { dateStr, timeStr } = AstroCore.birthClockParts(b.dateISO, b.tz);
+      born = chart.timeUnknown ? dateStr : `${dateStr} · ${timeStr}`;
+    }
+  } catch { /* raw ISO is a fine fallback */ }
+  const hnum = (h) => (typeof roman === "function" ? roman(h) : String(h));
+
+  const lines = [
+    "# Resonance — Natal Reading",
+    "",
+    `**Born** ${born}${b.placeLabel ? ` · ${b.placeLabel}` : ""}`,
+  ];
+  const facts = [];
+  if (typeof chart.isDayChart === "boolean") facts.push(`**Sect** ${chart.isDayChart ? "Day" : "Night"}`);
+  if (!chart.timeUnknown && typeof chart.asc === "number" && typeof ZODIAC !== "undefined" && ZODIAC[chart.ascSignIdx]) {
+    facts.push(`**Ascendant** ${chart.asc.toFixed(2)}° ${ZODIAC[chart.ascSignIdx].name}`);
+  }
+  if (!chart.timeUnknown && typeof chart.mc === "number" && typeof ZODIAC !== "undefined" && ZODIAC[chart.mcSignIdx]) {
+    facts.push(`**MC** ${chart.mc.toFixed(2)}° ${ZODIAC[chart.mcSignIdx].name}`);
+  }
+  if (chart.phase && chart.phase.phase) {
+    facts.push(`**Lunar phase** ${chart.phase.phase}`);
+  }
+  if (facts.length) lines.push(facts.join(" · "));
+  if (chart.timeUnknown) {
+    lines.push("", "*Birth time unknown — houses, Ascendant and Midheaven are not reliable on this chart.*");
+  }
+  lines.push("", "---");
+
+  let agentCount = 0;
+  cards.forEach((card, i) => {
+    const p = card.principal;
+    const { text, source } = readingTextFor(card, chart);
+    if (source === "agent") agentCount += 1;
+    lines.push(
+      "",
+      `## ${String(i + 1).padStart(2, "0")} · ${p.name}${p.retrograde ? " ℞" : ""} in ${card.name} — ${chart.timeUnknown ? "House —" : `House ${hnum(card.house)}`} · ${card.dignity.kind}`,
+      "",
+      text || "*No reading composed for this card.*",
+    );
+    if (source === "local") {
+      lines.push("", "*Composed locally from the classical tables.*");
+    }
+  });
+
+  const chartKey = "chart:" + chart.jd.toFixed(3) + ":" + b.lat + ":" + b.lng;
+  const synthesis = __cache.get(chartKey);
+  if (synthesis) {
+    lines.push("", "## The chart as one", "", synthesis);
+  }
+
+  lines.push(
+    "", "---", "",
+    `*Exported from Resonance. ${agentCount} of ${cards.length} readings are agent-interpreted; the rest are composed locally from the classical tables.*`,
+    "",
+  );
+  return lines.join("\n");
+}
+
+/** resonance-reading-1980-10-21.md */
+function exportFilename(chart) {
+  const iso = (chart && chart.birth && chart.birth.dateISO) || "";
+  const day = /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : "chart";
+  return `resonance-reading-${day}.md`;
+}
+
+/**
+ * Hand `text` to the browser as a downloaded file. Pure client mechanics —
+ * a Blob, an object URL, a synthetic anchor click — nothing leaves the
+ * page. Returns false (never throws) on a host with no document.
+ */
+function downloadTextFile(filename, text, mime = "text/markdown") {
+  if (typeof window === "undefined" || !window.document || !window.URL || !window.Blob) return false;
+  try {
+    const blob = new window.Blob([text], { type: `${mime};charset=utf-8` });
+    const url = window.URL.createObjectURL(blob);
+    const a = window.document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    window.document.body.appendChild(a);
+    a.click();
+    window.document.body.removeChild(a);
+    setTimeout(() => { try { window.URL.revokeObjectURL(url); } catch { /* revoked */ } }, 1000);
+    return true;
+  } catch { return false; }
+}
+
+/** The button's one call: the reading on screen becomes a file. */
+function exportReading(chart, cards) {
+  return downloadTextFile(exportFilename(chart), buildReadingMarkdown(chart, cards));
+}
+
 Object.assign(window, {
-  agentAvailable,
+  agentAvailable, remember, hydrateReadings, persistReadings,
+  readingTextFor, buildReadingMarkdown, exportFilename, downloadTextFile, exportReading,
+  READINGS_STORE_KEY, READINGS_STORE_MAX,
   interpretCard, interpretChart, useAgentReading, useAgentChartReading,
   buildCardPrompt, buildChartPrompt,
   interpretSynastryOverview, interpretSynastryAspect, useSynastryReading,

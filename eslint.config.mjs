@@ -172,7 +172,7 @@ const JSX_GLOBALS = {
   "ctmState": "readonly", "currentTransits": "readonly", "dateToJD": "readonly", "deckOrder": "readonly", "dedupeLanes": "readonly",
   "detectPatterns": "readonly", "dignityFor": "readonly", "dignityMeaning": "readonly", "dominantElement": "readonly", "dwellFor": "readonly",
   "eclipsePointsFor": "readonly", "edgeEvents": "readonly", "edgeResiduePreservation": "readonly", "elevenAudioElement": "readonly",
-  "elevenModule": "readonly", "elevenReady": "readonly", "expect": "readonly", "faceRuler": "readonly", "factorizeSmall": "readonly",
+  "elevenModule": "readonly", "elevenReady": "readonly", "expect": "readonly", "exportReading": "readonly", "faceRuler": "readonly", "factorizeSmall": "readonly",
   "findCity": "readonly", "fmtDate": "readonly", "fmtDateTime": "readonly", "fmtDegree": "readonly", "formatOffset": "readonly",
   "gearClass": "readonly", "haab": "readonly", "hcrmAngle": "readonly", "houseForLongEqual": "readonly", "houseForSign": "readonly",
   "houseOverlays": "readonly", "houseTopic": "readonly", "interpretCard": "readonly", "interpretChart": "readonly",
