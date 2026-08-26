@@ -8,6 +8,7 @@ const HCRM_DEFAULTS = /*EDITMODE-BEGIN*/{
   "dateISO":     "1980-10-21T17:31:00-04:00",
   "lat":         35.1408,
   "lng":         -79.0058,
+  "tz":          "America/New_York",
   "placeLabel":  "Fort Liberty (Bragg) · NC",
   "timeUnknown": false,
   "houseSystem": "whole",
@@ -88,6 +89,7 @@ function HCRMApp() {
   const onCast = (payload) => {
     setBirth({
       dateISO: payload.dateISO, lat: payload.lat, lng: payload.lng,
+      tz: payload.tz || null,
       placeLabel: payload.placeLabel, houseSystem: birth.houseSystem, sect: birth.sect,
       timeUnknown: !!payload.timeUnknown,
       dstNote: payload.dstNote || null,
@@ -101,6 +103,7 @@ function HCRMApp() {
     try {
       return computeNatal({
         dateISO: birth.dateISO, lat: birth.lat, lng: birth.lng,
+        tz: birth.tz || null,
         houseSystem: birth.houseSystem, sect: birth.sect, placeLabel: birth.placeLabel,
         timeUnknown: !!birth.timeUnknown,
       });
@@ -124,8 +127,8 @@ function HCRMApp() {
       </div>
     );
   }
-  const d = new Date(birth.dateISO);
-  const label = `${isNaN(d) ? "—" : d.toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"})} · ${birth.placeLabel}`;
+  // Birth-place clock, not device clock — see AstroCore.birthClockParts.
+  const label = `${AstroCore.birthClockParts(birth.dateISO, birth.tz).dateStr} · ${birth.placeLabel}`;
   return (
     <HBoundary>
       <HcrmStatusBanners chart={chart} birth={birth} banners={banners} onDismiss={dismiss} />

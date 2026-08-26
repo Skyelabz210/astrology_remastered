@@ -10,7 +10,7 @@ of 1,296,000; every lane is a BigInt residue; every claim is either exhaustively
 swept or explicitly marked open.
 
 ```
-5279/5279 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+5582/5582 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 **Before taking any claim below at face value, read:**
@@ -142,6 +142,102 @@ landing form and an `agent` toggle pill on every reading screen turn it off,
 and every agent call site now honors that setting, falling back to the
 existing local, non-AI reading. Full history: see ["Resolved: agent.jsx
 opt-out" in `project/docs/EXECUTION_STATUS.md`](project/docs/EXECUTION_STATUS.md#resolved-agentjsx-opt-out-owner-requested-2026-08-12).
+
+#### Eclipses and geophysical coordinates
+
+`eclipses.js` walks both eclipse series — solar and lunar — off the vendored
+astronomy-engine and answers three questions the chart layer could not:
+which eclipses **preceded** a birth (the prenatal solar and lunar pair),
+which eclipses across a lifetime **land on** that chart (conjunction or
+opposition to a natal body or angle, within a configurable orb), and **where
+on Earth** each one happened. `eclipse-view.jsx` renders that as a panel in
+the full spread.
+
+The "where" is two different answers and the panel never conflates them: a
+total or annular solar eclipse has a real shadow axis, so its coordinate is
+the point of **greatest eclipse**; a purely partial solar eclipse has no axis
+touching Earth and a lunar eclipse has no ground track at all, so those show
+the **subsolar / sublunar** point — where the eclipsed body stood at zenith.
+Every coordinate is printed with the basis that produced it, alongside the
+great-circle distance and bearing from the birthplace and whether the body
+was above that horizon at peak (necessary for visibility, not sufficient —
+the panel says "above horizon", never "you saw it"). Eclipse geometry runs
+only on the real ephemeris; under `EPHEMERIS_MODE === "SYNTHETIC"` the panel
+says so rather than printing invented coordinates.
+
+The module takes the astronomy engine as a parameter rather than importing
+it, so `project/test/present/eclipses.test.js` drives the shipped code
+against the real ephemeris — checking, among other things, that the Moon is
+at zenith over every computed sublunar point and the Sun above the horizon at
+every greatest-eclipse point across 1970–2030, which is what actually catches
+a flipped east/west longitude convention.
+
+#### Voice narration
+
+Readings are narrated by **ElevenLabs** (`elevenlabs.js`), with the browser's
+own `SpeechSynthesis` as the fallback (`voice.jsx`). The configured reading
+voice is **Nerissa**, resolved to an ElevenLabs voice ID *by name at runtime*
+— against the account's own voice list first, then the public Voice Library —
+because that ID is account-visible and a hard-coded literal would be a guess.
+
+Narration is on by default and costs nothing until an ElevenLabs API key is
+entered: with no key the provider is unreachable, `voice.jsx` narrates
+through the browser engine, and no request is made. Add a key under
+**Tweaks → Substrate · reading → ElevenLabs key**; it is stored in
+`localStorage` only, shown masked, and deliberately kept out of the settings
+object, because `useTweaks()` persists settings back into `app.jsx`'s source
+via the host and a secret must never travel that path.
+
+When the ElevenLabs provider *is* active it sends the reading text and that
+key to `api.elevenlabs.io` — and nothing else: no birth data, no
+coordinates, no placements. That is the app's second and last egress path
+(the first is `agent.jsx`), and the landing form's privacy note names both,
+conditioned on whether a key is actually stored. Every way the provider can
+fail — no key, unresolvable voice, refused request, network down, blocked
+playback — falls back to the browser voice rather than going silent; that
+fallback is what `project/test/present/voice-provider.test.js` exists to
+pin.
+
+#### The chart plays as one narrative
+
+A reading is not twelve things to trigger one at a time. `narrative.jsx`
+composes the whole chart as a single piece — an opening that places the
+nativity (date, place, sect, rising sign, lunar phase, chart shape), the
+twelve signs in deck order, and a closing that names what the shape came to
+— and `voice.jsx`'s `speakNarrative()` plays it end to end.
+
+The deck follows the voice rather than a timer. Each segment carries its
+character range within the joined text; ElevenLabs' `with-timestamps`
+endpoint returns a start time per character, so the card on screen changes
+when the narration actually reaches that sign. Where a model returns no
+alignment, the same ranges scale against the clip's measured duration; on
+the browser fallback each segment is its own utterance and the cue comes
+from its `onstart`, which is exact. Long narratives are split into
+request-sized chunks at segment boundaries — never mid-sentence — and the
+next chunk is synthesized while the current one plays.
+
+Because playback is driven by the audio element's own clock, pausing and
+resuming keep the deck in sync for free: the reading holds mid-sentence and
+the card holds with it. Stepping by hand stops the narration rather than
+fighting it.
+
+The page shows the sentence being spoken, not the source-tagged per-card
+table underneath it — those say different things, one written for the ear
+and one for the eye, and showing one while hearing the other made the
+reading feel like two apps at once. The table returns when narration stops.
+
+#### The default chart
+
+The app opens on the owner's own nativity — 21 October 1980, 17:31 EDT, Fort
+Liberty (Bragg), NC. Four files carry a copy of that fact (`app.jsx`'s
+`DEFAULT_SETTINGS`, `hcrm-app.jsx`'s `HCRM_DEFAULTS`, `landing.jsx`'s initial
+pickers, `cities.jsx`'s `DEFAULT_CITY_KEY`) and they cannot be collapsed into
+one constant — two are EDITMODE blocks the host tooling rewrites in place, and
+the pickers are calendar fields rather than an instant. So
+`project/test/present/defaults.test.js` is the coupling instead: it resolves
+the pickers through the same `tzresolve.js` call the submit handler uses and
+requires the result to be the DEFAULT_SETTINGS instant, which is what catches
+a hand-written −05:00 where that date is actually −04:00.
 
 ---
 
@@ -528,6 +624,11 @@ project/
     EXECUTION_STATUS.md    live status of every package (start here for "what's built")
     INPUTS_OUTPUTS.md      function-level reference for every export
     AUDIT_REMEDIATION_PLAN.md  the original external audit
+  eclipses.js          eclipse series, greatest-eclipse/sub-body coordinates, natal contacts
+  elevenlabs.js        ElevenLabs TTS provider for the reading voice (Nerissa)
+  narrative.jsx        the whole chart composed as one continuous spoken narrative
+  tzresolve.js         DST-aware wall-clock → UTC instant resolution
+  validate.js          birth-input validation, polar house-system warnings
   *.jsx, *.html        the presentation layer — chart UI, HCRM register console
   Core Test Harness.html the core's own gate — same modules, in a browser
   CLAIM_BOUNDARY.md    every claim, tagged, with counter-computations

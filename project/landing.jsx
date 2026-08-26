@@ -1,6 +1,5 @@
 // landing.jsx — Astrology Remastered landing screen.
-// Strict pickers (native selects, no free text). Default: the preloaded
-// subject — Fort Liberty (Bragg) · NC, 21 Oct 1980, 5:31 PM EDT.
+// Strict pickers (native selects, no free text). Default: San Antonio · TX.
 
 function Picker({ label, value, options, onChange, wide, disabled }) {
   return (
@@ -146,21 +145,35 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
   const pad = (n) => String(n).padStart(2, "0");
   const currentYear = new Date().getFullYear();
 
-  // Fallbacks are the PRELOADED SUBJECT — the chart the app opens on when no
-  // `initial` is threaded through. Keep in step with app.jsx's DEFAULT_SETTINGS
-  // and hcrm-app.jsx's HCRM_DEFAULTS; test/preloaded-subject.test.js fails if
-  // the three ever name different people.
-  const [year,     setYear]     = React.useState(initial?.year     ?? 1980);
-  const [month,    setMonth]    = React.useState(initial?.month    ?? 10);
+  // Owner's default nativity — 21 October 1980, 5:31 PM, Fort Liberty
+  // (Bragg), NC. The same instant app.jsx's DEFAULT_SETTINGS and
+  // hcrm-app.jsx's HCRM_DEFAULTS carry as an ISO string with the −04:00
+  // (EDT) offset that tzresolve.js derives from the city's IANA zone for
+  // that date; DEFAULT_CITY_KEY (cities.jsx) is the matching place.
+  // test/present/defaults.test.js asserts these four agree, including that
+  // the pickers below round-trip through tzresolve to the same instant.
+  //
+  // A PARTNER chart is a different person, so it deliberately does NOT
+  // inherit the owner's birth data — the partner form opens on a neutral
+  // noon date the reader is expected to replace.
+  const [year,     setYear]     = React.useState(initial?.year     ?? (isPartner ? 1990 : 1980));
+  const [month,    setMonth]    = React.useState(initial?.month    ?? (isPartner ? 3 : 10));
   const [day,      setDay]      = React.useState(initial?.day      ?? 21);
-  const [hour12,   setHour12]   = React.useState(initial?.hour12   ?? 5);
-  const [minute,   setMinute]   = React.useState(initial?.minute   ?? 31);
+  const [hour12,   setHour12]   = React.useState(initial?.hour12   ?? (isPartner ? 12 : 5));
+  const [minute,   setMinute]   = React.useState(initial?.minute   ?? (isPartner ? 30 : 31));
   const [meridiem, setMeridiem] = React.useState(initial?.meridiem ?? "PM");
-  const [place,    setPlace]    = React.useState(initial?.place    ?? DEFAULT_CITY_KEY);
+  const [place,    setPlace]    = React.useState(initial?.place    ?? (isPartner ? "San Antonio · TX" : DEFAULT_CITY_KEY));
   const [subjectName, setSubjectName] = React.useState(initial?.subjectName ?? (isPartner ? "" : "You"));
   const [timeUnknown, setTimeUnknown] = React.useState(initial?.timeUnknown ?? false);
   const [hoverKey, setHoverKey] = React.useState(null);
   const [formError, setFormError] = React.useState(null);
+
+  // Whether the ElevenLabs narration path is actually live right now — the
+  // privacy note below is conditioned on this rather than on the voice
+  // toggle, because with no stored key voice.jsx narrates through the
+  // browser's own offline engine and nothing leaves the page.
+  const voiceEgress = typeof window !== "undefined" && !!window.ElevenLabs
+    && (() => { try { return window.ElevenLabs.isConfigured(); } catch { return false; } })();
 
   const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -250,6 +263,12 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
       dateISO,
       lat: city.lat,
       lng: city.lng,
+      // Birth city's IANA zone, so headers can echo the birth instant in the
+      // BIRTH PLACE's own clock rather than whatever zone the viewing device
+      // happens to be in. null when the city carries only a legacy fixed
+      // offset — displays then fall back to the device zone, the pre-fix
+      // behavior.
+      tz: city.tz || null,
       placeLabel: `${city.name} · ${city.region}`,
       subjectName: (subjectName || "").trim() || (isPartner ? "Them" : "You"),
       timeUnknown,
@@ -373,9 +392,18 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
 
             {/* Privacy note — wording audited against the actual code, not
                 aspirational. Verified by `grep -rn "fetch(\|XMLHttpRequest\|sendBeacon"
-                project/*.jsx`: zero hits anywhere in the app, so chart math
-                itself never makes a network call. The one genuine egress
-                path is agent.jsx's `window.claude.complete(prompt)` — used
+                project/*.jsx`: zero hits anywhere in the jsx layer, so chart
+                math itself never makes a network call. There are now exactly
+                TWO egress paths in the whole app, and this note names both.
+                (2) is voice narration: elevenlabs.js POSTs the READING TEXT
+                and the reader's own stored API key to api.elevenlabs.io so
+                "Nerissa" can speak it. No birth data, coordinates, or
+                placements are in that request — and with no key stored there
+                is no request at all, because voice.jsx falls back to the
+                browser's offline SpeechSynthesis. Which is why the sentence
+                below is conditioned on a key actually being present rather
+                than on the voice toggle.
+                (1) is agent.jsx's `window.claude.complete(prompt)` — used
                 by the "Agent interpreter" narrative reading. Its prompt
                 (agent.jsx buildChartPrompt) includes the raw birth date,
                 latitude and longitude verbatim, and for the natal
@@ -411,7 +439,9 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
             <p className="lf-privacy">
               {isHcrm
                 ? "Every register value on this console — positions, residues, houses — is computed entirely in your browser; nothing about your birth data is sent anywhere. The register map does not use the AI \"Agent interpreter\" feature at all."
-                : "Chart math — positions, houses, aspects, dignities — is computed entirely in your browser; none of it is sent anywhere. " + (agentOn === true
+                : "Chart math — positions, houses, aspects, dignities, eclipses — is computed entirely in your browser; none of it is sent anywhere. " + (voiceEgress
+                    ? "Voice narration is set to ElevenLabs and a key is stored, so the text of each reading (and that key) is sent to ElevenLabs to be spoken aloud — no birth data or placements travel with it; switch the voice engine to \"Browser\" in the tweaks panel to keep narration offline. "
+                    : "") + (agentOn === true
                     ? "Because you ticked the checkbox above, right after you submit this form this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "your birth date, time, and location") + " to Claude (Anthropic) to generate the spoken-style \"Agent interpreter\" reading — untick it to keep everything local."
                     : "The checkbox above is off by default, so nothing is sent to Claude (Anthropic) — every reading uses the local, non-AI text instead.")}
             </p>

@@ -23,6 +23,11 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
     enabled: !!settings.voiceOn,
     style: settings.voiceStyle || "jedi",
     voiceName: settings.voiceName,
+    // Same ElevenLabs selection the reading session uses — the relationship
+    // overview is narrated by the same configured voice, not a second one.
+    provider: settings.voiceProvider,
+    elevenVoiceId: settings.elevenVoiceId,
+    elevenModel: settings.elevenModel,
     playing: true,
   });
 

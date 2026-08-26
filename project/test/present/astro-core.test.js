@@ -21,6 +21,7 @@
 //     astro-core.js → test/present/ctm-mayan.test.js.
 
 import {
+  birthClockParts,
   dignityFor,
   TRIP_DAY, TRIP_NIGHT, TRIP_PART,
   termRuler,
@@ -204,6 +205,39 @@ export function run() {
     const planets = ["Sun","Moon","Saturn","Mercury","Venus","Mars","Jupiter","Uranus","Neptune","Pluto"].map((n) => ({ name: n }));
     const p = detectPatterns(aspects, planets);
     t("Yod: sextile + two quincunxes", p.some((x) => x.kind === "Yod" && x.apex === "Saturn"));
+  }
+
+  // ── Birth-instant display formatting (birthClockParts) ────────────────
+  // The chart consumes the UTC instant; the header must echo the BIRTH
+  // PLACE's wall clock, not the viewing device's. The tz-path assertions
+  // pin against toLocaleTimeString with an explicit timeZone so they hold
+  // on any machine regardless of its own zone or default locale.
+  {
+    const iso = "1980-10-21T21:31:00Z"; // = 5:31 PM EDT at Fort Liberty
+    const inTz = new Date(iso).toLocaleTimeString(undefined,
+      { hour: "2-digit", minute: "2-digit", timeZone: "America/New_York" });
+    const parts = birthClockParts(iso, "America/New_York");
+    t("birthClockParts renders the birth zone's clock", parts.timeStr === inTz,
+      `${parts.timeStr} vs ${inTz}`);
+    const dateInTz = new Date(iso).toLocaleDateString(undefined,
+      { year: "numeric", month: "short", day: "numeric", timeZone: "America/New_York" });
+    t("date is rendered in the birth zone too", parts.dateStr === dateInTz,
+      `${parts.dateStr} vs ${dateInTz}`);
+    t("the birth zone clock reads 5:31, not the UTC face 21:31/9:31",
+      /5.31/.test(parts.timeStr) && !/9.31/.test(parts.timeStr), parts.timeStr);
+  }
+  {
+    const parts = birthClockParts("not-a-date", "America/New_York");
+    t("invalid instant \u2192 em-dashes, no throw",
+      parts.dateStr === "\u2014" && parts.timeStr === "\u2014");
+  }
+  {
+    const iso = "1980-10-21T21:31:00Z";
+    const device = new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    t("no tz \u2192 device-zone fallback (pre-fix behavior)",
+      birthClockParts(iso, null).timeStr === device);
+    t("unknown tz \u2192 device-zone fallback, no throw",
+      birthClockParts(iso, "Not/AZone").timeStr === device);
   }
 
   return R;
