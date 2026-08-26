@@ -2,26 +2,24 @@
 //
 // The card is gone; the reading IS the experience.
 // Each draw fills the viewport: a massive zodiac glyph shimmers in the
-// background while the agent's text materialises word by word in the
-// foreground — the same feel as the Conan/Star-Wars stone-writing effect.
-// The iridescence, glow intensity, and reveal cadence all scale with the
-// card's resonance.
+// background with the reading presented whole in the foreground. The
+// iridescence and glow intensity scale with the card's resonance.
+//
+// THE READER SETS THE PACE. An earlier cut typed the text out word by word
+// and then auto-advanced to the next card on a dwell timer the moment the
+// last word landed — which forced reading at the machine's speed and
+// snatched the card away exactly when reading it became possible. Both are
+// gone: text arrives as one piece, the deck moves only when the reader
+// steps it (or when voice narration, which follows the VOICE's position,
+// is playing), and with no timer to hold there is no pause button.
 
 const { useState: $sUseState, useEffect: $sUseEffect, useRef: $sUseRef, useMemo: $sUseMemo } = React;
-
-function dwellFor(card, textLength) {
-  // Stay on a card at least until the text is fully revealed, then add a beat.
-  const revealMs = textLength * 52; // ~52 ms per word
-  const minDwell = 5000 + 6000 * card.resonance;
-  return Math.max(revealMs + 1800, minDwell);
-}
 
 function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastry, onBack }) {
   const order = $sUseMemo(() => deckOrder(chart), [chart]);
   const cards  = $sUseMemo(() => order.map(i => chart.cards[i]), [chart, order]);
 
   const [pos,      setPos]      = $sUseState(0);
-  const [playing,  setPlaying]  = $sUseState(true);
   const [shuffled, setShuffled] = $sUseState(false);
 
   // ── continuous narration ────────────────────────────────────────────
@@ -52,7 +50,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   // opt-in default this is now the ORDINARY path, not the exception.
   const localReading = $sUseMemo(() => current && readingFor(current, chart), [current, chart]);
 
-  // What the voice actually says, and what the deck's dwell timer measures.
+  // What the voice actually says.
   //
   // This used to be `agent.text` alone, which meant narration had nothing to
   // speak whenever the Agent interpreter was off — and it IS off by default
@@ -133,7 +131,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
     provider:      settings.voiceProvider,
     elevenVoiceId: settings.elevenVoiceId,
     elevenModel:   settings.elevenModel,
-    playing,
+    playing:       true,
   });
 
   // Start the whole chart playing, from the top or from the card on screen.
@@ -149,7 +147,6 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
       : narrative;
     setNarrating(true);
     setNarrationSeg(rest.segments[0] ? rest.segments[0].index : 0);
-    setPlaying(true);
     narrationRef.current = speakNarrative(rest, {
       style:         settings.voiceStyle || "jedi",
       voiceName:     settings.voiceName,
@@ -178,24 +175,16 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   }, [settings.voiceOn, spokenText, narrative, narrationSeg, startNarration, stopNarration,
       voice.retrigger, voice.prime, setTweak]);
 
-  // Pre-warm next
-  const nextCard = cards[pos + 1];
+  // Interpret the WHOLE spread at once. Every card's request fires the
+  // moment the deck is up — in parallel, deduplicated by agent.jsx's
+  // __pending map and cached in __cache — so stepping to any card shows a
+  // finished reading instead of joining a per-card queue. This replaces
+  // the old current-card-plus-prewarm-one scheme, whose sequential fetches
+  // were what made each new card open on loading dots.
   $sUseEffect(() => {
-    if (agentOn && nextCard) interpretCard(nextCard, chart).catch(() => {});
-  }, [agentOn, nextCard && nextCard.idx]);
-
-  // Auto-advance — the fallback pacing for when the chart is NOT being
-  // narrated as one piece. While it is, the voice's own position drives the
-  // deck (showSegment), and a second timer moving `pos` underneath it would
-  // desynchronise the card from the words.
-  $sUseEffect(() => {
-    if (narrating) return;
-    if (!playing || !shuffled || !current || !spokenText) return;
-    const words = spokenText.split(/\s+/).length;
-    const dwell = dwellFor(current, words);
-    const t = setTimeout(() => setPos(p => Math.min(cards.length - 1, p + 1)), dwell);
-    return () => clearTimeout(t);
-  }, [pos, playing, shuffled, spokenText, current && current.idx, settings.voiceOn, narrating]);
+    if (!agentOn || !shuffled) return;
+    cards.forEach((c) => interpretCard(c, chart).catch(() => {}));
+  }, [agentOn, shuffled, chart]);
 
   // Stepping by hand means the reader wants THIS card, not the running
   // reading — so the narration yields rather than dragging the deck back.
@@ -261,21 +250,9 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
       {shuffled && (
         <SessionControls
           pos={pos} total={cards.length} cards={cards}
-          playing={playing}
           narrating={narrating}
-          onPlay={() => {
-            // While the chart is being narrated, play/pause means the
-            // READING pauses — the voice holds mid-sentence and the deck
-            // holds with it — not "stop advancing the cards on a timer".
-            const next = !playing;
-            setPlaying(next);
-            if (narrating && narrationRef.current) {
-              if (next) narrationRef.current.resume();
-              else narrationRef.current.pause();
-            }
-          }}
           onPrev={onPrev} onNext={onNext}
-          onPick={i => { stopNarration(); setPos(i); setPlaying(false); }}
+          onPick={i => { stopNarration(); setPos(i); }}
         />
       )}
     </div>
@@ -320,8 +297,8 @@ function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, po
 
         <div className="cs-body">
           {/* While the chart is being read as one narrative, the page shows
-              the SENTENCE THE VOICE IS SPEAKING, revealed word by word,
-              rather than the source-tagged per-card table underneath. The
+              the SEGMENT THE VOICE IS SPEAKING, presented whole, rather
+              than the source-tagged per-card table underneath. The
               two say different things — the narrative is written for the
               ear, the table for the eye — and showing one while hearing the
               other makes the reading feel like two apps at once. The table
@@ -420,38 +397,14 @@ function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, po
   );
 }
 
-// Word-by-word reveal. Each word fades in; the "live" word glows briefly.
-function WordReveal({ text, resonance }) {
-  const words = text.split(/(\s+)/);
-  const [shown, setShown] = $sUseState(0);
-  const intervalRef = $sUseRef(null);
-
-  // Speed scales with resonance — heavier cards reveal a touch slower.
-  const ms = Math.round(55 + 40 * (1 - resonance));
-
-  $sUseEffect(() => {
-    setShown(0);
-    intervalRef.current = setInterval(() => {
-      setShown(n => {
-        if (n >= words.length) { clearInterval(intervalRef.current); return n; }
-        return n + 1;
-      });
-    }, ms);
-    return () => clearInterval(intervalRef.current);
-  }, [text]);
-
-  return (
-    <p className="cs-text">
-      {words.map((w, i) => {
-        if (i >= shown) return null;
-        const isLive = i === shown - 1 && shown < words.length;
-        return (
-          <span key={i} className={`cs-word ${isLive ? "cs-word-live" : ""}`}>{w}</span>
-        );
-      })}
-      {shown < words.length && <span className="cs-cursor" aria-hidden="true">▍</span>}
-    </p>
-  );
+// The reading, presented whole. The name survives from the word-by-word
+// typewriter this replaced (kept so call sites and the generated bundle
+// need no renaming): the per-word interval, the glowing "live" word and
+// the caret are gone, because typing the text forced the reader to read
+// at the machine's pace. One soft fade for the whole piece — CSS only, no
+// timers — keyed on the text so a new card still visibly turns.
+function WordReveal({ text }) {
+  return <p className="cs-text cs-text-in" key={text}>{text}</p>;
 }
 
 function ShuffleAnimation() {
@@ -523,18 +476,14 @@ function SpeakerIcon({ active }) {
   );
 }
 
-function SessionControls({ pos, total, cards, playing, narrating, onPlay, onPrev, onNext, onPick }) {
-  // The play control's LABEL changes with what it actually does: while the
-  // chart is being read as one narrative it holds the voice mid-sentence,
-  // and calling that "pause" without saying what pauses would be vague at
-  // exactly the moment a screen-reader user needs it to be precise.
-  const playLabel = narrating
-    ? (playing ? "Pause the reading" : "Resume the reading")
-    : (playing ? "Pause" : "Play");
+function SessionControls({ pos, total, cards, narrating, onPrev, onNext, onPick }) {
+  // No play/pause control. Nothing advances on a timer any more, so there
+  // is nothing for "pause" to hold — the reader steps the deck with these
+  // arrows and the dots, and a running narration has its own explicit
+  // "stop the reading" button on the stage.
   return (
     <footer className={`rs-controls ${narrating ? "is-narrating" : ""}`}>
       <button className="rs-ctrl" onClick={onPrev} disabled={pos === 0} aria-label="Previous card">‹</button>
-      <button className="rs-ctrl rs-ctrl-play" onClick={onPlay} aria-label={playLabel} aria-pressed={playing}>{playing ? "▮▮" : "▶"}</button>
       <button className="rs-ctrl" onClick={onNext} disabled={pos >= total - 1} aria-label="Next card">›</button>
       <div className="rs-dots" role="group" aria-label="Jump to card">
         {cards.map((c, i) => (

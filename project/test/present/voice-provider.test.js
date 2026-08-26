@@ -236,8 +236,14 @@ export async function run() {
     t("prime() unlocks the audio element with a silent clip",
       calls.audioPlay > 0 && calls.audioSrc.some(s => String(s).startsWith("data:audio/wav")),
       JSON.stringify(calls.audioSrc));
-    t("prime() still does not speak anything",
-      calls.speak.length === 0 && calls.synthesize.length === 0);
+    // REFINED with the iOS unlock (see voice-prime.test.js): prime() now
+    // speaks one MUTED, blank utterance to gesture-register SpeechSynthesis.
+    // What it must still never do is narrate — no audible utterance, and no
+    // ElevenLabs synthesis spent on a gesture that asked for none.
+    t("prime() still speaks nothing audible and synthesizes nothing",
+      calls.speak.every((u) => u.volume === 0 && !(u.text || "").trim())
+      && calls.synthesize.length === 0,
+      `${calls.speak.length} utterance(s), ${calls.synthesize.length} synth call(s)`);
     t("useVoice reports which provider is active", voice.provider === "elevenlabs");
     t("useVoice still exposes the original hook shape",
       typeof voice.retrigger === "function" && "supported" in voice

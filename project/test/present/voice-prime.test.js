@@ -95,13 +95,27 @@ export async function run() {
       "supported" in voice && "speaking" in voice && "blocked" in voice);
   }
 
-  // ── behavioral difference: prime() must NOT speak; retrigger() must ───
+  // ── behavioral difference: prime() must not speak AUDIBLY ─────────────
+  //
+  // REFINED (was: "prime() does not call speechSynthesis.speak at all").
+  // iOS Safari only honours later asynchronous speak() calls once some
+  // utterance has been spoken inside a real gesture, so prime() now speaks
+  // exactly one MUTED, blank unlock utterance — that is the fix for the
+  // browser voice sitting silent on iOS, and it is not "speaking" in any
+  // sense a listener can hear. The contract this row protects is the
+  // original one: prime() must never narrate the reading text. So: every
+  // utterance prime() queues must be muted (volume 0) and content-free,
+  // and none may carry the reading text.
   {
     const { sandbox, calls } = makeHookRig();
     const voice = sandbox.useVoice({ text: "the reading text", enabled: true, style: "jedi", voiceName: "", playing: true });
     voice.prime();
-    t("prime() does not call speechSynthesis.speak", calls.speak.length === 0,
-      `speak() called ${calls.speak.length} times`);
+    const audible = calls.speak.filter((u) => u.volume !== 0 || (u.text || "").trim().length > 0);
+    t("prime() speaks nothing audible — unlock utterances are muted and blank",
+      audible.length === 0,
+      `${calls.speak.length} utterance(s) queued, ${audible.length} audible`);
+    t("prime() never speaks the reading text",
+      calls.speak.every((u) => !(u.text || "").includes("the reading text")));
   }
   {
     const { sandbox, calls } = makeHookRig();
