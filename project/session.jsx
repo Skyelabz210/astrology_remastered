@@ -89,7 +89,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         const card = chart.cards[idx];
         if (!card) return;
         try {
-          const hit = __cache.get(cacheKey(card));
+          const hit = __cache.get(cacheKey(card, chart));
           if (hit) agentTexts[idx] = hit;
         } catch { /* cache shape changed — fall back to local text */ }
       });

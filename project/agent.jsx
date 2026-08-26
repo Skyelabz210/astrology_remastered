@@ -8,6 +8,63 @@
 const __cache = new Map();
 const __pending = new Map();
 
+// ── the readings survive the page ─────────────────────────────────────
+//
+// A chart is generated ONCE and then explored. The cache above used to be
+// memory-only, so a reload discarded every reading the agent had already
+// produced and the whole spread re-fetched — twelve requests to regenerate
+// text the reader had literally just been shown. The cache is now written
+// through to localStorage and hydrated at load: reopening the app puts the
+// finished chart back on screen with no regeneration. Only genuinely new
+// work (a different birth entry, a partner chart, a synastry pair) fetches,
+// and none of it evicts the first chart — entries are capped FIFO at
+// STORE_MAX, chart-scoped by key, and a full or unavailable store (quota,
+// private mode) degrades to the in-memory session cache, never to a crash.
+const READINGS_STORE_KEY = "resonance.readings.v1";
+const READINGS_STORE_MAX = 400;
+
+function readingsStore() {
+  // Private-mode Safari can throw on the localStorage GETTER itself.
+  try {
+    if (typeof window !== "undefined" && window.localStorage) return window.localStorage;
+  } catch { /* no store on this host */ }
+  return null;
+}
+
+function hydrateReadings() {
+  const store = readingsStore();
+  if (!store) return;
+  try {
+    const raw = store.getItem(READINGS_STORE_KEY);
+    if (!raw) return;
+    const rows = JSON.parse(raw);
+    if (!Array.isArray(rows)) return;
+    for (const row of rows) {
+      if (Array.isArray(row) && typeof row[0] === "string" && typeof row[1] === "string") {
+        __cache.set(row[0], row[1]);
+      }
+    }
+  } catch { /* a corrupt store regenerates; it must never brick the app */ }
+}
+
+function persistReadings() {
+  const store = readingsStore();
+  if (!store) return;
+  try {
+    const rows = [...__cache.entries()].slice(-READINGS_STORE_MAX);
+    store.setItem(READINGS_STORE_KEY, JSON.stringify(rows));
+  } catch { /* quota or private mode: the session cache still works */ }
+}
+
+/** The single write path: every finished reading lands here. */
+function remember(key, text) {
+  __cache.set(key, text);
+  persistReadings();
+  return text;
+}
+
+hydrateReadings();
+
 // Strip any markdown the model returns despite instructions.
 function stripMd(text) {
   if (!text) return text;
@@ -26,11 +83,19 @@ function stripMd(text) {
     .trim();
 }
 
-function cacheKey(card) {
-  // Card + chart signature: index, principal, house, dignity, aspect, resonance
+function cacheKey(card, chart) {
+  // Card + chart signature: index, principal, house, dignity, aspect,
+  // resonance — PLUS the chart's own identity. The card fields alone were
+  // enough while the cache lived and died with the page; a persisted cache
+  // outlives the chart that filled it, and a reading must never follow a
+  // look-alike card into someone else's chart.
   const p = card.principal;
   const a = card.aspect;
+  const sig = chart
+    ? [chart.jd.toFixed(4), chart.birth.lat, chart.birth.lng, chart.timeUnknown ? 1 : 0].join(",")
+    : "nochart";
   return [
+    sig,
     card.idx, p.name, p.sign, p.house, p.retrograde ? 1 : 0,
     card.dignity.kind,
     a ? `${a.name}:${a.sep.toFixed(2)}` : "noasp",
@@ -254,7 +319,7 @@ function requireAgent() {
 
 async function interpretCard(card, chart) {
   requireAgent();
-  const key = cacheKey(card);
+  const key = cacheKey(card, chart);
   if (__cache.has(key)) return __cache.get(key);
   if (__pending.has(key)) return __pending.get(key);
 
@@ -263,7 +328,7 @@ async function interpretCard(card, chart) {
     try {
       const raw = await window.claude.complete(prompt);
       const clean = stripMd((raw || "").trim());
-      __cache.set(key, clean);
+      remember(key, clean);
       __pending.delete(key);
       return clean;
     } catch (err) {
@@ -285,7 +350,7 @@ async function interpretChart(chart) {
     try {
       const text = await window.claude.complete(prompt);
       const clean = stripMd((text || "").trim());
-      __cache.set(key, clean);
+      remember(key, clean);
       __pending.delete(key);
       return clean;
     } catch (err) {
@@ -302,7 +367,7 @@ function useAgentReading(card, chart, active) {
   React.useEffect(() => {
     if (!active || !card || !chart) return;
     if (!agentAvailable()) { setState(AGENT_UNAVAILABLE); return; }
-    const key = cacheKey(card);
+    const key = cacheKey(card, chart);
     if (__cache.has(key)) {
       setState({ loading: false, text: __cache.get(key), error: null });
       return;
@@ -314,7 +379,7 @@ function useAgentReading(card, chart, active) {
       (err)  => { if (!cancelled) setState({ loading: false, text: null, error: String(err && err.message || err) }); }
     );
     return () => { cancelled = true; };
-  }, [active, card && cacheKey(card)]);
+  }, [active, card && chart && cacheKey(card, chart)]);
   return state;
 }
 
@@ -400,7 +465,7 @@ async function interpretSynastryOverview(syn) {
     try {
       const text = await window.claude.complete(prompt);
       const clean = stripMd((text || "").trim());
-      __cache.set(key, clean); __pending.delete(key); return clean;
+      remember(key, clean); __pending.delete(key); return clean;
     } catch (err) { __pending.delete(key); throw err; }
   })();
   __pending.set(key, promise);
@@ -417,7 +482,7 @@ async function interpretSynastryAspect(hit, syn) {
     try {
       const text = await window.claude.complete(prompt);
       const clean = stripMd((text || "").trim());
-      __cache.set(key, clean); __pending.delete(key); return clean;
+      remember(key, clean); __pending.delete(key); return clean;
     } catch (err) { __pending.delete(key); throw err; }
   })();
   __pending.set(key, promise);
@@ -441,7 +506,8 @@ function useSynastryReading(syn, active) {
 }
 
 Object.assign(window, {
-  agentAvailable,
+  agentAvailable, remember, hydrateReadings, persistReadings,
+  READINGS_STORE_KEY, READINGS_STORE_MAX,
   interpretCard, interpretChart, useAgentReading, useAgentChartReading,
   buildCardPrompt, buildChartPrompt,
   interpretSynastryOverview, interpretSynastryAspect, useSynastryReading,
