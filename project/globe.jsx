@@ -7,11 +7,42 @@
 // A zodiac sign is stencilled into the sphere: a second, finer dot lattice
 // is lit only where it falls inside the current glyph's alpha mask, so the
 // sign is drawn out of the same dots the globe is made of rather than
-// pasted over them. Every few seconds it dissolves out and a random
-// different sign dissolves in. window.ZodiacGlobe (zodiac-globe.js) owns
+// pasted over them, lit in luminescent Maya blue. Every few seconds it
+// dissolves out and a random different sign dissolves in. window.ZodiacGlobe (zodiac-globe.js) owns
 // the glyph table, the pick-a-different-sign draw, the cycle clock, the
 // fade weights, and the screen-space stencil mapping; this file owns the
 // pixels.
+
+// Maya blue, the pigment the Dresden Codex the CRAM substrate was read out
+// of is painted in — so the sign the globe wears is in the same colour as
+// the source the arithmetic under it came from.
+//
+// Luminescence is a pale core inside a soft bloom, both painted with
+// `lighter` compositing so the blooms of neighbouring dots SUM along a
+// glyph's strokes — that summation is what reads as light rather than as
+// paint. The bloom is a pre-rendered radial-gradient sprite blitted once
+// per dot, not an arc: a flat-alpha arc has a hard rim and reads as a ring
+// around each dot (tried first, visibly wrong), and canvas `shadowBlur`,
+// the other way to get a soft edge, is per-draw-call expensive enough to
+// halve the frame rate at this dot count.
+const SIGN_HALO = "56,168,220";    // saturated Maya blue, the bloom
+const SIGN_CORE = "141,213,247";   // Maya blue, lightened: the lit centre
+const GLOW_R    = 6;               // bloom radius in px
+
+// One sprite, drawn once at mount and blitted per lit dot.
+function buildGlowSprite(rgb, r) {
+  const c = document.createElement("canvas");
+  c.width = c.height = r * 2;
+  const g = c.getContext("2d");
+  if (!g) return null;
+  const grad = g.createRadialGradient(r, r, 0, r, r, r);
+  grad.addColorStop(0.00, `rgba(${rgb},0.85)`);
+  grad.addColorStop(0.35, `rgba(${rgb},0.30)`);
+  grad.addColorStop(1.00, `rgba(${rgb},0)`);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, r * 2, r * 2);
+  return c;
+}
 
 // Rasterise each zodiac glyph into an n×n alpha mask (Uint8 per pixel).
 //
@@ -158,6 +189,7 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
     const lngCos = new Float64Array(fineLng.length);
     const GLYPH_BOX = ZG ? ZG.GLYPH_BOX_RATIO * R : 0;
     const MASK_N = ZG ? ZG.MASK_SIZE : 0;
+    const glow = ZG ? buildGlowSprite(SIGN_HALO, GLOW_R) : null;
 
     const project = (lat, lng) => {
       const rotL = ((lng + yawRef.current) * Math.PI / 180);
@@ -241,6 +273,7 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
         const w = ZG.fadeWeights(cycle, now);
         const mFrom = masks[cycle.from];
         const mTo   = masks[cycle.to];
+        ctx.globalCompositeOperation = "lighter";
 
         for (let j = 0; j < fineLng.length; j++) {
           const rotL = (fineLng[j] + yawRef.current) * Math.PI / 180;
@@ -263,12 +296,18 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
             const ink = mFrom[k] * w.from + mTo[k] * w.to;
             if (ink < 10) continue;
             const a = (0.14 + 0.62 * z) * (ink / 255);
-            ctx.fillStyle = `rgba(246,216,168,${a.toFixed(3)})`;
+            if (glow) {
+              ctx.globalAlpha = Math.min(1, a * 1.15);
+              ctx.drawImage(glow, px - GLOW_R, py - GLOW_R);
+              ctx.globalAlpha = 1;
+            }
+            ctx.fillStyle = `rgba(${SIGN_CORE},${a.toFixed(3)})`;
             ctx.beginPath();
             ctx.arc(px, py, 1.15, 0, Math.PI * 2);
             ctx.fill();
           }
         }
+        ctx.globalCompositeOperation = "source-over";
       }
 
       // place city DOM dots
