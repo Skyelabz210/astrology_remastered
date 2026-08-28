@@ -629,6 +629,7 @@ project/
   narrative.jsx        the whole chart composed as one continuous spoken narrative
   tzresolve.js         DST-aware wall-clock → UTC instant resolution
   validate.js          birth-input validation, polar house-system warnings
+  zodiac-globe.js      the zodiac sign stencilled into the landing globe's dots
   *.jsx, *.html        the presentation layer — chart UI, HCRM register console
   Core Test Harness.html the core's own gate — same modules, in a browser
   CLAIM_BOUNDARY.md    every claim, tagged, with counter-computations

@@ -29,6 +29,7 @@ isolation, tests, and claim-status tagging.
 | Ledger import + schema | `src/ledger/` | DEFINED | evidence inputs |
 | Synthetic ephemeris | `src/demo/` (`astro.jsx`) | SCAFFOLD / PRESENTATION | UI / layout testing only |
 | Console / reading UI | `*.html`, `*-view.jsx` | SCAFFOLD | presentation |
+| Landing globe zodiac stencil | `zodiac-globe.js`, `globe.jsx` | PRESENTATION · decorative only — the sign showing is a random draw on a timer, NOT the visitor's Sun sign, the chart being entered, or any computed placement | presentation |
 | Eclipse series + geophysics | `eclipses.js`, `eclipse-view.jsx` | FLOAT PRESENTATION · verified against the vendored ephemeris by geometric invariant (zenith over every sublunar point; Sun above the horizon at every greatest-eclipse point, 1970–2030) | presentation |
 | Voice narration (ElevenLabs + SpeechSynthesis) | `elevenlabs.js`, `voice.jsx` | SCAFFOLD / PRESENTATION · no bearing on any chart value | presentation |
 | Whole-chart narrative | `narrative.jsx` | PRESENTATION · composed only from computed chart values; inherits readings.jsx's unknown-birth-time gate (no house or Ascendant language), asserted in test/present/narrative.test.js | presentation |

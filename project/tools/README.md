@@ -82,12 +82,14 @@ expect a stale copy to be committed):
   on the page; if `HCRM Console.html` gains or drops a `.jsx` script tag,
   update this list to match rather than trusting it's still accurate.
 - **`core-shim.js` / `tzresolve.js` / `validate.js` /
-  `tools/ephemeris/houses.js` / `src/present/astro-core.js`** (real ES
+  `tools/ephemeris/houses.js` / `src/present/astro-core.js` /
+  `zodiac-globe.js`** (real ES
   modules, importing the `src/core/`/`src/ledger/` graph) — bundled into a
   single IIFE per module with `esbuild` (`buildSync`, `bundle: true, format:
   "iife"`) and inlined as a plain `<script>`, so `window.HCRM_CORE` /
   `window.TzResolve` / `window.Validate` / `window.HousesPolicy` /
-  `window.AstroCore` are populated with no runtime `import` left at all.
+  `window.AstroCore` / `window.ZodiacGlobe` are populated with no runtime
+  `import` left at all.
   Same caveat as the JSX list above: this is the current
   `<script type="module">` tag list, not a hardcoded input to the build.
 - **`vendor/astronomy.browser.min.js`** — inlined verbatim (already a plain

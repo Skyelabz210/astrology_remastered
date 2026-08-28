@@ -3,6 +3,114 @@
 // 1800 background dots drawn on <canvas> (fast); city dots are DOM buttons
 // positioned each frame so we get free hit-testing + tooltips + focus rings.
 // Globe drifts slowly. Selecting a city eases the yaw to centre it.
+//
+// A zodiac sign is stencilled into the sphere: a second, finer dot lattice
+// is lit only where it falls inside the current glyph's alpha mask, so the
+// sign is drawn out of the same dots the globe is made of rather than
+// pasted over them, lit in luminescent Maya blue. Every few seconds it
+// dissolves out and a random different sign dissolves in. window.ZodiacGlobe (zodiac-globe.js) owns
+// the glyph table, the pick-a-different-sign draw, the cycle clock, the
+// fade weights, and the screen-space stencil mapping; this file owns the
+// pixels.
+
+// Maya blue, the pigment the Dresden Codex the CRAM substrate was read out
+// of is painted in — so the sign the globe wears is in the same colour as
+// the source the arithmetic under it came from.
+//
+// Luminescence is a pale core inside a soft bloom, both painted with
+// `lighter` compositing so the blooms of neighbouring dots SUM along a
+// glyph's strokes — that summation is what reads as light rather than as
+// paint. The bloom is a pre-rendered radial-gradient sprite blitted once
+// per dot, not an arc: a flat-alpha arc has a hard rim and reads as a ring
+// around each dot (tried first, visibly wrong), and canvas `shadowBlur`,
+// the other way to get a soft edge, is per-draw-call expensive enough to
+// halve the frame rate at this dot count.
+const SIGN_HALO = "56,168,220";    // saturated Maya blue, the bloom
+const SIGN_CORE = "141,213,247";   // Maya blue, lightened: the lit centre
+const GLOW_R    = 6;               // bloom radius in px
+
+// One sprite, drawn once at mount and blitted per lit dot.
+function buildGlowSprite(rgb, r) {
+  const c = document.createElement("canvas");
+  c.width = c.height = r * 2;
+  const g = c.getContext("2d");
+  if (!g) return null;
+  const grad = g.createRadialGradient(r, r, 0, r, r, r);
+  grad.addColorStop(0.00, `rgba(${rgb},0.85)`);
+  grad.addColorStop(0.35, `rgba(${rgb},0.30)`);
+  grad.addColorStop(1.00, `rgba(${rgb},0)`);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, r * 2, r * 2);
+  return c;
+}
+
+// Rasterise each zodiac glyph into an n×n alpha mask (Uint8 per pixel).
+//
+// Two passes per sign, because the twelve glyphs do not share metrics in
+// any font: the first draw is measured for the ink's real bounding box,
+// then the glyph is redrawn scaled and translated so every sign fills the
+// same fraction of the mask. Without that, ♑ (tall, descending) and ♎
+// (short, wide) would read as two different type sizes as they cycle.
+function buildSignMasks(glyphs, n) {
+  const off = document.createElement("canvas");
+  off.width = n;
+  off.height = n;
+  const g = off.getContext("2d", { willReadFrequently: true });
+  if (!g) return null;
+
+  // Symbol-bearing families first, then a generic fallback: these are the
+  // same U+2648–2653 characters the deck and readings already print as
+  // text, so any font that renders the app renders these.
+  const FONT = '"Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", "DejaVu Sans", serif';
+  const FILL = 0.80;  // fraction of the mask the ink spans on its long axis
+
+  const alphaOf = () => {
+    const px = g.getImageData(0, 0, n, n).data;
+    const m = new Uint8Array(n * n);
+    for (let i = 0; i < n * n; i++) m[i] = px[i * 4 + 3];
+    return m;
+  };
+  const inkBox = (m) => {
+    let x0 = n, y0 = n, x1 = -1, y1 = -1;
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        if (m[y * n + x] < 12) continue;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+    return x1 < x0 ? null : { x0, y0, x1, y1 };
+  };
+
+  return glyphs.map(({ glyph }) => {
+    const base = Math.round(n * 0.62);
+    const paint = (size, tx, ty) => {
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, n, n);
+      g.fillStyle = "#fff";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.font = `${size}px ${FONT}`;
+      g.fillText(glyph, tx, ty);
+    };
+
+    paint(base, n / 2, n / 2);
+    const box = inkBox(alphaOf());
+    if (!box) return new Uint8Array(n * n);  // font has no glyph: draw nothing
+
+    const w = box.x1 - box.x0 + 1;
+    const h = box.y1 - box.y0 + 1;
+    const scale = (FILL * n) / Math.max(w, h);
+    // Re-draw at the corrected size, nudging the anchor by the offset the
+    // first pass showed between the requested centre and the ink's centre.
+    const dx = n / 2 - (box.x0 + box.x1 + 1) / 2;
+    const dy = n / 2 - (box.y0 + box.y1 + 1) / 2;
+    paint(Math.max(1, Math.round(base * scale)), n / 2 + dx * scale, n / 2 + dy * scale);
+    return alphaOf();
+  });
+}
 
 function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKey }) {
   const canvasRef = React.useRef(null);
@@ -37,6 +145,51 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
     ctx.scale(dpr, dpr);
 
     let mounted = true;
+
+    // ─── zodiac stencil set-up ───
+    //
+    // zodiac-globe.js is a <script type="module">; if a page forgets to
+    // load it the globe still draws, just without a sign in it.
+    const ZG = typeof window !== "undefined" ? window.ZodiacGlobe : null;
+    const masks = ZG ? buildSignMasks(ZG.SIGN_GLYPHS, ZG.MASK_SIZE) : null;
+    // A reader who has asked for reduced motion gets one sign for the
+    // visit instead of a fade every few seconds. The globe's own drift is
+    // pre-existing and untouched; this is about not adding a new
+    // repeating change on top of it.
+    const holdSign = typeof window !== "undefined" && window.matchMedia
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false;
+    let cycle = ZG ? ZG.startCycle(ZG.nextSignIndex(null, Math.random()), performance.now()) : null;
+
+    // The stencil's own lattice: finer than the 6° terrain grid, because a
+    // glyph sampled at 6° would be ~24 dots across the box and unreadable.
+    // Its per-latitude sines/cosines never change, so they are hoisted out
+    // of the frame loop; only the 180 longitudes rotate with the yaw, and
+    // those are tabulated once per frame rather than per dot.
+    const FINE_STEP = 2;
+    const fineLat = [];
+    const halfBox = ZG ? ZG.GLYPH_BOX_RATIO / 2 : 0;  // in radius units
+    for (let lat = -86; lat <= 86; lat += FINE_STEP) {
+      const phi = lat * Math.PI / 180;
+      const s = Math.sin(phi), c = Math.cos(phi);
+      // A whole latitude row can be dropped up front when no longitude on
+      // it could ever project inside the glyph box: the row's screen-space
+      // y = s·cosT − (c·cosL)·sinT sweeps the interval below as cosL runs
+      // −1…1, and rows whose entire sweep misses the box (everything from
+      // roughly ±40° out to the poles) are a third of the lattice that
+      // would otherwise be projected every frame only to be discarded.
+      const lo = s * cosT - c * Math.abs(sinT);
+      const hi = s * cosT + c * Math.abs(sinT);
+      if (lo > halfBox || hi < -halfBox) continue;
+      fineLat.push({ s, c });
+    }
+    const fineLng = [];
+    for (let lng = -180; lng < 180; lng += FINE_STEP) fineLng.push(lng);
+    const lngSin = new Float64Array(fineLng.length);
+    const lngCos = new Float64Array(fineLng.length);
+    const GLYPH_BOX = ZG ? ZG.GLYPH_BOX_RATIO * R : 0;
+    const MASK_N = ZG ? ZG.MASK_SIZE : 0;
+    const glow = ZG ? buildGlowSprite(SIGN_HALO, GLOW_R) : null;
 
     const project = (lat, lng) => {
       const rotL = ((lng + yawRef.current) * Math.PI / 180);
@@ -106,6 +259,57 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
         }
       }
 
+      // ─── zodiac stencil ───
+      //
+      // Screen-space: the glyph box holds still at the centre of the disc
+      // while the lattice turns through it, so the sign stays the same
+      // size and orientation and the spin reads as dots scanning across
+      // it. Only dots whose projection lands inside the box are ever
+      // tested against the mask, so the per-frame drawing cost is roughly
+      // the few hundred dots the glyph actually lights.
+      if (masks && cycle) {
+        const now = performance.now();
+        cycle = ZG.advanceCycle(cycle, now, { hold: holdSign }, Math.random);
+        const w = ZG.fadeWeights(cycle, now);
+        const mFrom = masks[cycle.from];
+        const mTo   = masks[cycle.to];
+        ctx.globalCompositeOperation = "lighter";
+
+        for (let j = 0; j < fineLng.length; j++) {
+          const rotL = (fineLng[j] + yawRef.current) * Math.PI / 180;
+          lngSin[j] = Math.sin(rotL);
+          lngCos[j] = Math.cos(rotL);
+        }
+
+        for (let i = 0; i < fineLat.length; i++) {
+          const { s: sinPhi, c: cosPhi } = fineLat[i];
+          for (let j = 0; j < fineLng.length; j++) {
+            const z0 = cosPhi * lngCos[j];
+            const z  = sinPhi * sinT + z0 * cosT;
+            if (z < 0.05) continue;                     // far side / grazing the limb
+            const y = sinPhi * cosT - z0 * sinT;
+            const py = cy - R * y;
+            const px = cx + R * (cosPhi * lngSin[j]);
+            const uv = ZG.stencilUV(px, py, cx, cy, GLYPH_BOX);
+            if (!uv) continue;
+            const k = ZG.maskIndex(uv.u, uv.v, MASK_N);
+            const ink = mFrom[k] * w.from + mTo[k] * w.to;
+            if (ink < 10) continue;
+            const a = (0.14 + 0.62 * z) * (ink / 255);
+            if (glow) {
+              ctx.globalAlpha = Math.min(1, a * 1.15);
+              ctx.drawImage(glow, px - GLOW_R, py - GLOW_R);
+              ctx.globalAlpha = 1;
+            }
+            ctx.fillStyle = `rgba(${SIGN_CORE},${a.toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(px, py, 1.15, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        ctx.globalCompositeOperation = "source-over";
+      }
+
       // place city DOM dots
       CITIES.forEach((c) => {
         const node = cityRefs.current.get(cityKey(c));
@@ -141,7 +345,12 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
           its coordinates, UTC offset) is duplicated as real text in the
           readout below and as labelled <button>s per city, so the canvas
           is marked decorative rather than given a role="img" that would
-          just repeat "a globe" with no way to describe a live animation. */}
+          just repeat "a globe" with no way to describe a live animation.
+          The zodiac sign stencilled into the sphere is decorative on the
+          same terms: it is ambience, not an input or a reading — it says
+          nothing about the chart being cast — so it stays inside the
+          aria-hidden canvas rather than being announced, which at a sign
+          every few seconds would talk over the form. */}
       <canvas ref={canvasRef} className="glb-canvas" aria-hidden="true" role="presentation" />
       <div className="glb-cities">
         {CITIES.map((c) => {
