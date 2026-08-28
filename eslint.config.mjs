@@ -16,7 +16,8 @@
 //     code) — fixing them is a behavior-risking rewrite out of scope for a
 //     tooling-only package, so they stay unlinted for now. core-shim.js IS an
 //     ES module (import/export, `typeof window` guard) and lints clean, so it
-//     is included.
+//     is included — and so is zodiac-globe.js, which is new code of exactly
+//     that shape rather than legacy.
 //
 // project/*.jsx — no longer excluded. It used to be, on the reasoning
 // "Babel-standalone JSX, not valid plain JS syntax; no parser is configured
@@ -205,6 +206,7 @@ export default [
       "project/vendor/**",
       "project/*.js",
       "!project/core-shim.js",
+      "!project/zodiac-globe.js",
     ],
   },
   js.configs.recommended,
@@ -258,7 +260,11 @@ export default [
     },
   },
   {
-    files: ["project/core-shim.js"],
+    // zodiac-globe.js (the landing globe's zodiac stencil) is the same
+    // shape as core-shim.js — a root-level dual-environment ES module with
+    // a `typeof window` guard publishing onto `window` for the .jsx layer —
+    // so it is un-ignored above and shares this block's `window` global.
+    files: ["project/core-shim.js", "project/zodiac-globe.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
