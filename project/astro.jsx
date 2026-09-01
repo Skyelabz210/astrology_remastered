@@ -515,6 +515,11 @@ function computeNatal(birth) {
       : houseForLongEqual(lon, asc);
   };
 
+  // The Ascendant's own shadow lane — the chart-specific term inside every
+  // card's resonance, returned on the chart so the reading can NAME it
+  // instead of only feeling it as glow.
+  const ascR11 = Math.floor(asc * 3600) % 11;
+
   const planets = PLANET_ORDER.map(p => {
     const lon  = planetLongitude(p, jd);
     const sign = Math.floor(lon / 30);
@@ -608,8 +613,6 @@ function computeNatal(birth) {
     // Resonance: a 0..1 scalar that drives glow vibrance.
     // Blends Ptolemaic dignity total, tenancy count, aspect tightness, and the
     // card's shadow-lane (mod 11) residue distance from the chart's Asc residue.
-    const ascArcsec = asc * 3600;
-    const ascR11 = Math.floor(ascArcsec) % 11;
     const cardArcsec = (idx * 30 + 15) * 3600;
     const cardR11 = Math.floor(cardArcsec) % 11;
     const laneDist = Math.min(
@@ -651,7 +654,6 @@ function computeNatal(birth) {
       hueShift,
       laneR11: cardR11,
       laneR13: Math.floor(cardArcsec) % 13,
-      cardR7:  Math.floor(cardArcsec) % 7,
     };
   });
 
@@ -824,6 +826,7 @@ function computeNatal(birth) {
     quadrantCount,
     stelliums,
     patterns,
+    ascR11,
     outOfBounds,
     voidOfCourse,
     birth,

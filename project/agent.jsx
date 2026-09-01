@@ -119,7 +119,7 @@ function buildCardPrompt(card, chart) {
       liveLines = [
         ``,
         `LIVE CTM STATE (today, running coordinate on ℝ × S¹):`,
-        `Long Count ${ctm.longCount.formatted} · Tzolk'in ${ctm.tzolkin.number} ${ctm.tzolkin.sign} · Haab ${ctm.haab.day} ${ctm.haab.month}. Age ${ctm.ageYears.toFixed(2)} yr. Phase syndrome S = ${ctm.syndromeDeg.toFixed(2)}°.`,
+        `Age ${ctm.ageYears.toFixed(2)} yr · ${Math.floor(ctm.ageDays).toLocaleString()} days lived · phase θ = ${ctm.tco.thetaDeg.toFixed(2)}° on the ${ctm.tco.M.toLocaleString()}-day round · syndrome S = ${ctm.syndromeDeg.toFixed(2)}°.`,
         principalTransits.length
           ? `Active transits to ${p.name}: ${principalTransits.map(h => `${h.T} ${h.aspect} ${h.orb.toFixed(2)}° ${h.phase}`).join("; ")}.`
           : `No active transit to ${p.name} within 2° right now.`,
@@ -130,7 +130,7 @@ function buildCardPrompt(card, chart) {
   const lines = [
     `You are the reader of a chart. The mathematics has already run; the placements below are computed and fixed. Your task is to deliver the reading aloud — the way a fluent, experienced astrologer speaks when they sit across from someone and tell them what their chart shows. This is the STANDARD reading: spoken, synthesized, human.`,
     ``,
-    `The classical apparatus is the reading. The Mayan CRT substrate (Safe Basis {2,3,5,7,11,13}) ADDS one extra disclosure at the end — mod 11, the shadow prime, surfaces a thread of correspondence classical astrology cannot see. It refines; it never overrides.`,
+    `The classical apparatus is the reading. The exact residue substrate (Safe Basis {2,3,5,7,11,13}) ADDS one extra disclosure at the end — mod 11, the Shadow Prime, surfaces a thread of correspondence classical astrology cannot see. It refines; it never overrides.`,
     ``,
     `HOW TO NARRATE (this is the part that matters):`,
     `- SYNTHESIZE, do not enumerate. A placement is not a list of attributes — it is one coherent behavior. Fuse dignity + house + aspect + sect into a single, connected statement of how this part of the person operates. Each sentence should follow from the last like spoken thought, not like rows in a table.`,
@@ -167,7 +167,7 @@ function buildCardPrompt(card, chart) {
     p.retrograde ? `Retrograde: the signification turns inward, reconsidered rather than outwardly asserted.` : null,
     `Shadow lane "${SHADOW_LANE_NAMES[card.laneR11]}" (mod 11) is the hidden thread to fold into the final sentence — treat it as a quiet undercurrent beneath the classical reading, not a headline.`,
     ``,
-    `SUBSTRATE (Mayan CRT — additive, not replacement; for grounding only, do NOT read these figures aloud):`,
+    `SUBSTRATE (exact residues — additive, not replacement; for grounding only, do NOT read these figures aloud):`,
     `CRT residues: r₂=${r.r2}, r₃=${r.r3}, r₅=${r.r5}, r₇=${r.r7}, r₁₁=${r.r11} (SHADOW), r₁₃=${r.r13} (BOUNDARY).`,
     `Gear K = ${gearK} (mod 323).`,
     `Card shadow-lane: ${card.laneR11} (${SHADOW_LANE_NAMES[card.laneR11]}).`,
@@ -313,7 +313,7 @@ const AGENT_UNAVAILABLE = Object.freeze({
 /** @throws {Error} when the host provides no interpreter. */
 function requireAgent() {
   if (!agentAvailable()) {
-    throw new Error("no agent interpreter on this host (window.claude.complete is absent)");
+    throw new Error("the AI interpreter is not available in this session");
   }
 }
 
@@ -450,8 +450,7 @@ function buildSynastryOverviewPrompt(syn) {
     overlayHi ? `House overlays: ${overlayHi}.` : null,
     syn.receptionsAB.length || syn.receptionsBA.length ? `Cross-reception present — each receives the other into a sign they rule, a sign of mutual accommodation.` : null,
     `Shared shadow lanes (mod 11 resonances both charts hold): ${syn.ctm.sharedLanes.slice(0,4).map(s => `${s.a}/${s.b} in lane ${s.laneName}`).join("; ") || "none significant"}.`,
-    syn.ctm.daySignMatch ? `Both were born under the same Tzolk'in day-sign — a rare calendrical echo.` : null,
-    `Phase syndrome between their birth points on the time-cylinder: ${syn.ctm.syndromeDeg.toFixed(1)}° (0° = born in phase, 180° = counterphase).`,
+    `Phase offset between their birth points on the time-cylinder: ${syn.ctm.syndromeFoldDeg.toFixed(1)}° (0° = born in phase, 180° = counterphase). This is the gap between the births on the 30,030-day round — a calendar rhythm, not a chart aspect.`,
   ].filter(Boolean).join("\n");
 }
 

@@ -214,12 +214,12 @@ function readingFor(card, chart) {
     const fn = ASPECT_FN[card.aspect.name] || "";
     body.push({
       text: `Sun-${p.name} ${card.aspect.name} ${card.aspect.sep.toFixed(2)}° (orb ${card.aspect.orb}°, ${card.aspect.family}). ${fn}`,
-      sourceTag: ASPECT_FAMILY_SOURCE_TAG[card.aspect.family] || "Aspect (astro-core.js orb table)",
+      sourceTag: ASPECT_FAMILY_SOURCE_TAG[card.aspect.family] || "Aspect (classical orb table)",
     });
   } else {
     body.push({
       text: "No Sun-aspect within orb. This sector reads from intrinsic dignity alone.",
-      sourceTag: "Aspect scan (Sun-relative, astro-core.js orb table)",
+      sourceTag: "Aspect scan (Sun-relative, classical orbs)",
     });
   }
 
@@ -270,8 +270,11 @@ function rigorousFor(card, chart) {
   chart = chart || {};
   const p = card.principal;
   const r = p.residues;
-  // Mayan-style gear coordinate: K = (r11 · 13 + r13)  mod 323
-  const gearK = ((r.r11 * 13) + r.r13) % 323;
+  // Shadow/boundary lane pair, folded to one coordinate: K = r11·13 + r13.
+  // Range [0, 143) — a display pairing of the two lanes, NOT the core's
+  // K-Elimination winding (that lives in the HCRM register, with its own
+  // certificate).
+  const gearK = (r.r11 * 13) + r.r13;
   return [
     { label: "λ arcsec",         value: Math.floor(p.arcsec).toLocaleString() },
     { label: "λ degrees",        value: p.lon.toFixed(4) + "°" },
@@ -285,7 +288,7 @@ function rigorousFor(card, chart) {
     { label: "r₇",               value: r.r7,  note: "classical week" },
     { label: "r₁₁ shadow",       value: r.r11, note: "INVISIBLE LANE", shadow: true },
     { label: "r₁₃ boundary",     value: r.r13, note: "edge lane" },
-    { label: "K (gear)",         value: gearK, note: "mod 17·19 = 323" },
+    { label: "K (lane pair)",    value: gearK, note: "r₁₁·13 + r₁₃ ∈ [0, 143)" },
     { label: "card lane-11",     value: card.laneR11, note: SHADOW_LANE_NAMES[card.laneR11], shadow: true },
     { label: "card lane-13",     value: card.laneR13, note: BOUNDARY_LANE_NAMES[card.laneR13] },
     { label: "resonance ρ",      value: card.resonance.toFixed(4) },
@@ -304,20 +307,8 @@ const BOUNDARY_LANE_NAMES = [
   "Mirror","Bone","Thread","Door","Veil",
 ];
 
-// Statement issued to the user when rigorous mode opens — declares what
-// the substrate is actually doing.
-const SUBSTRATE_NOTE = [
-  "Every longitude is stored as an integer arcsecond on the 1,296,000″ ring.",
-  "The Safe Basis {2, 3, 5, 7, 11, 13} factors M_SAFE = 30,030.",
-  "Classical astrology surfaces residues mod 2 (sect), 3 (modality), 5 (?), 7 (planetary week), 12 (signs).",
-  "It is *blind* to mod 11. The Shadow Prime opens eleven lanes of correspondence the old reading could not see.",
-  "Mod 13 names the Boundary lanes. The pair (r₁₁, r₁₃) gives a unique gear coordinate K ∈ [0, 323).",
-  "Resonance ρ blends dignity, tenancy, aspect tightness, and proximity in the shadow lane to the Ascendant.",
-];
-
 Object.assign(window, {
   readingFor, rigorousFor, roman,
   SHADOW_LANE_NAMES, BOUNDARY_LANE_NAMES,
   DIGNITY_STATEMENT, ASPECT_FN, PLANET_FN,
-  SUBSTRATE_NOTE,
 });

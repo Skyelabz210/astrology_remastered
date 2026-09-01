@@ -21,7 +21,7 @@ const HCRM_DEFAULTS = /*EDITMODE-BEGIN*/{
 // wording; ErrorBoundary already surfaces the caught error's message.
 function HBoundary({ children }) {
   return (
-    <ErrorBoundary title="register map unresolved" resetLabel="reset">
+    <ErrorBoundary title="the register map couldn't be drawn" resetLabel="reset">
       {children}
     </ErrorBoundary>
   );
@@ -40,7 +40,7 @@ function HcrmStatusBanners({ chart, birth, banners, onDismiss }) {
     notes.push({
       id: "synthetic-mode",
       kind: "info",
-      text: "Offline / synthetic ephemeris — planetary positions come from the built-in mean-motion model, not the verified astronomy-engine vendor data. Expect lower precision (typically a few arcminutes to roughly a degree).",
+      text: "Offline / synthetic ephemeris — planetary positions come from the built-in mean-motion model, not the full verified astronomical tables. Expect lower precision (typically a few arcminutes to roughly a degree).",
     });
   }
 
@@ -121,8 +121,8 @@ function HCRMApp() {
     return (
       <div className="boundary">
         <HcrmStatusBanners chart={null} birth={birth} banners={banners} onDismiss={dismiss} />
-        <div className="boundary-title">chart unresolved</div>
-        <div className="boundary-sub">the natal inputs did not produce a valid chart — see the error above for why.</div>
+        <div className="boundary-title">the chart wouldn’t cast</div>
+        <div className="boundary-sub">those birth details didn’t resolve into a chart — the note above says what stopped it.</div>
         <button onClick={() => setScreen("landing")}>back</button>
       </div>
     );

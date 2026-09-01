@@ -144,18 +144,19 @@ function synastryCTM(chartA, chartB) {
   }
   // composite midpoint phase
   const midTheta = phaseSyndrome((tcoA.theta + tcoB.theta) / 2, 0);
-  // Tzolk'in day-signs of each birth
-  const tzA = tzolkin(chartA.jd);
-  const tzB = tzolkin(chartB.jd);
+  // The directional syndrome S = θA − θB is antisymmetric: swapping who is
+  // entered first maps S to 360° − S, which used to flip the spoken verdict
+  // from "aligned rhythm" to "counterphase" for the SAME two people. The
+  // folded offset min(S, 360 − S) is order-independent — that is what the
+  // view judges and displays; S itself stays for anything that needs the
+  // signed phase.
+  const syndromeDeg = syndrome * 180 / Math.PI;
+  const syndromeFoldDeg = Math.min(syndromeDeg, 360 - syndromeDeg);
   return {
     tcoA, tcoB,
-    syndrome, syndromeDeg: syndrome * 180 / Math.PI,
+    syndrome, syndromeDeg, syndromeFoldDeg,
     sharedLanes,
     midTheta, midThetaDeg: midTheta * 180 / Math.PI,
-    tzolkinA: `${tzA.number} ${tzA.sign}`,
-    tzolkinB: `${tzB.number} ${tzB.sign}`,
-    daySignMatch: tzA.sign === tzB.sign,
-    numberMatch: tzA.number === tzB.number,
   };
 }
 

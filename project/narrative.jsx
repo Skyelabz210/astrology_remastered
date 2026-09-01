@@ -125,6 +125,14 @@ function narrativeOpening(chart) {
   const dominant = dominantElement(chart);
   if (dominant) lines.push(`${dominant.name} carries the weight of it.`);
 
+  // The birth's fixed coordinate on the long round — the cyclic clock every
+  // later moment of this chart is measured against. A verifiable arithmetic
+  // fact, not an interpretive claim.
+  if (chart.jd && typeof tcoPhase === "function") {
+    const t = tcoPhase(chart.jd);
+    lines.push(`On the long round of ${t.M.toLocaleString()} days, this birth holds phase ${t.thetaDeg.toFixed(1)} degrees — the fixed coordinate every later moment of the chart is measured against.`);
+  }
+
   lines.push("Here it is, sign by sign.");
   return lines.join(" ");
 }
@@ -179,12 +187,42 @@ function narrativeForCard(card, chart, { first = false } = {}) {
     parts.push(`This is the rising sign itself — the lens the rest of the chart is read through.`);
   }
 
-  parts.push(`Beneath it, the eleventh lane runs as ${nLaneName(card.laneR11)}.`);
+  // The eleventh lane spoken here is the PRINCIPAL BODY's own — arcsec mod
+  // 11 of this chart's actual placement — not the sign midpoint's constant.
+  // Before this, the sentence was identical for every person with the same
+  // sign: decoration wearing the voice of content. card.laneR11 (the sign
+  // midpoint's lane) remains what the resonance geometry uses.
+  const laneOfPrincipal = card.principal && card.principal.residues
+    ? card.principal.residues.r11
+    : card.laneR11;
+  const laneHolder = card.principal ? card.principal.name : null;
+  parts.push(laneHolder
+    ? `Beneath it, the eleventh lane of ${laneHolder} runs as ${nLaneName(laneOfPrincipal)}.`
+    : `Beneath it, the eleventh lane runs as ${nLaneName(card.laneR11)}.`);
   return parts.join(" ");
 }
 
 function aspectArticle(name) {
   return /^[aeiou]/i.test(String(name)) ? "an" : "a";
+}
+
+// Pairs of visible bodies sharing an eleventh-lane residue in THIS chart —
+// the same coincidences the Prime Resonance lattice draws, computed from
+// the planets' real arcseconds (never the sign-midpoint constants). The
+// nodes' two ends share a lane only by construction (they oppose), so the
+// South Node is excluded.
+const SHADOW_CONTACT_BODIES = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","Chiron","NorthNode"];
+function shadowLaneContacts(chart) {
+  const ps = (chart.planets || []).filter(p => SHADOW_CONTACT_BODIES.includes(p.name) && p.residues);
+  const out = [];
+  for (let i = 0; i < ps.length; i++) {
+    for (let j = i + 1; j < ps.length; j++) {
+      if (ps[i].residues.r11 === ps[j].residues.r11) {
+        out.push({ a: ps[i].name, b: ps[j].name, lane: ps[i].residues.r11 });
+      }
+    }
+  }
+  return out;
 }
 
 // ── the closing ───────────────────────────────────────────────────────
@@ -204,6 +242,22 @@ function narrativeClosing(chart) {
   if (chart.voidOfCourse && chart.voidOfCourse.isVoc) {
     lines.push("The Moon was void of course at the moment of birth: whatever it was carrying had already finished being decided.");
   }
+
+  // The substrate's own two closing facts — both computed from this chart's
+  // actual arcseconds, both stated as coincidences rather than aspects, per
+  // CLAIM_BOUNDARY: no meaning is asserted that the arithmetic doesn't carry.
+  const contacts = shadowLaneContacts(chart);
+  if (contacts.length > 0) {
+    const c = contacts[0];
+    const others = contacts.length - 1;
+    lines.push(`In the eleventh lane, ${c.a} and ${c.b} fall together — lane ${c.lane}, ${nLaneName(c.lane)}${others > 0 ? `, with ${others} more such ${others === 1 ? "pairing" : "pairings"} behind it` : ""}. That is a substrate coincidence, not a classical aspect — most charts carry several — but it is a correspondence the traditional reading has no name for.`);
+  }
+  const closures = (chart.planets || []).filter(p => SHADOW_CONTACT_BODIES.includes(p.name) && p.residues && p.residues.r11 === 0);
+  if (closures.length > 0) {
+    const names = closures.map(p => p.name).join(" and ");
+    lines.push(`${names} ${closures.length === 1 ? "sits" : "sit"} at lane zero — the shadow lane's closure point, a property of the exact arcsecond, not of the sign.`);
+  }
+
   lines.push("The classical reading is the reading. The eleventh lane only adds what it could never see.");
   return lines.join(" ");
 }

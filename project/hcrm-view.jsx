@@ -86,11 +86,13 @@ function SyntheticBadge({ cert }) {
   return (
     <div
       className={`hc-synthetic-badge ${cert.rejected ? "is-rejected" : "is-admitted"}`}
-      title={cert.message}
+      title={cert.rejected
+        ? "This console is drawn from demonstration positions; the exact core refuses to certify them."
+        : cert.message}
     >
       {cert.rejected
-        ? "⚠ SYNTHETIC — not admissible to core"
-        : "⚠ SYNTHETIC_DEMO admitted (unexpected)"}
+        ? "⚠ demonstration positions — not certified by the exact core"
+        : "⚠ demonstration positions were accepted — this should never happen"}
     </div>
   );
 }
@@ -112,10 +114,10 @@ function ToolsMenu() {
     if (open) { document.addEventListener("click", close); return () => document.removeEventListener("click", close); }
   }, [open]);
   const tools = [
-    { href: "CRAM Calculator.html", label: "CRAM Depth Calculator", sub: "5-level raise / lower · K-Elim" },
-    { href: "API Reference.html", label: "API Reference", sub: "window.CRAM · live endpoints" },
-    { href: "Core Test Harness.html", label: "Core Test Harness", sub: "P4 gate · full ecliptic sweep" },
-    { href: "Resonance Spread.html", label: "Resonance Spread", sub: "reading app · cards + agent" },
+    { href: "CRAM Calculator.html", label: "CRAM Depth Calculator", sub: "5-level raise / lower · K-Elimination" },
+    { href: "API Reference.html", label: "API Reference", sub: "the live endpoints" },
+    { href: "Core Test Harness.html", label: "Core Test Harness", sub: "the core's own gate · full ecliptic sweep" },
+    { href: "Resonance Spread.html", label: "Resonance Spread", sub: "the reading deck · cards · voice" },
   ];
   return (
     <div className="hc-tools" onClick={e => e.stopPropagation()}>
@@ -155,7 +157,7 @@ function ClassLegend() {
   return (
     <div className={`hc-legend ${open ? "is-open" : ""}`}>
       <button className="hc-legend-toggle" onClick={() => setOpen(o => !o)}>
-        {open ? "− " : "+ "}visual class legend · keep layers distinct
+        {open ? "− " : "+ "}what the colours mean
       </button>
       {open && (
         <div className="hc-legend-grid">
@@ -220,16 +222,16 @@ function Ledger({ hcrm, selRow, setSelRow }) {
               <td className="num">{r.res.r3}</td>
               <td className="num">{r.res.r5}</td>
               <td className="num">{r.res.r7}</td>
-              <td className={`num hc-sh ${r.shadowHit ? "is-hit" : ""}`} title={r.shadowHit ? "SH-body · r11 = 0 · computed" : ""}>{r.res.r11}</td>
+              <td className={`num hc-sh ${r.shadowHit ? "is-hit" : ""}`} title={r.shadowHit ? "SH-body · r11 = 0" : ""}>{r.res.r11}</td>
               <td className={`num hc-bd ${r.b13State === "pre" ? "is-pre" : r.b13State === "zero" ? "is-zero" : ""}`}
-                  title={r.b13State === "pre" ? "B13-pre · r13 = 12 · pre / re-entry · computed" : r.b13State === "zero" ? "B13-zero · r13 = 0 · closure · computed" : ""}>{r.res.r13}</td>
+                  title={r.b13State === "pre" ? "B13-pre · r13 = 12 · pre / re-entry" : r.b13State === "zero" ? "B13-zero · r13 = 0 · closure" : ""}>{r.res.r13}</td>
               <td className="num">{r.res.r17}</td>
               <td className="num">{r.res.r19}</td>
               <td className="hc-opclass">
                 {r.bodyEvents.length === 0
                   ? <span className="hc-badge hc-badge-R" title="ordinary residue register · no closure events">R</span>
                   : r.bodyEvents.map((e, k) => (
-                      <span key={k} className={`hc-badge hc-badge-${e.eventClass}`} title={`${e.eventClass} · ${e.trigger} · ${e.proofStatus}`}>{e.eventClass}</span>
+                      <span key={k} className={`hc-badge hc-badge-${e.eventClass}`} title={`${e.eventClass} · ${e.trigger}`}>{e.eventClass}</span>
                     ))}
               </td>
             </tr>
@@ -428,7 +430,7 @@ function EdgeGraph({ hcrm }) {
                 {e.edgeEvents.length === 0
                   ? <span className="hc-badge hc-badge-R" title="no preserved witness lanes">—</span>
                   : e.edgeEvents.map((ev, k) => (
-                      <span key={k} className={`hc-badge hc-badge-${ev.eventClass}`} title={`${ev.eventClass} · ${ev.trigger} · ${ev.proofStatus}`}>{ev.eventClass}</span>
+                      <span key={k} className={`hc-badge hc-badge-${ev.eventClass}`} title={`${ev.eventClass} · ${ev.trigger}`}>{ev.eventClass}</span>
                     ))}
               </td>
             </tr>
@@ -586,7 +588,7 @@ function Odometer({ hcrm }) {
       </div>
 
       <div className="hc-odo-foot">
-        17 → 47 demo: residues (1,2,2) on B={"{2,3,5}"} name both — winding K separates the blocks.
+        Worked example — 17 vs 47: residues (1,2,2) on B={"{2,3,5}"} name both — winding K separates the blocks.
         Here on SafeS8 the same logic runs across eight dials; the tray + winding name the integer exactly.
       </div>
     </div>
@@ -654,7 +656,7 @@ function KElimination({ hcrm }) {
                 <td className="num hc-shared">{ke.Krecovered}</td>
                 <td className="num">{ke.Ktrue}</td>
                 <td>{ke.recovered
-                  ? <span className="hc-badge hc-badge-G-body" title="winding recovered from residues alone · computed">✓ certified</span>
+                  ? <span className="hc-badge hc-badge-G-body" title="winding recovered from residues alone">✓ certified</span>
                   : <span className="hc-failed">✕</span>}</td>
               </tr>
             );
@@ -688,7 +690,7 @@ function CramState({ hcrm }) {
       <div className="hc-edges-note">
         Each body is a CRAM state <b>S = (B, r, K, …)</b>. The residue tray <b>r</b> is primary;
         the integer longitude is the boundary projection <b>Val<sub>B</sub>(S) = γ̃<sub>B</sub>(r) + K·shell</b>,
-        certified by <code>window.HCRM_CORE.shellIdentity</code> / <code>verifyShellWinding</code>
+        certified by the core’s shell-identity and winding checks
         (BigInt K-Elimination). γ̃ is the CRT reconstruction over the parked shell
         {" "}{hcrm.mShell ? hcrm.mShell.toLocaleString() : "—"} = 2·3·5·7·13·17·19, and K is
         recovered from the shadow lane {hcrm.parkAnchor || 11} alone — 0 or 1 within one ring

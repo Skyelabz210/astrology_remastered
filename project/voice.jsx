@@ -212,7 +212,7 @@ async function speakEleven(text, opts = {}) {
     const settings = EL.voiceSettingsFor(style, rate ?? preset.rate);
     const modelId = elevenModel || EL.DEFAULT_MODEL_ID;
 
-    say("resolving", "resolving voice…");
+    say("resolving", "finding the voice…");
     const resolved = await EL.resolveVoiceId({
       apiKey,
       name: voiceName || EL.DEFAULT_VOICE_NAME,
@@ -223,7 +223,7 @@ async function speakEleven(text, opts = {}) {
     const key = cacheKeyFor(effText, resolved.voiceId, modelId, settings);
     let url = __eleven.cache.get(key);
     if (!url) {
-      say("synthesizing", `synthesizing with ${resolved.name || voiceName}…`);
+      say("synthesizing", `shaping the narration with ${resolved.name || voiceName}…`);
       const buf = await EL.synthesize({
         apiKey,
         voiceId: resolved.voiceId,
@@ -504,7 +504,7 @@ function playNarrationChunk(chunk, entry, ctx) {
       a.removeEventListener("error", onError);
     };
     const onEnded = () => { cleanup(); resolve(); };
-    const onError = () => { cleanup(); reject(new Error("narration playback failed")); };
+    const onError = () => { cleanup(); reject(new Error("the narration wouldn't play")); };
 
     a.addEventListener("timeupdate", announce);
     a.addEventListener("loadedmetadata", onMeta);
@@ -533,7 +533,7 @@ async function speakNarrativeEleven(narrative, opts, state) {
   const modelId = opts.elevenModel || EL.DEFAULT_MODEL_ID;
   const say = (s, message) => { if (opts.onStatus) opts.onStatus({ state: s, message }); };
 
-  say("resolving", "resolving voice…");
+  say("resolving", "finding the voice…");
   const resolved = await EL.resolveVoiceId({
     apiKey,
     name: opts.voiceName || EL.DEFAULT_VOICE_NAME,
@@ -548,7 +548,7 @@ async function speakNarrativeEleven(narrative, opts, state) {
     onSegment: opts.onSegment, onStatus: opts.onStatus,
   };
 
-  say("synthesizing", `synthesizing the reading with ${resolved.name || opts.voiceName}…`);
+  say("synthesizing", `shaping the reading with ${resolved.name || opts.voiceName}…`);
   let pending = renderNarrationChunk(chunks[0], ctx);
   for (let i = 0; i < chunks.length; i++) {
     const entry = await pending;
