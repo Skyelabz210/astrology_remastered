@@ -166,12 +166,15 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
         <h3 className="syn-panel-h">Cylindrical Time · the two birth points compared</h3>
         <div className="syn-ctm-grid">
           <div className="syn-ctm-cell">
-            <div className="syn-ctm-label">phase syndrome S</div>
-            <div className="syn-ctm-big">{syn.ctm.syndromeDeg.toFixed(1)}°</div>
+            <div className="syn-ctm-label">phase offset S</div>
+            <div className="syn-ctm-big">{syn.ctm.syndromeFoldDeg.toFixed(1)}°</div>
             <div className="syn-ctm-note">
-              {syn.ctm.syndromeDeg < 30 ? "born nearly in phase — aligned rhythm"
-                : syn.ctm.syndromeDeg > 150 ? "near counterphase — opposite tempo, complementary"
-                : "offset phase — distinct but interlocking cycles"}
+              {syn.ctm.syndromeFoldDeg < 30 ? "born nearly in phase on the round"
+                : syn.ctm.syndromeFoldDeg > 150 ? "near counterphase on the round"
+                : "offset on the round — distinct positions in the cycle"}
+            </div>
+            <div className="syn-ctm-note">
+              the gap between the two births on the 30,030-day round — a calendar rhythm, not a chart aspect
             </div>
           </div>
           <div className="syn-ctm-cell">
@@ -188,9 +191,14 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
             <div className="syn-ctm-lanes">
               {syn.ctm.sharedLanes.length === 0 && <span className="syn-ctm-note">no coincident lanes</span>}
               {dedupeLanes(syn.ctm.sharedLanes).slice(0, 6).map((s, i) => (
-                <span key={i} className="syn-lane-chip">{s.laneName}</span>
+                <span key={i} className="syn-lane-chip">{s.a} ↔ {s.b} · {s.laneName}</span>
               ))}
             </div>
+            {syn.ctm.sharedLanes.length > 0 && (
+              <div className="syn-ctm-note">
+                shared lanes are common between any two charts — what distinguishes a pair is which bodies share them
+              </div>
+            )}
           </div>
         </div>
       </div>

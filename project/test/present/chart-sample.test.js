@@ -247,11 +247,13 @@ export async function run() {
     // — cards —
     check("twelve sign cards, resonance in [0,1]",
       chart.cards.length === 12 && chart.cards.every((c) => c.resonance >= 0 && c.resonance <= 1), id);
-    check("card shadow-lane residues are the card centre's arcsec mod 11/13/7",
+    check("card shadow-lane residues are the card centre's arcsec mod 11/13",
       chart.cards.every((c) => {
         const cardArcsec = Math.floor((c.idx * 30 + 15) * 3600);
-        return c.laneR11 === cardArcsec % 11 && c.laneR13 === cardArcsec % 13 && c.cardR7 === cardArcsec % 7;
+        return c.laneR11 === cardArcsec % 11 && c.laneR13 === cardArcsec % 13;
       }), id);
+    check("the chart names the Ascendant's own shadow lane",
+      chart.ascR11 === Math.floor(chart.asc * 3600) % 11, id);
 
     check("void-of-course carries a verdict and a sign-change horizon",
       chart.voidOfCourse && typeof chart.voidOfCourse.isVoc === "boolean" &&

@@ -219,6 +219,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
             key={current.idx}
             card={current}
             timeUnknown={!!chart.timeUnknown}
+            ascLane={chart.ascR11}
             agent={agent}
             localReading={localReading}
             pos={pos}
@@ -263,7 +264,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
 // ──────────────────────────────────────────────────────────────────────
 // CINEMATIC STAGE
 // ──────────────────────────────────────────────────────────────────────
-function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, pos, total,
+function CinematicStage({ card, timeUnknown, ascLane, agent, localReading, spokenText, pos, total,
                          voiceOn, voiceSpeaking, voiceStatus, narrating, narrationSeg,
                          narrationTotal, narrationSegment, onPlayWholeChart, onResumeWholeChart,
                          onStopNarration, onSpeakNow }) {
@@ -372,9 +373,21 @@ function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, po
           </div>
         )}
 
-        <div className="cs-resonance">
+        {/* The one substrate quantity every reader sees. It was an
+            unlabeled percentage; the title/aria text now states exactly
+            what it blends, and names the Ascendant's own shadow lane —
+            the chart-specific term inside it that was previously
+            computed, consumed, and never once shown. */}
+        <div
+          className="cs-resonance"
+          title={`Resonance blends dignity, tenancy, aspect tightness, and this card's shadow-lane distance from the Ascendant's own lane${typeof ascLane === "number" ? ` (lane ${ascLane}${typeof SHADOW_LANE_NAMES !== "undefined" ? ` — ${SHADOW_LANE_NAMES[ascLane]}` : ""})` : ""}.`}
+        >
           <span className="cs-res-label">resonance</span>
-          <span className="cs-res-bar">
+          <span
+            className="cs-res-bar"
+            role="img"
+            aria-label={`resonance ${(card.resonance * 100).toFixed(0)} percent — a blend of dignity, tenancy, aspect tightness, and shadow-lane proximity to the Ascendant`}
+          >
             <span className="cs-res-fill" style={{ width: `${(card.resonance * 100).toFixed(1)}%` }} />
           </span>
           {voiceOn && (
