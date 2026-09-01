@@ -144,9 +144,6 @@ function synastryCTM(chartA, chartB) {
   }
   // composite midpoint phase
   const midTheta = phaseSyndrome((tcoA.theta + tcoB.theta) / 2, 0);
-  // Tzolk'in day-signs of each birth
-  const tzA = tzolkin(chartA.jd);
-  const tzB = tzolkin(chartB.jd);
   // The directional syndrome S = θA − θB is antisymmetric: swapping who is
   // entered first maps S to 360° − S, which used to flip the spoken verdict
   // from "aligned rhythm" to "counterphase" for the SAME two people. The
@@ -160,10 +157,6 @@ function synastryCTM(chartA, chartB) {
     syndrome, syndromeDeg, syndromeFoldDeg,
     sharedLanes,
     midTheta, midThetaDeg: midTheta * 180 / Math.PI,
-    tzolkinA: `${tzA.number} ${tzA.sign}`,
-    tzolkinB: `${tzB.number} ${tzB.sign}`,
-    daySignMatch: tzA.sign === tzB.sign,
-    numberMatch: tzA.number === tzB.number,
   };
 }
 

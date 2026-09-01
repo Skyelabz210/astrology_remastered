@@ -48,7 +48,7 @@ function Harness() {
           <span className="hn-mark">✦</span>
           <div>
             <div className="hn-title">Resonance · Correctness Battery</div>
-            <div className="hn-sub">classical astrology · CTM · Mayan CRT</div>
+            <div className="hn-sub">classical astrology · cylindrical time · the shadow prime</div>
           </div>
         </div>
         <div className="hn-actions">

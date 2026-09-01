@@ -1024,10 +1024,10 @@ function PrimeLayer({ chart }) {
   return (
     <section className="pl">
       <header className="pl-head">
-        <div className="pl-title">Prime Resonance · Mayan CRT substrate</div>
+        <div className="pl-title">Prime Resonance · the exact residue substrate</div>
         <div className="pl-sub">
           Safe Basis {'{'} 2, 3, 5, 7, 11, 13 {'}'} · M = 30,030 · Gear 17·19 = 323
-          · Maya epoch JD 584,283
+          · anchor epoch JD 584,283
         </div>
       </header>
 

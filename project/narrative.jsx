@@ -125,13 +125,12 @@ function narrativeOpening(chart) {
   const dominant = dominantElement(chart);
   if (dominant) lines.push(`${dominant.name} carries the weight of it.`);
 
-  // The birth's own place on the Mayan count — the calendar the substrate's
-  // epoch (JD 584,283) is anchored to. A verifiable calendrical fact, not an
-  // interpretive claim; the solo reading never had it (only synastry did).
-  if (chart.jd && typeof tzolkin === "function" && typeof mayaLongCount === "function") {
-    const tz = tzolkin(chart.jd);
-    const lc = mayaLongCount(chart.jd);
-    lines.push(`By the Long Count this birth falls on ${lc.formatted}; its day-sign is ${tz.number} ${tz.sign}.`);
+  // The birth's fixed coordinate on the long round — the cyclic clock every
+  // later moment of this chart is measured against. A verifiable arithmetic
+  // fact, not an interpretive claim.
+  if (chart.jd && typeof tcoPhase === "function") {
+    const t = tcoPhase(chart.jd);
+    lines.push(`On the long round of ${t.M.toLocaleString()} days, this birth holds phase ${t.thetaDeg.toFixed(1)} degrees — the fixed coordinate every later moment of the chart is measured against.`);
   }
 
   lines.push("Here it is, sign by sign.");

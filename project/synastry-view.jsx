@@ -178,12 +178,11 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
             </div>
           </div>
           <div className="syn-ctm-cell">
-            <div className="syn-ctm-label">Tzolk'in signatures</div>
+            <div className="syn-ctm-label">positions on the round</div>
             <div className="syn-ctm-rows">
-              <div className="cl-row"><span className="l">{A}</span><span className="v">{syn.ctm.tzolkinA}</span></div>
-              <div className="cl-row"><span className="l">{B}</span><span className="v">{syn.ctm.tzolkinB}</span></div>
-              {syn.ctm.daySignMatch && <div className="syn-ctm-match">⊙ shared day-sign</div>}
-              {syn.ctm.numberMatch && <div className="syn-ctm-match">⊙ shared galactic tone</div>}
+              <div className="cl-row"><span className="l">{A}</span><span className="v">θ {syn.ctm.tcoA.thetaDeg.toFixed(1)}°</span></div>
+              <div className="cl-row"><span className="l">{B}</span><span className="v">θ {syn.ctm.tcoB.thetaDeg.toFixed(1)}°</span></div>
+              <div className="cl-row"><span className="l">gap</span><span className="v">{Math.abs(Math.round(syn.ctm.tcoA.P - syn.ctm.tcoB.P)).toLocaleString()} days on the round</span></div>
             </div>
           </div>
           <div className="syn-ctm-cell">

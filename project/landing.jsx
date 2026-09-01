@@ -297,7 +297,7 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
               ? "Enter the second chart. The engine compares the two across every cross-aspect, house overlay, and — uniquely — the phase between your two birth points on the time-cylinder."
               : isHcrm
               ? "Enter a birth event. Every body is projected to exact integer arcseconds and reduced through the full prime basis 2·3·5·7·11·13·17·19 — the chart becomes a residue map of the human, with the shadow-prime witness lanes exposed."
-              : "Every chart runs through the Mayan CRT substrate beneath classical astrology. The eleven lanes of the Shadow Prime — always there, never legible — are finally lit."}
+              : "Classical astrology, rigorously derived: every body computed to the exact arcsecond and reduced through the full prime basis, so every familiar mechanic reads more precisely. And beneath them, the Shadow Prime — lane eleven — carries the threads the tradition could never see."}
           </p>
 
           <form className="landing-form" onSubmit={submit}>
@@ -457,7 +457,7 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
             onHoverKey={setHoverKey}
           />
           <div className="landing-cred">
-            <span>{isPartner ? "Synastry · cross-aspects · phase syndrome" : isHcrm ? "HCRM · integer arcsec · basis 2·3·5·7·11·13·17·19" : "Mayan CRT · Safe Basis 2·3·5·7·11·13 · M = 30,030"}</span>
+            <span>{isPartner ? "Synastry · cross-aspects · phase syndrome" : isHcrm ? "HCRM · integer arcsec · basis 2·3·5·7·11·13·17·19" : "Astrology Remastered · Safe Basis 2·3·5·7·11·13 · M = 30,030"}</span>
           </div>
         </section>
       </div>
