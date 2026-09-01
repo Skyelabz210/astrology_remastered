@@ -257,6 +257,94 @@ function windingLift(natal, jdTarget) {
   };
 }
 
+// ─────────────────── Perfections ───────────────────
+//
+// The exact instants — not the days, the instants — when the slow sky
+// strikes the natal chart, inside a window around a target moment of the
+// lifecycle. This is the classical transit report made precise: each hit
+// is found by scanning the real ephemeris on a coarse grid and then
+// bisecting the crossing down to sub-second resolution, so the date the
+// reader sees is when the aspect actually perfects, not "sometime that
+// week". Retrograde loops fall out for free: a body that crosses, backs
+// over, and re-crosses a natal point reports all three perfections.
+//
+// Transiting bodies are the slow movers (Mars outward) — the fast bodies
+// perfect aspects several times a day and belong to a clock, not a
+// lifecycle. Natal points are the ten classical bodies plus the angles
+// when the birth time is known.
+const PERFECTION_TRANSITERS = ["Mars","Jupiter","Saturn","Uranus","Neptune","Pluto"];
+const PERFECTION_ASPECTS = [
+  { name: "Conjunction", angle: 0,   targets: [0] },
+  { name: "Sextile",     angle: 60,  targets: [60, -60] },
+  { name: "Square",      angle: 90,  targets: [90, -90] },
+  { name: "Trine",       angle: 120, targets: [120, -120] },
+  { name: "Opposition",  angle: 180, targets: [180] },
+];
+
+function __wrap180(x) {
+  const m = ((x % 360) + 360) % 360;
+  return m > 180 ? m - 360 : m;
+}
+
+function transitPerfections(natal, jdCenter, spanDays = 366, bodies = PERFECTION_TRANSITERS) {
+  const half = spanDays / 2;
+  const jd0 = jdCenter - half, jd1 = jdCenter + half;
+  const STEP = 2; // days — Mars at ~0.8°/day moves ≤1.6°/step, no crossing can hide
+
+  const natalPoints = natal.planets
+    .filter((p) => PERFECTION_TRANSITERS.includes(p.name) ||
+                   ["Sun","Moon","Mercury","Venus"].includes(p.name))
+    .map((p) => ({ name: p.name, glyph: p.glyph, lon: p.lon }));
+  if (!natal.timeUnknown && Number.isFinite(natal.asc)) {
+    natalPoints.push({ name: "Ascendant", glyph: "Asc", lon: natal.asc });
+    natalPoints.push({ name: "Midheaven", glyph: "MC", lon: natal.mc });
+  }
+
+  const hits = [];
+  for (const T of bodies) {
+    // one longitude grid per transiting body, shared by every natal point
+    const grid = [];
+    for (let jd = jd0; jd <= jd1 + 1e-9; jd += STEP) grid.push({ jd, lon: planetLongitude(T, jd) });
+
+    for (const N of natalPoints) {
+      // A body aspecting its OWN natal place stays in: the conjunction to
+      // it is exactly the return chart (Saturn return, Jupiter return).
+      for (const asp of PERFECTION_ASPECTS) {
+        for (const v of asp.targets) {
+          const h = (lon) => __wrap180(lon - N.lon - v);
+          for (let i = 1; i < grid.length; i++) {
+            const h0 = h(grid[i - 1].lon), h1 = h(grid[i].lon);
+            // a genuine crossing changes sign WITHOUT wrapping the ±180 cut
+            if (h0 === 0 || h0 * h1 >= 0 || Math.abs(h1 - h0) > 180) continue;
+            let lo = grid[i - 1].jd, hi = grid[i].jd;
+            let hLo = h0;
+            for (let k = 0; k < 40; k++) {
+              const mid = (lo + hi) / 2;
+              const hm = h(planetLongitude(T, mid));
+              if ((hLo < 0) === (hm < 0)) { lo = mid; hLo = hm; } else { hi = mid; }
+            }
+            const jdHit = (lo + hi) / 2;
+            hits.push({
+              jd: jdHit,
+              dateISO: new Date((jdHit - 2440587.5) * 86400000).toISOString(),
+              transit: T,
+              transitGlyph: PLANET_GLYPH[T],
+              natal: N.name,
+              natalGlyph: N.glyph,
+              aspect: asp.name,
+              angle: asp.angle,
+              retrograde: isRetrograde(T, jdHit),
+              daysFromCenter: jdHit - jdCenter,
+            });
+          }
+        }
+      }
+    }
+  }
+  hits.sort((a, b) => a.jd - b.jd);
+  return { jdCenter, spanDays, hits };
+}
+
 // Expose
 isRetrograde; // silence linter: relies on astro.jsx globals
 Object.assign(window, {
@@ -264,5 +352,5 @@ Object.assign(window, {
   TZOLKIN_SIGNS, HAAB_MONTHS,
   mayaLongCount, tzolkin, haab, calendarRound,
   tcoPhase, tcoPeriod, phaseSyndrome,
-  ctmState, currentTransits, progressedAt, windingLift,
+  ctmState, currentTransits, progressedAt, windingLift, transitPerfections,
 });
