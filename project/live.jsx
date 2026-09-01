@@ -1,8 +1,12 @@
-// live.jsx — Cylindrical Time live state panel.
+// live.jsx — Cylindrical Time · the lifecycle panel.
 //
-// Mounts a "now" tick (refreshes every 60s) and renders the user's running
-// cylindrical coordinate: Maya Long Count, Tzolk'in × Haab, TCO phase,
-// current tight transits to the natal chart, and a phase-syndrome readout.
+// The chart, addressed at ANY instant of its lifecycle. Defaults to a
+// ticking "now" (refreshes every 60s); a date control retargets the whole
+// panel — the cylindrical coordinate, the winding lift (per-body circuit
+// counts K + shadow-lane state against natal), tight transits to the
+// natal chart at the target moment, and secondary progressions at the
+// target age. Prior states are addressable the same way: the winding
+// counts simply run negative before birth.
 
 function useNow(intervalMs = 60000) {
   const [now, setNow] = React.useState(() => new Date());
@@ -15,15 +19,26 @@ function useNow(intervalMs = 60000) {
 
 function LiveStatePanel({ chart }) {
   const now = useNow(60000);
+  // Target instant: "now" keeps ticking; picking a date freezes the panel
+  // on that day (noon UTC — the panel reads whole days of the lifecycle).
+  // null = ticking now · "birth" = the exact birth instant · a date string
+  // = noon UTC of that day (the panel reads whole days of the lifecycle).
+  const [targetDate, setTargetDate] = React.useState(null);
+  const birthISO = chart.birth && chart.birth.dateISO;
+  const target = targetDate === "birth" && birthISO
+    ? new Date(birthISO)
+    : targetDate && targetDate !== "birth"
+    ? new Date(`${targetDate}T12:00:00Z`)
+    : now;
   const data = React.useMemo(() => {
-    const jdNow = dateToJD(now);
+    const jdT = dateToJD(target);
     return {
-      jdNow,
-      ctm:      ctmState(jdNow, chart.jd),
-      transits: currentTransits(chart, jdNow),
-      prog:     null, // computed below from age
+      jdT,
+      ctm:      ctmState(jdT, chart.jd),
+      transits: currentTransits(chart, jdT),
+      lift:     windingLift(chart, jdT),
     };
-  }, [now.getTime() - (now.getTime() % 60000), chart.jd]);
+  }, [target.getTime() - (target.getTime() % 60000), chart.jd]);
 
   // Secondary progressions at current age
   const prog = React.useMemo(
@@ -31,43 +46,59 @@ function LiveStatePanel({ chart }) {
     [chart.jd, data.ctm.ageYears]
   );
 
-  const lc = data.ctm.longCount;
-  const tz = data.ctm.tzolkin;
-  const ha = data.ctm.haab;
   return (
     <section className="cl">
       <header className="cl-head">
         <div>
-          <div className="cl-title">Cylindrical Time · live state</div>
+          <div className="cl-title">Cylindrical Time · any point of the lifecycle</div>
           <div className="cl-sub">
-            ℝ × S¹ · the natal point now indexed against today's running coordinate
+            ℝ × S¹ · the chart addressed at a chosen instant — earlier states recovered through the winding lift against the shadow prime
           </div>
         </div>
-        <div className="cl-now">{now.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</div>
+        <div className="cl-target">
+          <button
+            className={`cl-target-btn ${targetDate === null ? "is-on" : ""}`}
+            onClick={() => setTargetDate(null)}
+            type="button"
+          >now</button>
+          {birthISO && (
+            <button
+              className={`cl-target-btn ${targetDate === "birth" ? "is-on" : ""}`}
+              onClick={() => setTargetDate("birth")}
+              type="button"
+            >birth</button>
+          )}
+          <input
+            className="cl-target-date"
+            type="date"
+            aria-label="target date — address the chart at this moment of its lifecycle"
+            value={targetDate && targetDate !== "birth" ? targetDate : ""}
+            onChange={(e) => setTargetDate(e.target.value || null)}
+          />
+          <span className="cl-now">{targetDate
+            ? target.toLocaleDateString(undefined, { dateStyle: "medium" })
+            : now.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
+        </div>
       </header>
 
       <div className="cl-grid">
         <div className="cl-card">
           <h4>z · linear coordinate</h4>
-          <div className="cl-big">{lc.formatted}</div>
+          <div className="cl-big">{Math.floor(data.ctm.ageDays).toLocaleString()} d</div>
           <div className="cl-rows">
-            <div className="cl-row"><span className="l">Long Count</span><span className="v">{lc.baktun}.{lc.katun}.{lc.tun}.{lc.winal}.{lc.kinDay}</span></div>
-            <div className="cl-row"><span className="l">kin (days since epoch)</span><span className="v">{lc.kin.toLocaleString()}</span></div>
-            <div className="cl-row"><span className="l">age</span><span className="v">{data.ctm.ageYears.toFixed(3)} yr</span></div>
-            <div className="cl-row"><span className="l">days lived</span><span className="v">{Math.floor(data.ctm.ageDays).toLocaleString()}</span></div>
+            <div className="cl-row"><span className="l">days from birth</span><span className="v">{Math.floor(data.ctm.ageDays).toLocaleString()}</span></div>
+            <div className="cl-row"><span className="l">age at target</span><span className="v">{data.ctm.ageYears.toFixed(3)} yr</span></div>
+            <div className="cl-row"><span className="l">days since the anchor epoch</span><span className="v">{data.ctm.longCount.kin.toLocaleString()}</span></div>
           </div>
         </div>
 
         <div className="cl-card">
           <h4>θ · cyclic coordinate</h4>
-          <div className="cl-big">{tz.number} {tz.sign}</div>
+          <div className="cl-big">{data.ctm.tco.thetaDeg.toFixed(1)}°</div>
           <div className="cl-rows">
-            <div className="cl-row"><span className="l">Tzolk'in (260)</span><span className="v">{tz.number} {tz.sign}</span></div>
-            <div className="cl-row"><span className="l">Haab (365)</span><span className="v">{ha.day} {ha.month}</span></div>
-            <div className="cl-row"><span className="l">Calendar Round</span><span className="v">{data.ctm.calendarRound} / 18,980</span></div>
-            <div className="cl-row"><span className="l">TCO phase P (mod {data.ctm.tco.M})</span><span className="v">{data.ctm.tco.P}</span></div>
+            <div className="cl-row"><span className="l">phase P on the {data.ctm.tco.M.toLocaleString()}-day round</span><span className="v">{data.ctm.tco.P.toLocaleString()}</span></div>
             <div className="cl-row"><span className="l">θ (deg)</span><span className="v">{data.ctm.tco.thetaDeg.toFixed(2)}°</span></div>
-            <div className="cl-row"><span className="l">phase syndrome S</span><span className="v">{data.ctm.syndromeDeg.toFixed(2)}°</span></div>
+            <div className="cl-row"><span className="l">phase syndrome S vs birth</span><span className="v">{data.ctm.syndromeDeg.toFixed(2)}°</span></div>
           </div>
         </div>
 
@@ -78,9 +109,35 @@ function LiveStatePanel({ chart }) {
       </div>
 
       <div className="cl-card cl-card-wide">
-        <h4>Active transits — tight aspects from current sky to natal</h4>
+        <h4>The winding lift · K against the shadow prime</h4>
+        <p className="cl-note">
+          Each body's state at the target is two numbers: K, the circuits it has closed since birth
+          (negative before birth — earlier states are reached the same way), and its shadow-lane residue
+          (arcsec mod 11) beside the natal one. Residue and winding together name the whole path — the
+          register's K-elimination, run along the chart's own history. ↺ marks a shadow-lane return.
+        </p>
+        <table className="tp-table">
+          <thead>
+            <tr><th>body</th><th className="num">circuits K</th><th className="num">lane₁₁ at target</th><th className="num">natal lane₁₁</th><th>return</th></tr>
+          </thead>
+          <tbody>
+            {data.lift.rows.map((r) => (
+              <tr key={r.name}>
+                <td><span className="pl-gl">{r.glyph}</span> {r.name}</td>
+                <td className="num">{r.K.toLocaleString()}</td>
+                <td className="num">{r.lane11}</td>
+                <td className="num">{r.natalLane}</td>
+                <td>{r.isReturn ? "↺ in its natal lane" : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="cl-card cl-card-wide">
+        <h4>Transits at the target — tight aspects from that sky to natal</h4>
         {data.transits.hits.length === 0 ? (
-          <div className="cl-row"><span className="l">no transits within 2° right now</span></div>
+          <div className="cl-row"><span className="l">no transits within 2° at the target moment</span></div>
         ) : (
           <table className="tp-table">
             <thead>
@@ -102,7 +159,7 @@ function LiveStatePanel({ chart }) {
       </div>
 
       <div className="cl-card cl-card-wide">
-        <h4>Secondary progressions (one day per year of life)</h4>
+        <h4>Secondary progressions at the target age (one day per year of life)</h4>
         <table className="tp-table">
           <thead><tr><th>body</th><th className="num">progressed λ</th><th>sign</th><th className="num">natal λ</th><th className="num">Δ</th></tr></thead>
           <tbody>

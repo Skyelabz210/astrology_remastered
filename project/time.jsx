@@ -207,6 +207,56 @@ function progressedAt(natalJd, ageYears) {
   return { progressedJd, bodies };
 }
 
+// ─────────────────── The winding lift ───────────────────
+//
+// Address any point in the chart's lifecycle. For each body, two numbers
+// name its state at the target instant relative to birth:
+//
+//   K       — the winding count: completed circuits of the zodiac since
+//             birth, by the body's own period. Negative before birth —
+//             earlier states stay addressable the same way.
+//   lane 11 — the shadow-lane residue (arcsec mod 11) of the body's
+//             position at the target, beside its natal lane.
+//
+// Residue and winding together name the full path: the residue recovers
+// the state inside one circuit, K counts the circuits — the same shape as
+// the register's K-Elimination, applied to the chart's own history. When
+// a body's target lane equals its natal lane, that is a shadow-lane
+// return: a recurrence classical transit reading has no name for.
+function windingLift(natal, jdTarget) {
+  const bodies = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto"];
+  const ageDays = jdTarget - natal.jd;
+  const rows = bodies.map(name => {
+    const natalP = natal.planets.find(p => p.name === name);
+    const lon = planetLongitude(name, jdTarget);
+    const lane11 = Math.floor(lon * 3600) % 11;
+    const natalLane = natalP && natalP.residues
+      ? natalP.residues.r11
+      : Math.floor((natalP ? natalP.lon : 0) * 3600) % 11;
+    const periodDays = PLANET_PERIODS[name] * 365.25;
+    // `|| 0` folds Math.trunc's negative zero (a target minutes before
+    // birth) into plain zero, so no row ever prints "-0 circuits".
+    const K = Math.trunc(ageDays / periodDays) || 0;
+    return {
+      name,
+      glyph: PLANET_GLYPH[name],
+      lon,
+      sign: Math.floor(lon / 30),
+      K,
+      lane11,
+      natalLane,
+      isReturn: lane11 === natalLane,
+    };
+  });
+  return {
+    jdTarget,
+    ageDays,
+    ageYears: ageDays / 365.25,
+    rows,
+    returns: rows.filter(r => r.isReturn).map(r => r.name),
+  };
+}
+
 // Expose
 isRetrograde; // silence linter: relies on astro.jsx globals
 Object.assign(window, {
@@ -214,5 +264,5 @@ Object.assign(window, {
   TZOLKIN_SIGNS, HAAB_MONTHS,
   mayaLongCount, tzolkin, haab, calendarRound,
   tcoPhase, tcoPeriod, phaseSyndrome,
-  ctmState, currentTransits, progressedAt,
+  ctmState, currentTransits, progressedAt, windingLift,
 });
