@@ -286,14 +286,14 @@ function EclipsePanel({ chart, settings }) {
       <section className="tp ec">
         <header className="tp-head">
           <div className="tp-title">Eclipses · geophysical</div>
-          <div className="tp-sub">unavailable without the real ephemeris</div>
+          <div className="tp-sub">needs the full ephemeris</div>
         </header>
         <div className="tp-card">
           <div className="tp-row">
             <span className="l">engine</span>
             <span className="v">
-              Eclipse geometry needs the vendored astronomy engine (vendor/astronomy.browser.min.js).
-              The synthetic mean-motion fallback cannot resolve a shadow axis, so nothing is shown rather than something invented.
+              Eclipse geometry needs the full ephemeris. The offline model cannot
+              place a shadow axis, so nothing is shown rather than something invented.
             </span>
           </div>
         </div>
@@ -316,7 +316,7 @@ function EclipsePanel({ chart, settings }) {
 
       {error && (
         <div className="tp-card">
-          <div className="tp-row"><span className="l">failed</span><span className="v">{error}</span></div>
+          <div className="tp-row"><span className="l">unavailable</span><span className="v">{error}</span></div>
         </div>
       )}
 

@@ -214,12 +214,12 @@ function readingFor(card, chart) {
     const fn = ASPECT_FN[card.aspect.name] || "";
     body.push({
       text: `Sun-${p.name} ${card.aspect.name} ${card.aspect.sep.toFixed(2)}° (orb ${card.aspect.orb}°, ${card.aspect.family}). ${fn}`,
-      sourceTag: ASPECT_FAMILY_SOURCE_TAG[card.aspect.family] || "Aspect (astro-core.js orb table)",
+      sourceTag: ASPECT_FAMILY_SOURCE_TAG[card.aspect.family] || "Aspect (classical orb table)",
     });
   } else {
     body.push({
       text: "No Sun-aspect within orb. This sector reads from intrinsic dignity alone.",
-      sourceTag: "Aspect scan (Sun-relative, astro-core.js orb table)",
+      sourceTag: "Aspect scan (Sun-relative, classical orbs)",
     });
   }
 

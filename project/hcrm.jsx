@@ -185,7 +185,7 @@ function syntheticCertificate(arcsec, bodyName) {
     HC.admitForCore(entry);
     // Should be unreachable — SYNTHETIC_DEMO is refused unconditionally by
     // the core's admission gate. Surface it loudly if that ever changes.
-    return { entry, admitted: true, rejected: false, message: "admitted (unexpected — SYNTHETIC_DEMO should always be refused)" };
+    return { entry, admitted: true, rejected: false, message: "demonstration data was accepted by the core's gate — it should always be refused" };
   } catch (e) {
     return { entry, admitted: false, rejected: true, message: e && e.message || String(e) };
   }

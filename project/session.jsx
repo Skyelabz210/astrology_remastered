@@ -293,7 +293,7 @@ function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, po
           </span>
           {p.retrograde && <span className="cs-retro">℞</span>}
           <span className="cs-house">{timeUnknown ? "House —" : `House ${roman(card.house)}`}</span>
-          <span className="cs-dig cs-dig-{card.dignity.kind}">{card.dignity.kind}</span>
+          <span className={`cs-dig cs-dig-${card.dignity.kind}`}>{card.dignity.kind}</span>
         </div>
 
         <div className="cs-body">
@@ -316,12 +316,12 @@ function CinematicStage({ card, timeUnknown, agent, localReading, spokenText, po
           )}
           {agent.unavailable && (
             <p className="cs-note">
-              the agent interpreter is not offered on this host — the reading below is the local one
+              the AI interpreter isn't available here — the reading below is composed from the classical tables
             </p>
           )}
           {agent.error && (
             <p className="cs-error">
-              interpreter call failed — {agent.error} — reading from local fallback
+              the interpreter couldn't be reached — the reading below is composed from the classical tables instead
             </p>
           )}
           {agent.text && <WordReveal text={agent.text} resonance={card.resonance} />}

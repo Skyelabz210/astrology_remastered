@@ -183,7 +183,7 @@ function ChartStatusBanners({ chart, settings, dstNote, banners, onDismiss }) {
     notes.push({
       id: "synthetic-mode",
       kind: "info",
-      text: "Offline / synthetic ephemeris — planetary positions come from the built-in mean-motion model, not the verified astronomy-engine vendor data. Expect lower precision (typically a few arcminutes to roughly a degree).",
+      text: "Offline / synthetic ephemeris — planetary positions come from the built-in mean-motion model, not the full verified astronomical tables. Expect lower precision (typically a few arcminutes to roughly a degree).",
     });
   }
 
@@ -259,7 +259,7 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
         <div className="boundary-sub">
           {chartA && !chartB && !partner
             ? "the second birth input hasn't been entered yet."
-            : "one of the two birth inputs did not resolve into a valid chart — see the error above."}
+            : "one of the two births didn't resolve into a chart — the note above says why."}
         </div>
         <button onClick={onBack}>back</button>
       </div>
@@ -308,8 +308,8 @@ function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOp
     return (
       <div className="boundary">
         <ChartStatusBanners chart={null} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
-        <div className="boundary-title">substrate failed to resolve</div>
-        <div className="boundary-sub">the natal inputs did not produce a valid chart — see the error above for why.</div>
+        <div className="boundary-title">the chart wouldn’t cast</div>
+        <div className="boundary-sub">those birth details didn’t resolve into a chart — the note above says what stopped it.</div>
         <button onClick={onBack}>return to entry</button>
       </div>
     );
@@ -363,8 +363,8 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
     return (
       <div className="boundary">
         <ChartStatusBanners chart={null} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
-        <div className="boundary-title">substrate failed to resolve</div>
-        <div className="boundary-sub">the natal inputs did not produce a valid chart — see the error above for why.</div>
+        <div className="boundary-title">the chart wouldn’t cast</div>
+        <div className="boundary-sub">those birth details didn’t resolve into a chart — the note above says what stopped it.</div>
         <button onClick={onBack}>return to entry</button>
       </div>
     );
@@ -479,8 +479,8 @@ function Synthesis({ reading, settings }) {
         agent synthesis
       </div>
       <div className="syn-text">
-        {reading.loading && <span className="syn-loading">interpreting natal substrate…</span>}
-        {reading.error   && <span className="syn-error">agent offline</span>}
+        {reading.loading && <span className="syn-loading">drawing the whole chart together…</span>}
+        {reading.error   && <span className="syn-error">the interpreter couldn't be reached — the local synthesis stands</span>}
         {reading.text    && <span>{reading.text}</span>}
       </div>
     </section>
@@ -669,7 +669,7 @@ function ElevenLabsTweaks({ t }) {
   // stored key, and report what happened — the one place a reader can find
   // out WHY narration fell back to the browser voice.
   const resolve = () => {
-    setProbe({ state: "working", message: "asking ElevenLabs…" });
+    setProbe({ state: "working", message: "checking with ElevenLabs…" });
     EL.resolveVoiceId({
       apiKey: EL.readKey(),
       name: t.tweaks.voiceName || EL.DEFAULT_VOICE_NAME,
@@ -680,11 +680,11 @@ function ElevenLabsTweaks({ t }) {
         state: "ok",
         message: r.needsAdd
           ? `found "${r.name}" in the public Voice Library — add it to your ElevenLabs account if narration is refused`
-          : `resolved "${r.name}" (${r.source})`,
+          : `found "${r.name}"`,
         voiceId: r.voiceId,
       });
     }).catch((e) => {
-      setProbe({ state: "error", message: (e && e.message) || "resolution failed" });
+      setProbe({ state: "error", message: (e && e.message) || "couldn't find that voice" });
     });
   };
 

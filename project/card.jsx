@@ -200,16 +200,16 @@ function CardBack({ card, chart, settings, active }) {
           {agent.loading && (
             <div className="zc-agent-loading">
               <span className="zc-agent-pulse"></span>
-              <span>interpreting substrate…</span>
+              <span>reading the chart…</span>
             </div>
           )}
           {agent.unavailable && (
             <p className="zc-agent-note">
-              the agent interpreter is not offered on this host — the reading below is the local one.
+              the AI interpreter isn't available here — the reading below is composed from the classical tables.
             </p>
           )}
           {agent.error && (
-            <p className="zc-agent-error">agent call failed — {agent.error} — reading from local fallback.</p>
+            <p className="zc-agent-error">the interpreter couldn't be reached — the reading below is composed from the classical tables instead.</p>
           )}
           {agent.text && <p className="zc-agent-text">{agent.text}</p>}
           {!agent.loading && !agent.text && reading.body.map((line, i) => (
@@ -228,7 +228,7 @@ function CardBack({ card, chart, settings, active }) {
             <div><span className="l">triplicity</span><span className="v">{card.tripLord}</span></div>
             <div><span className="l">term</span><span className="v">{card.term}{card.inOwnTerm ? " ✓" : ""}</span></div>
             <div><span className="l">face</span><span className="v">{card.face}{card.inOwnFace ? " ✓" : ""}</span></div>
-            <div><span className="l">ptol. score</span><span className="v">{card.ptolemaicBonus >= 0 ? "+" : ""}{card.ptolemaicBonus}</span></div>
+            <div><span className="l">Ptolemaic score</span><span className="v">{card.ptolemaicBonus >= 0 ? "+" : ""}{card.ptolemaicBonus}</span></div>
             <div><span className="l">aspect</span><span className="v">{card.aspect ? `${card.aspect.name.slice(0,4)} ${card.aspect.sep.toFixed(1)}°` : "—"}</span></div>
           </div>
         </div>

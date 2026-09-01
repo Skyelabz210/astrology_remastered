@@ -313,7 +313,7 @@ const AGENT_UNAVAILABLE = Object.freeze({
 /** @throws {Error} when the host provides no interpreter. */
 function requireAgent() {
   if (!agentAvailable()) {
-    throw new Error("no agent interpreter on this host (window.claude.complete is absent)");
+    throw new Error("the AI interpreter is not available in this session");
   }
 }
 
