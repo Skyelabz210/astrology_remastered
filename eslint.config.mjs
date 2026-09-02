@@ -195,7 +195,7 @@ const JSX_GLOBALS = {
   "stopEleven": "readonly", "stopSpeech": "readonly", "stripMd": "readonly", "suite": "readonly", "synAspect": "readonly", "synastryCTM": "readonly",
   "syntheticCertificate": "readonly", "tcoPeriod": "readonly", "tcoPhase": "readonly", "termRuler": "readonly", "tightAspectsFor": "readonly",
   "toArcsec": "readonly", "tzolkin": "readonly", "useAgentChartReading": "readonly", "useAgentReading": "readonly", "useErrorBanner": "readonly",
-  "useNow": "readonly", "useSynastryReading": "readonly", "useTweaks": "readonly", "useVoice": "readonly", "windingLift": "readonly", "transitPerfections": "readonly",
+  "useNow": "readonly", "useSynastryReading": "readonly", "useTweaks": "readonly", "useVoice": "readonly", "windingLift": "readonly", "transitPerfections": "readonly", "nearestBodyReturns": "readonly", "returnChart": "readonly", "RETURN_BODIES": "readonly",
 };
 
 export default [

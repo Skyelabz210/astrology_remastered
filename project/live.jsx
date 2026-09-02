@@ -83,6 +83,15 @@ function LiveStatePanel({ chart }) {
     [chart.jd, data.ctm.ageYears]
   );
 
+  // Return charts: the Sun's and Moon's own natal-degree returns, cast in
+  // full at the natal place. Cheap (two extra computeNatal calls, unlike
+  // the year-wide perfection scan) — day-granularity key keeps it from
+  // recomputing on every "now" minute-tick.
+  const returns = React.useMemo(
+    () => RETURN_BODIES.map((b) => returnChart(chart, b, data.jdT)).filter(Boolean),
+    [chart.jd, Math.floor(data.jdT)]
+  );
+
   return (
     <section className="cl">
       <header className="cl-head">
@@ -142,6 +151,44 @@ function LiveStatePanel({ chart }) {
         <div className="cl-card">
           <h4>Helix · z vs θ</h4>
           <HelixViz syndrome={data.ctm.syndromeDeg} />
+        </div>
+      </div>
+
+      <div className="cl-card cl-card-wide">
+        <h4>Return charts · the subject, sampled once a cycle</h4>
+        <p className="cl-note">
+          Classical technique, cast whole: the exact instant this body returns to its own natal
+          degree, with a full chart drawn for that moment at the natal place — its own Ascendant,
+          its own houses, its own sky. Strung together over a lifetime, one return after another is
+          this apparatus's evolving image of the subject — the natal chart is a single instant; the
+          returns are the same subject, sampled once a cycle, forever.
+          {chart.timeUnknown && " Timing uses the default noon birth time, so treat these as approximate."}
+        </p>
+        <div className="cl-return-grid">
+          {returns.map((r) => (
+            <div className="cl-return" key={r.body}>
+              <h5>
+                {r.body === "Sun" ? "Solar" : "Lunar"} Return {r.isCurrent ? `#${r.K}` : "— upcoming"}
+              </h5>
+              <div className="cl-rows">
+                <div className="cl-row"><span className="l">exact instant</span><span className="v">{r.dateISO.slice(0, 16).replace("T", " ")} UTC</span></div>
+                <div className="cl-row"><span className="l">Ascendant</span><span className="v">{ZODIAC[r.chart.ascSignIdx].glyph} {ZODIAC[r.chart.ascSignIdx].name} {(r.chart.asc % 30).toFixed(1)}°</span></div>
+                <div className="cl-row"><span className="l">Midheaven</span><span className="v">{ZODIAC[r.chart.mcSignIdx].glyph} {ZODIAC[r.chart.mcSignIdx].name} {(r.chart.mc % 30).toFixed(1)}°</span></div>
+                <div className="cl-row"><span className="l">next {r.body === "Sun" ? "solar" : "lunar"} return</span><span className="v">{r.nextDateISO.slice(0, 10)}</span></div>
+              </div>
+              <table className="tp-table cl-return-planets">
+                <tbody>
+                  {r.chart.planets.filter((p) => ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto"].includes(p.name)).map((p) => (
+                    <tr key={p.name}>
+                      <td><span className="pl-gl">{p.glyph}</span> {p.name}{p.retrograde ? " ℞" : ""}</td>
+                      <td>{ZODIAC[p.sign].glyph} {ZODIAC[p.sign].name} {(p.lon % 30).toFixed(1)}°</td>
+                      <td className="num">H{p.house}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
         </div>
       </div>
 
