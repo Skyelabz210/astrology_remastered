@@ -37,6 +37,7 @@ function LiveStatePanel({ chart }) {
       ctm:      ctmState(jdT, chart.jd),
       transits: currentTransits(chart, jdT),
       lift:     windingLift(chart, jdT),
+      digest:   lifecycleDigest(chart, jdT),
     };
   }, [target.getTime() - (target.getTime() % 60000), chart.jd]);
 
@@ -126,6 +127,14 @@ function LiveStatePanel({ chart }) {
             : now.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
         </div>
       </header>
+
+      {/* The same facts the tables below carry, read as a paragraph
+          first. Nothing here is computed specially for this sentence —
+          it is lifecycleDigest's prose over data.ctm/lift/returnChart,
+          the identical numbers the cards underneath show as tables. */}
+      <p className="cl-digest">
+        {data.digest.lines.map((line, i) => <span key={i}>{line} </span>)}
+      </p>
 
       <div className="cl-grid">
         <div className="cl-card">
