@@ -163,7 +163,7 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
             <div className="syn-overlay-title">{B}'s planets in {A}'s houses</div>
             {chartA.timeUnknown ? (
               <div className="syn-overlay-unavailable" style={{ color: "var(--ink-dim)" }}>
-                {A}'s birth time is unknown — house overlays need a real Ascendant.
+                {possessive(A)} birth time is unknown — house overlays need a real Ascendant.
               </div>
             ) : (
               <table className="tp-table">
@@ -184,7 +184,7 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
             <div className="syn-overlay-title">{A}'s planets in {B}'s houses</div>
             {chartB.timeUnknown ? (
               <div className="syn-overlay-unavailable" style={{ color: "var(--ink-dim)" }}>
-                {B}'s birth time is unknown — house overlays need a real Ascendant.
+                {possessive(B)} birth time is unknown — house overlays need a real Ascendant.
               </div>
             ) : (
               <table className="tp-table">
@@ -240,15 +240,26 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
           </div>
           <div className="syn-ctm-cell">
             <div className="syn-ctm-label">shared shadow lanes (mod 11)</div>
-            <div className="syn-ctm-lanes">
-              {syn.ctm.sharedLanes.length === 0 && <span className="syn-ctm-note">no coincident lanes</span>}
-              {dedupeLanes(syn.ctm.sharedLanes).slice(0, 6).map((s, i) => (
-                <span key={i} className="syn-lane-chip">{s.a} ↔ {s.b} · {s.laneName}</span>
-              ))}
-            </div>
-            {syn.ctm.sharedLanes.length > 0 && (
+            {syn.ctm.lanesReliable ? (
+              <>
+                <div className="syn-ctm-lanes">
+                  {syn.ctm.sharedLanes.length === 0 && <span className="syn-ctm-note">no coincident lanes</span>}
+                  {dedupeLanes(syn.ctm.sharedLanes).slice(0, 6).map((s, i) => (
+                    <span key={i} className="syn-lane-chip">{s.a} ↔ {s.b} · {s.laneName}</span>
+                  ))}
+                </div>
+                {syn.ctm.sharedLanes.length > 0 && (
+                  <div className="syn-ctm-note">
+                    shared lanes are common between any two charts — what distinguishes a pair is which bodies share them
+                  </div>
+                )}
+              </>
+            ) : (
               <div className="syn-ctm-note">
-                shared lanes are common between any two charts — what distinguishes a pair is which bodies share them
+                {chartA.timeUnknown && chartB.timeUnknown
+                  ? `${possessive(A)} and ${possessive(B)} birth times are both unknown`
+                  : chartA.timeUnknown ? `${possessive(A)} birth time is unknown` : `${possessive(B)} birth time is unknown`}
+                {" "}— the natal lane is an arcsecond-level residue an assumed noon can't support, so shared lanes aren't shown here.
               </div>
             )}
           </div>
@@ -377,6 +388,15 @@ const ASPECT_SYMBOL = {
 const HOUSE_SHORT = [
   "", "self", "money", "mind", "home", "joy", "work", "partner", "depth", "belief", "career", "friends", "unseen",
 ];
+// A/B default to the pronouns "You"/"Them" when no subject name is given
+// (see SynastryView above) — `${name}'s` reads as "You's"/"Them's" for
+// those two specifically, so the possessive needs its own small map
+// rather than a bare apostrophe-s suffix.
+function possessive(name) {
+  if (name === "You") return "Your";
+  if (name === "Them") return "Their";
+  return `${name}'s`;
+}
 function dedupeLanes(lanes) {
   const seen = new Set();
   return lanes.filter(l => { if (seen.has(l.lane)) return false; seen.add(l.lane); return true; });

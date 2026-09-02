@@ -131,14 +131,29 @@ function synastryCTM(chartA, chartB) {
   const tcoA = tcoPhase(chartA.jd);
   const tcoB = tcoPhase(chartB.jd);
   const syndrome = phaseSyndrome(tcoA.theta, tcoB.theta);
-  // shared shadow lanes — planets whose mod-11 residues coincide across charts
+  // shared shadow lanes — planets whose mod-11 residues coincide across
+  // charts. Both sides are NATAL arcsecond residues, so if either birth
+  // time is unknown (computed at an assumed noon — see astro.jsx), the
+  // comparison carries no signal: checked directly against the real
+  // ephemeris (not assumed from mean orbital periods), every body's own
+  // natal lane cycles through all eleven residues inside a single day of
+  // birth-time uncertainty, all the way out to Pluto. A "coincidence"
+  // against an effectively random residue on either side isn't one, so
+  // this is withheld entirely rather than computed-and-caveated — the
+  // same all-or-nothing shape the solo chart's own shared-lane sentence
+  // uses (time.jsx's lifecycleDigest, narrative.jsx's closing).
+  // lanesReliable lets the view say why, rather than silently showing an
+  // empty list indistinguishable from "checked, found none."
+  const lanesReliable = !chartA.timeUnknown && !chartB.timeUnknown;
   const sharedLanes = [];
-  for (const A of chartA.planets) {
-    if (!SYN_BODIES.includes(A.name)) continue;
-    for (const B of chartB.planets) {
-      if (!SYN_BODIES.includes(B.name)) continue;
-      if (A.residues.r11 === B.residues.r11) {
-        sharedLanes.push({ a: A.name, b: B.name, lane: A.residues.r11, laneName: SHADOW_LANE_NAMES[A.residues.r11] });
+  if (lanesReliable) {
+    for (const A of chartA.planets) {
+      if (!SYN_BODIES.includes(A.name)) continue;
+      for (const B of chartB.planets) {
+        if (!SYN_BODIES.includes(B.name)) continue;
+        if (A.residues.r11 === B.residues.r11) {
+          sharedLanes.push({ a: A.name, b: B.name, lane: A.residues.r11, laneName: SHADOW_LANE_NAMES[A.residues.r11] });
+        }
       }
     }
   }
@@ -155,7 +170,7 @@ function synastryCTM(chartA, chartB) {
   return {
     tcoA, tcoB,
     syndrome, syndromeDeg, syndromeFoldDeg,
-    sharedLanes,
+    sharedLanes, lanesReliable,
     midTheta, midThetaDeg: midTheta * 180 / Math.PI,
   };
 }
