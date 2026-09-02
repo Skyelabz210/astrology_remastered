@@ -345,6 +345,102 @@ function transitPerfections(natal, jdCenter, spanDays = 366, bodies = PERFECTION
   return { jdCenter, spanDays, hits };
 }
 
+// ─────────────────── Return charts ───────────────────
+//
+// The classical technique this app's whole lifecycle apparatus has been
+// building toward: a body returns to its exact natal degree, and the sky
+// at that instant is cast as a FULL chart in its own right — not a
+// comparison table, an image. Solar returns (~once a year) and lunar
+// returns (~once a month) are the two bodies this is classically done
+// for, because neither is ever retrograde: the longitude climbs
+// monotonically through the natal degree exactly once per period, so
+// there is never more than one return to find per cycle.
+//
+// Every return chart carries a K — which numbered return this is, e.g.
+// "Solar Return #45" — the same idea windingLift already counts (circuits
+// since birth by the body's own period), but rounded to the nearest whole
+// return rather than truncated to whole periods elapsed by an arbitrary
+// moment: the two agree almost everywhere and can differ by exactly 1 in
+// the day or two around a return, because trunc(x) and round(x) of the
+// same real number never differ by more than that. Successive return
+// charts, strung together over a lifetime, are the "evolving image" this
+// apparatus was built to produce: the natal chart is one instant; the
+// returns are the same subject, sampled once a cycle, forever.
+const RETURN_BODIES = ["Sun", "Moon"];
+
+/** Every crossing of `body`'s natal longitude inside [jd0, jd1]. Assumes
+ *  `body` is never retrograde (true for Sun and Moon) — the crossing is
+ *  then guaranteed unique per period, so a coarse grid + bisection is
+ *  exact and cannot double-count a retrograde loop the way a planet scan
+ *  would have to guard against. */
+function __bodyReturnsInWindow(natal, body, jd0, jd1) {
+  const natalLon = natal.planets.find((p) => p.name === body).lon;
+  const periodDays = PLANET_PERIODS[body] * 365.25;
+  const STEP = periodDays / 30; // ~12° of travel per step for both Sun and Moon
+  const h = (jd) => __wrap180(planetLongitude(body, jd) - natalLon);
+
+  const hits = [];
+  let prevJd = jd0, prevH = h(prevJd);
+  for (let jd = jd0 + STEP; jd <= jd1 + 1e-9; jd += STEP) {
+    const curH = h(jd);
+    if (prevH !== 0 && (prevH < 0) !== (curH < 0) && Math.abs(curH - prevH) < 180) {
+      let lo = prevJd, hi = jd, hLo = prevH;
+      for (let k = 0; k < 40; k++) {
+        const mid = (lo + hi) / 2;
+        const hm = h(mid);
+        if ((hLo < 0) === (hm < 0)) { lo = mid; hLo = hm; } else { hi = mid; }
+      }
+      hits.push((lo + hi) / 2);
+    }
+    prevJd = jd; prevH = curH;
+  }
+  return hits;
+}
+
+/** The return immediately before `targetJd` and the one immediately after,
+ *  for `body`. Either can be missing: `prev` is absent when the target
+ *  falls before the body's first post-natal return (there is no return
+ *  before birth — the scan window is clamped to start half a day after
+ *  natal.jd so the birth instant itself, where h is exactly 0, is never
+ *  mistaken for one). */
+function nearestBodyReturns(natal, body, targetJd) {
+  const periodDays = PLANET_PERIODS[body] * 365.25;
+  const jd0 = Math.max(natal.jd + 0.5, targetJd - periodDays * 1.05);
+  const jd1 = targetJd + periodDays * 1.05;
+  const hits = __bodyReturnsInWindow(natal, body, jd0, jd1);
+  const prev = hits.filter((jd) => jd <= targetJd).pop();
+  const next = hits.find((jd) => jd > targetJd);
+  return { prev, next };
+}
+
+/** The full chart cast at `body`'s return nearest `targetJd` — the return
+ *  in force at the target if one has happened, else the upcoming one.
+ *  Cast at the natal place; sect is always re-derived for the return
+ *  instant itself (`sect: "auto"`), never inherited from the natal
+ *  chart's own setting. Returns null only if `body` has never returned
+ *  and none is found ahead either, which does not happen in practice
+ *  (nearestBodyReturns' window always contains at least one crossing). */
+function returnChart(natal, body, targetJd) {
+  const { prev, next } = nearestBodyReturns(natal, body, targetJd);
+  const jd = prev !== undefined ? prev : next;
+  if (jd === undefined) return null;
+  const dateISO = new Date((jd - 2440587.5) * 86400000).toISOString();
+  const birth = natal.birth || {};
+  const chart = computeNatal({
+    dateISO, lat: birth.lat, lng: birth.lng,
+    houseSystem: birth.houseSystem, sect: "auto",
+  });
+  const periodDays = PLANET_PERIODS[body] * 365.25;
+  const K = Math.round((jd - natal.jd) / periodDays);
+  return {
+    body, jd, dateISO, K,
+    isCurrent: jd === prev,
+    chart,
+    nextJd: next,
+    nextDateISO: next !== undefined ? new Date((next - 2440587.5) * 86400000).toISOString() : null,
+  };
+}
+
 // Expose
 isRetrograde; // silence linter: relies on astro.jsx globals
 Object.assign(window, {
@@ -353,4 +449,5 @@ Object.assign(window, {
   mayaLongCount, tzolkin, haab, calendarRound,
   tcoPhase, tcoPeriod, phaseSyndrome,
   ctmState, currentTransits, progressedAt, windingLift, transitPerfections,
+  RETURN_BODIES, nearestBodyReturns, returnChart,
 });

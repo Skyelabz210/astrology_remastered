@@ -2044,6 +2044,25 @@ body::before {
   color-scheme: dark;
 }
 .tp-table tr.is-near td { color: var(--ink); }
+.cl-return-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.cl-return {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.cl-return h5 {
+  margin: 0 0 8px;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink);
+  font-weight: 400;
+}
+.cl-return-planets { margin-top: 8px; }
 .cl-note {
   font-family: var(--sans);
   font-size: 12px;
@@ -2541,6 +2560,7 @@ body::before {
    squeezing three grid columns. */
 @media (max-width: 720px) {
   .rs { padding: 12px 14px 16px; }
+  .cl-return-grid { grid-template-columns: 1fr; }
 
   /* header: brand left, controls right, birth line on its own row */
   .rs-hdr {
