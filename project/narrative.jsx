@@ -252,10 +252,12 @@ function narrativeClosing(chart) {
   // (found via this file's own Playwright verification, the same class of
   // bug a Codex review had already caught twice in the sibling digests):
   // r11 is an ARCSECOND-level residue, and an assumed noon uncertain by
-  // hours does not blur a fast body's residue, it scrambles it. Slow bodies
-  // would stay meaningful even then, but this follows the houses/Ascendant
-  // precedent's all-or-nothing shape (this file's header) rather than
-  // filtering SHADOW_CONTACT_BODIES by speed.
+  // hours does not blur it, it scrambles it — checked directly against the
+  // real ephemeris, every one of the twelve SHADOW_CONTACT_BODIES visits
+  // all eleven residues within a single day of birth-time uncertainty, not
+  // only the visibly fast ones. There is no slow body left whose residue
+  // would still mean something here, so filtering SHADOW_CONTACT_BODIES by
+  // speed was never on the table — this is the whole set, all the time.
   if (!chart.timeUnknown) {
     const contacts = shadowLaneContacts(chart);
     if (contacts.length > 0) {

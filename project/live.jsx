@@ -217,6 +217,7 @@ function LiveStatePanel({ chart }) {
           (negative before birth — earlier states are reached the same way), and its shadow-lane residue
           (arcsec mod 11) beside the natal one. Residue and winding together name the whole path — the
           register's K-elimination, run along the chart's own history. ↺ marks a shadow-lane return.
+          {chart.timeUnknown && " The birth time is unknown, so the natal lane and return column below are withheld: an assumed noon can be off by hours, and arcsecond width is so narrow that every body's natal lane cycles through all eleven residues inside a single day of that uncertainty. K and the target's own lane are unaffected — like the age above, they carry only the same sub-day imprecision the assumed clock time already has."}
         </p>
         <table className="tp-table">
           <thead>
@@ -228,8 +229,8 @@ function LiveStatePanel({ chart }) {
                 <td><span className="pl-gl">{r.glyph}</span> {r.name}</td>
                 <td className="num">{r.K.toLocaleString()}</td>
                 <td className="num">{r.lane11}</td>
-                <td className="num">{r.natalLane}</td>
-                <td>{r.isReturn ? "↺ in its natal lane" : "—"}</td>
+                <td className="num">{chart.timeUnknown ? "—" : r.natalLane}</td>
+                <td>{chart.timeUnknown ? "—" : r.isReturn ? "↺ in its natal lane" : "—"}</td>
               </tr>
             ))}
           </tbody>

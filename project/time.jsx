@@ -550,15 +550,20 @@ function lifecycleDigest(natal, jdTarget) {
   // target, where a shared lane is a genuine (if common) recurrence.
   //
   // An unknown birth time suppresses it entirely instead, for the same
-  // reason progressionsDigest withholds its Moon-driven facts: the
-  // natal lane is an ARCSECOND-level residue (mod 11 of arcseconds), and
-  // even the Moon's slowest-in-this-list companion among the fast bodies
-  // completes a full residue cycle in well under a minute of real time
-  // — an assumed noon uncertain by hours does not blur this fact, it
-  // scrambles it. The outer planets move slowly enough that their own
-  // natal lanes stay meaningful even then, but — as in progressionsDigest
-  // — this follows the houses/Ascendant precedent's all-or-nothing shape
-  // rather than filtering lift.returns body by body.
+  // reason progressionsDigest withholds its Moon-driven facts, but more
+  // completely: the natal lane is an ARCSECOND-level residue (mod 11 of
+  // arcseconds), and an assumed noon uncertain by hours does not blur
+  // this fact, it scrambles it. Unlike progressionsDigest's SIGN-level
+  // (30°-wide) facts — where only the Moon moves fast enough for an
+  // hours-wide uncertainty to matter — arcsecond width is thousands of
+  // times narrower, so EVERY body is affected, all the way out to Pluto:
+  // checked directly against the real ephemeris (not assumed from mean
+  // orbital periods), even Pluto's natal lane visits all eleven residues
+  // within a single day of birth-time uncertainty. There is no slow body
+  // left whose natal lane would still mean something here, so this isn't
+  // a cautious application of the houses/Ascendant precedent's
+  // all-or-nothing shape — it is the only correct answer, for every body
+  // lift.returns could ever name.
   if (lift.returns.length > 0 && jdTarget !== natal.jd && !natal.timeUnknown) {
     const who = lift.returns.length === 1 ? lift.returns[0] : `${lift.returns.slice(0, -1).join(", ")} and ${lift.returns[lift.returns.length - 1]}`;
     lines.push(
