@@ -128,6 +128,45 @@ export async function run() {
       typeof dJustAfter.lines.some((l) => l.includes("shadow lane")) === "boolean");
   }
 
+  // ── an unknown birth time suppresses the shadow-lane sentence entirely ──
+  // (Caught by a Codex review on the sibling progressionsDigest: the
+  // natal lane is an ARCSECOND-level residue — even the fastest bodies
+  // here complete a full residue cycle in well under a minute of real
+  // time, so an assumed noon uncertain by hours does not blur this fact,
+  // it scrambles it. The age/return lines above are NOT suppressed: their
+  // imprecision from an unknown birth time is bounded to well under a
+  // day, a rounding-level concern, not this one.)
+  {
+    // A positive control first: find a real offset where the KNOWN-time
+    // chart's digest actually carries the sentence, so the unknown-time
+    // check below is proving suppression of a real fact, not the absence
+    // of one that was never going to appear anyway.
+    const offsetWithSentence = [0, 137, 4009, 9001, 16000].find((d) => {
+      if (d === 0) return false; // the birth-instant tautology case, excluded on purpose
+      return sb.lifecycleDigest(chart, chart.jd + d).lines.some((l) => l.includes("shadow lane"));
+    });
+    t("sanity: at least one sampled offset gives the known-time chart a real shadow-lane sentence to suppress",
+      offsetWithSentence !== undefined);
+
+    const unknownChart = { ...chart, timeUnknown: true };
+    for (const offsetDays of [0, 137, 4009, 9001, 16000]) {
+      const jd = chart.jd + offsetDays;
+      const dUnknown = sb.lifecycleDigest(unknownChart, jd);
+      t(`timeUnknown: no shadow-lane sentence at +${offsetDays}d, known-time or not`,
+        !dUnknown.lines.some((l) => l.includes("shadow lane")), dUnknown.lines.join(" | "));
+      // The age and return-status lines are UNAFFECTED — only the
+      // arcsecond-sensitive sentence is withheld.
+      t(`timeUnknown: the age line still appears at +${offsetDays}d`,
+        dUnknown.lines[0].includes("years into the chart's history"));
+      t(`timeUnknown: return-status lines still appear at +${offsetDays}d`,
+        // Case-insensitive: "in force" phrasing capitalizes it ("Solar
+        // Return #2..."), but the "hasn't happened yet" phrasing does not
+        // ("No solar return has happened yet") — both are still a
+        // return-status line either way, which is all this asserts.
+        dUnknown.lines.some((l) => /return/i.test(l)), dUnknown.lines.join(" | "));
+    }
+  }
+
   // ── determinism ──
   {
     const a = sb.lifecycleDigest(chart, targetJd);

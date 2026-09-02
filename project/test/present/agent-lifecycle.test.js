@@ -129,6 +129,37 @@ export async function run() {
   t("an explicit undefined behaves exactly like the default",
     buildChartPrompt(chart, undefined) === base);
 
+  // ── an unknown birth time: buildChartPrompt passes each digest's
+  //    already-suppressed content through verbatim, deriving nothing of
+  //    its own from jdTarget ──────────────────────────────────────────────
+  // (Same Codex-driven fix as time.jsx's own digest functions — lifecycle
+  // drops just its shadow-lane sentence, progressions collapses to its
+  // one-line caveat. This pins that buildChartPrompt neither special-cases
+  // timeUnknown itself nor leaks a fact either function has withheld.)
+  t("sanity: the known-time chart's RIGHT NOW block at this target carries a real shadow-lane sentence to withhold",
+    digest.lines.some((l) => l.includes("shadow lane")));
+  t("sanity: the known-time chart's BY PROGRESSION block at this target carries a real Moon-sign fact to withhold",
+    progressions.lines.some((l) => l.includes("the Moon has reached")));
+
+  const unknownChart = { ...chart, timeUnknown: true };
+  const withUnknownTime = buildChartPrompt(unknownChart, jdNow);
+  const unknownDigest = lifecycleDigest(unknownChart, jdNow);
+  const unknownProgressions = progressionsDigest(unknownChart, jdNow);
+  t("timeUnknown: a RIGHT NOW section is still added (age/return facts remain reliable)",
+    withUnknownTime.includes("RIGHT NOW"));
+  t("timeUnknown: a BY PROGRESSION section is still added (the caveat itself is the content)",
+    withUnknownTime.includes("BY PROGRESSION"));
+  t("timeUnknown: no shadow-lane sentence appears, unlike the known-time chart at the same target",
+    !withUnknownTime.includes("shadow lane"), withUnknownTime);
+  t("timeUnknown: no Moon-sign fact appears, unlike the known-time chart at the same target",
+    !withUnknownTime.includes("the Moon has reached"), withUnknownTime);
+  t("timeUnknown: both digests' own (already-suppressed) lines still appear verbatim — no re-derivation",
+    unknownDigest.lines.every((l) => withUnknownTime.includes(l))
+    && unknownProgressions.lines.every((l) => withUnknownTime.includes(l)),
+    withUnknownTime);
+  t("timeUnknown: the sentence budget still expands by one per block actually offered (here, both)",
+    withUnknownTime.includes("4 to 6 sentences total"));
+
   // ── interpretChart: the cache key reflects the digest's OWN content ───
   let calls = 0;
   sb.window.claude = { complete: async (prompt) => { calls += 1; return "READING #" + calls + ": " + prompt.length; } };

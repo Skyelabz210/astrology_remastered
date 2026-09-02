@@ -222,9 +222,31 @@ function progressedAt(natalJd, ageYears) {
 // not how often it happens.
 function progressionsDigest(natal, jdTarget) {
   const ageYears = (jdTarget - natal.jd) / 365.25;
-  const prog = progressedAt(natal.jd, ageYears);
   const lines = [];
 
+  // An unknown birth time is only as good as an assumed clock (every
+  // position is computed at an assumed noon — see astro.jsx) — the same
+  // reason narrativeOpening withholds houses and the Ascendant. Secondary
+  // progression does not absorb that uncertainty, it MAGNIFIES the part
+  // of it that matters here: a birth time uncertain by hours shifts the
+  // progressed instant by those same hours, and the Moon moves fast
+  // enough (~13°/day) that hours are plenty to flip its progressed sign
+  // or the Sun-Moon phase relationship — reported here as settled facts,
+  // which they would not be. (Caught by a Codex review — the narrative
+  // spoke these plainly while app.jsx elsewhere already treats the
+  // natal Moon's own exact position as unreliable on such a chart.) The
+  // other progressed bodies move slowly enough that this doesn't apply
+  // to them the same way, but the "no exception, no half-measure" shape
+  // of the houses/Ascendant precedent is followed here too, rather than
+  // arguing case by case which residual risk is small enough to keep.
+  if (natal.timeUnknown) {
+    lines.push(
+      "The birth time is unknown, so secondary progression is not stated here — an assumed clock time carries the same uncertainty forward into the progressed instant, and this technique has no house or Ascendant scaffolding to fall back on the way the rest of the chart does."
+    );
+    return { ageYears, progressedJd: natal.jd + ageYears, lines };
+  }
+
+  const prog = progressedAt(natal.jd, ageYears);
   const progMoon = prog.bodies.find((b) => b.name === "Moon");
   if (progMoon) {
     lines.push(
@@ -526,7 +548,18 @@ function lifecycleDigest(natal, jdTarget) {
   // natal lane (K=0 for all) — that is a tautology, not a coincidence,
   // so the sentence is suppressed there and only fires at any OTHER
   // target, where a shared lane is a genuine (if common) recurrence.
-  if (lift.returns.length > 0 && jdTarget !== natal.jd) {
+  //
+  // An unknown birth time suppresses it entirely instead, for the same
+  // reason progressionsDigest withholds its Moon-driven facts: the
+  // natal lane is an ARCSECOND-level residue (mod 11 of arcseconds), and
+  // even the Moon's slowest-in-this-list companion among the fast bodies
+  // completes a full residue cycle in well under a minute of real time
+  // — an assumed noon uncertain by hours does not blur this fact, it
+  // scrambles it. The outer planets move slowly enough that their own
+  // natal lanes stay meaningful even then, but — as in progressionsDigest
+  // — this follows the houses/Ascendant precedent's all-or-nothing shape
+  // rather than filtering lift.returns body by body.
+  if (lift.returns.length > 0 && jdTarget !== natal.jd && !natal.timeUnknown) {
     const who = lift.returns.length === 1 ? lift.returns[0] : `${lift.returns.slice(0, -1).join(", ")} and ${lift.returns[lift.returns.length - 1]}`;
     lines.push(
       `${who} ${lift.returns.length === 1 ? "sits" : "sit"}, right now, in the same shadow lane ` +
