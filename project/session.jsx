@@ -90,6 +90,18 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
     [chart, jdSessionNow]
   );
 
+  // Cheap by comparison (no ephemeris chart-casting — five planetLongitude
+  // calls and a phase lookup), but kept in the SAME [chart, jdSessionNow]
+  // memo shape as lifecycleText on principle: this file has already
+  // shipped the agent.text-coupling bug once, and the fix is to never let
+  // a per-instant digest live inside a memo that also depends on
+  // agent.text, not to judge case by case whether a given digest happens
+  // to be cheap enough to get away with it.
+  const progressionsText = $sUseMemo(
+    () => (typeof narrativeProgressions === "function" ? narrativeProgressions(chart, jdSessionNow) : ""),
+    [chart, jdSessionNow]
+  );
+
   // The whole-chart narrative. Rebuilt only when the chart itself changes:
   // it is the same piece from the first play to the last, so a re-render
   // must not hand the player a different object mid-reading.
@@ -102,11 +114,12 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   // sequential LLM round trips before the first word, and would send birth
   // data for cards the reader never asked about.
   //
-  // `lifecycleText` (precomputed above) closes the piece with
-  // lifecycleDigest's facts about this session's "now" — passed as an
-  // already-computed string specifically so THIS memo's `agent.text`
-  // dependency (which does change every card transition) never re-triggers
-  // the expensive computation, only the cheap string splice.
+  // `lifecycleText`/`progressionsText` (both precomputed above) close the
+  // piece with lifecycleDigest's and progressionsDigest's facts about this
+  // session's "now" — passed as already-computed strings specifically so
+  // THIS memo's `agent.text` dependency (which does change every card
+  // transition) never re-triggers either computation, only the cheap
+  // string splice.
   const narrative = $sUseMemo(() => {
     if (typeof buildChartNarrative !== "function") return null;
     let agentTexts = null;
@@ -121,8 +134,8 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         } catch { /* cache shape changed — fall back to local text */ }
       });
     }
-    return buildChartNarrative(chart, { agentTexts, lifecycleText });
-  }, [chart, order, agentOn, agent.text, lifecycleText]);
+    return buildChartNarrative(chart, { agentTexts, lifecycleText, progressionsText });
+  }, [chart, order, agentOn, agent.text, lifecycleText, progressionsText]);
 
   // Where each narrative segment puts the deck. Segments that are not a
   // card (the opening, the closing) leave the current card alone.
