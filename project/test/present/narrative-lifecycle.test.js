@@ -70,7 +70,11 @@ export async function run() {
     withOtherOpts.text === base.text && withOtherOpts.segments.length === baseCount);
 
   // ── with jdTarget: exactly one lifecycle segment, appended last ──────
-  const withLife = buildChartNarrative(chart, { jdTarget: jdNow });
+  // progressionsText: "" isolates the lifecycle segment under test here —
+  // jdTarget alone would ALSO add a progressions segment (see
+  // narrative-progressions.test.js), which is correct behavior but not
+  // what this file is pinning.
+  const withLife = buildChartNarrative(chart, { jdTarget: jdNow, progressionsText: "" });
   t("providing jdTarget adds exactly one lifecycle segment",
     withLife.segments.filter((s) => s.kind === "lifecycle").length === 1);
   t("every prior segment is unchanged",
@@ -106,7 +110,7 @@ export async function run() {
   t("a real chart and target yields real prose", narrativeLifecycle(chart, jdNow).length > 20);
 
   // ── it is genuinely date-sensitive, not a fixed string ───────────────
-  const atBirth = buildChartNarrative(chart, { jdTarget: chart.jd });
+  const atBirth = buildChartNarrative(chart, { jdTarget: chart.jd, progressionsText: "" });
   const segBirth = atBirth.segments[atBirth.segments.length - 1];
   t("the birth instant produces different lifecycle prose than a 2026 target",
     segBirth.text !== seg.text);
@@ -119,7 +123,7 @@ export async function run() {
   // (windingLift/returnChart/ctmState read only .jd and planet longitudes
   // — none of the lifecycle facts depend on houses or the angles.)
   const unknownChart = computeNatal({ dateISO: "1980-10-21T21:31:00Z", lat: 35.1408, lng: -79.0058, houseSystem: "whole", timeUnknown: true });
-  const withUnknownTime = buildChartNarrative(unknownChart, { jdTarget: jdNow });
+  const withUnknownTime = buildChartNarrative(unknownChart, { jdTarget: jdNow, progressionsText: "" });
   const segUnknown = withUnknownTime.segments[withUnknownTime.segments.length - 1];
   t("an unknown-birth-time chart still gets a well-formed lifecycle segment",
     !!segUnknown && segUnknown.kind === "lifecycle" && segUnknown.text.length > 20, segUnknown && segUnknown.text);
@@ -142,11 +146,11 @@ export async function run() {
   t("a chart's-worth of other output built via lifecycleText matches the jdTarget path exactly",
     withText.text === withLife.text);
   t("lifecycleText takes precedence over jdTarget when both are given — no re-derivation",
-    buildChartNarrative(chart, { jdTarget: chart.jd, lifecycleText: precomputed }).text === withText.text);
+    buildChartNarrative(chart, { jdTarget: chart.jd, lifecycleText: precomputed, progressionsText: "" }).text === withText.text);
   t("lifecycleText: '' (computed, nothing to say) adds no segment, and is NOT treated as absent",
-    buildChartNarrative(chart, { lifecycleText: "", jdTarget: jdNow }).segments.length === baseCount);
+    buildChartNarrative(chart, { lifecycleText: "", jdTarget: jdNow, progressionsText: "" }).segments.length === baseCount);
   t("lifecycleText: null falls back to computing from jdTarget, same as the default",
-    buildChartNarrative(chart, { lifecycleText: null, jdTarget: jdNow }).text === withLife.text);
+    buildChartNarrative(chart, { lifecycleText: null, jdTarget: jdNow, progressionsText: "" }).text === withLife.text);
 
   // ── regression: session.jsx must not recompute the digest on every
   //    agent-driven rerender (the bug the lifecycleText option exists to
@@ -175,12 +179,16 @@ export async function run() {
   const nextMarker = sessionSrc.indexOf("// Where each narrative segment", nStart);
   const narrativeMemo = nStart >= 0 && nextMarker > nStart ? sessionSrc.slice(nStart, nextMarker) : "";
   t("session.jsx's narrative memo exists", narrativeMemo.length > 0);
+  // progressionsText rides along in the same memo and dependency array —
+  // see narrative-progressions.test.js for its own dedicated regression
+  // check; these patterns just need to tolerate its presence rather than
+  // expect the pre-progressions exact shape.
   t("the narrative memo's dependency array includes agent.text (that part of the coupling is real and expected)",
-    /\[chart, order, agentOn, agent\.text, lifecycleText\]/.test(narrativeMemo), narrativeMemo);
+    /\[chart, order, agentOn, agent\.text, lifecycleText, progressionsText\]/.test(narrativeMemo), narrativeMemo);
   t("...but the narrative memo itself never calls narrativeLifecycle or lifecycleDigest directly",
     !/narrativeLifecycle\(|lifecycleDigest\(/.test(narrativeMemo), narrativeMemo);
   t("...and passes the precomputed lifecycleText through to buildChartNarrative instead of a jdTarget",
-    /buildChartNarrative\(chart, \{ agentTexts, lifecycleText \}\)/.test(narrativeMemo), narrativeMemo);
+    /buildChartNarrative\(chart, \{ agentTexts, lifecycleText, progressionsText \}\)/.test(narrativeMemo), narrativeMemo);
 
   return rows;
 }

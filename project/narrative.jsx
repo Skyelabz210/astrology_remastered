@@ -279,6 +279,20 @@ function narrativeLifecycle(chart, jdTarget) {
   return digest.lines.join(" ");
 }
 
+// The same reuse-not-recompute pattern as narrativeLifecycle, over
+// progressionsDigest (time.jsx) instead — the progressed Moon's current
+// sign, any slower body's sign change since birth, and the progressed
+// Sun-Moon phase. A separate segment rather than folded into the
+// lifecycle one: two distinct techniques (winding/returns vs. secondary
+// progression), each read as its own short coda rather than one
+// overloaded paragraph.
+function narrativeProgressions(chart, jdTarget) {
+  if (!chart || typeof progressionsDigest !== "function" || !Number.isFinite(jdTarget)) return "";
+  const digest = progressionsDigest(chart, jdTarget);
+  if (!digest || !Array.isArray(digest.lines) || digest.lines.length === 0) return "";
+  return digest.lines.join(" ");
+}
+
 // ── assembly ──────────────────────────────────────────────────────────
 
 /**
@@ -308,11 +322,20 @@ function narrativeLifecycle(chart, jdTarget) {
  * for a one-off call, a test, or any caller whose own memo already keys on
  * exactly `[chart, jdTarget]`).
  *
+ * `progressionsText` is the identical opt-in, one layer over — verbatim text
+ * for a SEPARATE segment closing with progressionsDigest's facts (secondary
+ * progression: the progressed Moon's sign, any slower body's sign change,
+ * the progressed lunar phase). Cheap to derive from `jdTarget` directly (no
+ * ephemeris chart-casting, unlike lifecycleDigest), but still accepts a
+ * precomputed string for the same reason: a caller already memoizing
+ * lifecycleText the safe way should derive this one the same way, not
+ * reintroduce a jdTarget-keyed recompute next to it.
+ *
  * Returns `{ text, segments }`. Every segment carries `{ index, kind,
  * cardIdx, title, text, start, end }` where `[start, end)` is its character
  * range inside `text` — the ranges playback syncs the deck against.
  */
-function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarget = null, lifecycleText = null } = {}) {
+function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarget = null, lifecycleText = null, progressionsText = null } = {}) {
   if (!chart || !Array.isArray(chart.cards)) return { text: "", segments: [] };
   const order = (typeof deckOrder === "function") ? deckOrder(chart) : chart.cards.map((_, i) => i);
 
@@ -337,6 +360,11 @@ function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarg
     ? lifecycleText
     : (Number.isFinite(jdTarget) ? narrativeLifecycle(chart, jdTarget) : "");
   if (resolvedLifecycleText) raw.push({ kind: "lifecycle", cardIdx: null, title: "Right now", text: resolvedLifecycleText });
+
+  const resolvedProgressionsText = progressionsText != null
+    ? progressionsText
+    : (Number.isFinite(jdTarget) ? narrativeProgressions(chart, jdTarget) : "");
+  if (resolvedProgressionsText) raw.push({ kind: "progressions", cardIdx: null, title: "By progression", text: resolvedProgressionsText });
 
   // Character ranges are assigned against the SAME joiner the text is built
   // with, so an offset always indexes the string that is actually spoken.
@@ -427,6 +455,7 @@ Object.assign(window, {
   narrativeOpening,
   narrativeClosing,
   narrativeLifecycle,
+  narrativeProgressions,
   chunkNarrative,
   segmentTimingsFromAlignment,
   segmentTimingsFromDuration,
