@@ -441,6 +441,57 @@ function returnChart(natal, body, targetJd) {
   };
 }
 
+// ─────────────────── The lifecycle digest ───────────────────
+//
+// Everything above this point answers "what is true at this instant" in
+// tables — a reader has to assemble that into a picture themselves. This
+// composes the SAME already-computed facts (age, which return is in
+// force, which bodies share their natal shadow lane right now) into a
+// handful of plain sentences, the same register narrative.jsx's opening
+// and closing already write for the natal chart itself. It changes
+// nothing about what is computed, only what is said about it — read
+// before the tables, not instead of them.
+//
+// Roughly half of all moments have at least one body sharing its natal
+// shadow lane purely by chance (10 bodies, 11 lanes, so P(at least one
+// match) = 1 − (10/11)^10 ≈ 0.58) — the sentence says so, the same
+// honesty the narrative's own shadow-contact line already practices.
+function lifecycleDigest(natal, jdTarget) {
+  const fmtDate = (iso) => iso.slice(0, 10);
+  const ctm = ctmState(jdTarget, natal.jd);
+  const lift = windingLift(natal, jdTarget);
+  const lines = [];
+
+  lines.push(
+    `This moment is ${ctm.ageYears.toFixed(1)} years into the chart's history` +
+    ` — ${Math.floor(ctm.ageDays).toLocaleString()} days from birth.`
+  );
+
+  for (const body of RETURN_BODIES) {
+    const r = returnChart(natal, body, jdTarget);
+    if (!r) continue;
+    const label = body === "Sun" ? "Solar" : "Lunar";
+    lines.push(r.isCurrent
+      ? `${label} Return #${r.K} has been in force since ${fmtDate(r.dateISO)}, governing until the next on ${fmtDate(r.nextDateISO)}.`
+      : `No ${label.toLowerCase()} return has happened yet — the first, #${r.K}, falls on ${fmtDate(r.dateISO)}.`);
+  }
+
+  // At the birth instant itself every body trivially shares its own
+  // natal lane (K=0 for all) — that is a tautology, not a coincidence,
+  // so the sentence is suppressed there and only fires at any OTHER
+  // target, where a shared lane is a genuine (if common) recurrence.
+  if (lift.returns.length > 0 && jdTarget !== natal.jd) {
+    const who = lift.returns.length === 1 ? lift.returns[0] : `${lift.returns.slice(0, -1).join(", ")} and ${lift.returns[lift.returns.length - 1]}`;
+    lines.push(
+      `${who} ${lift.returns.length === 1 ? "sits" : "sit"}, right now, in the same shadow lane ` +
+      `${lift.returns.length === 1 ? "it" : "they"} held at birth — common to about half of all moments, ` +
+      `not a classical aspect, but a correspondence the traditional reading has no name for.`
+    );
+  }
+
+  return { ageYears: ctm.ageYears, ageDays: ctm.ageDays, lines };
+}
+
 // Expose
 isRetrograde; // silence linter: relies on astro.jsx globals
 Object.assign(window, {
@@ -449,5 +500,5 @@ Object.assign(window, {
   mayaLongCount, tzolkin, haab, calendarRound,
   tcoPhase, tcoPeriod, phaseSyndrome,
   ctmState, currentTransits, progressedAt, windingLift, transitPerfections,
-  RETURN_BODIES, nearestBodyReturns, returnChart,
+  RETURN_BODIES, nearestBodyReturns, returnChart, lifecycleDigest,
 });

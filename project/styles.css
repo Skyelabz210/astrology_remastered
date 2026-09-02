@@ -2063,6 +2063,15 @@ body::before {
   font-weight: 400;
 }
 .cl-return-planets { margin-top: 8px; }
+.cl-digest {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0 0 20px;
+  max-width: 76ch;
+}
 .cl-note {
   font-family: var(--sans);
   font-size: 12px;
