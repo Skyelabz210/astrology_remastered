@@ -6,15 +6,27 @@
 // buildChartNarrative before it, this was otherwise purely a function of
 // the birth chart. It gains the identical opt-in: given a jdTarget, the
 // prompt is handed the SAME lifecycleDigest (time.jsx) facts the spoken
-// narrative closes with — reused verbatim, not reworded for the model —
-// and the reading cache is bucketed by day so "now" ticking every render
-// does not mean a fresh API call every render either.
+// narrative closes with — reused verbatim, not reworded for the model.
 //
-// buildChartPrompt has no prior test coverage at all (nothing in this
-// repo asserted its shape before this change); this file only covers the
-// behavior this PR actually adds or could break — the prompt's shape
-// with and without jdTarget, and interpretChart's cache-key bucketing —
-// not a full retroactive spec of every line agent.jsx already sends.
+// The reading cache key's lifecycle component is derived from the
+// DIGEST'S OWN content (a fingerprint of its computed lines), not from a
+// day bucket. An earlier version of this file bucketed by
+// Math.floor(jdTarget) on the theory that lifecycleDigest is "day-
+// granularity" — a Codex review correctly caught that it is NOT: the
+// shared-shadow-lane sentence depends on exact ecliptic longitude and can
+// change within minutes for a fast body, a return can begin intraday, and
+// the lived-day count changes at the birth time-of-day boundary, not at
+// midnight. A day-bucketed key served a stale RIGHT NOW statement for
+// however long was left in the bucket after the facts actually changed.
+// Fingerprinting the actual content fixes that AND stays cache-friendly:
+// repeat calls whose facts are unchanged still hit the same entry.
+//
+// buildChartPrompt has no prior test coverage predating this file (nothing
+// in this repo asserted its shape before jdTarget existed); this file only
+// covers the behavior this PR actually adds or could break — the prompt's
+// shape with and without jdTarget, interpretChart's content-derived cache
+// key, and the ":latest" pointer buildReadingMarkdown's export depends on
+// — not a full retroactive spec of every line agent.jsx already sends.
 
 import vm from "node:vm";
 import { readFileSync } from "node:fs";
@@ -86,40 +98,47 @@ export async function run() {
   t("an explicit undefined behaves exactly like the default",
     buildChartPrompt(chart, undefined) === base);
 
-  // ── interpretChart: the cache is bucketed by day, not by raw jdTarget ──
-  // Two hosts' clocks a few hours apart must not both re-fetch — but a
-  // genuinely different day, where the digest's own facts can differ
-  // (a return coming into or out of force), must.
+  // ── interpretChart: the cache key reflects the digest's OWN content ───
   let calls = 0;
-  sb.window.claude = { complete: async (prompt) => { calls += 1; return "READING:" + prompt.length; } };
+  sb.window.claude = { complete: async (prompt) => { calls += 1; return "READING #" + calls + ": " + prompt.length; } };
   const { interpretChart } = sb;
 
-  // Safely inside one noon-to-noon Julian Day window either way — not
-  // hugging the UTC-noon boundary the JD convention itself uses.
   const jdMorning = dateToJD(new Date("2026-09-02T14:00:00Z"));
   const jdEvening = dateToJD(new Date("2026-09-02T20:00:00Z"));
-  const jdNextNext = dateToJD(new Date("2026-09-04T14:00:00Z"));
-  t("sanity: the two same-day instants really do floor to the same JD",
+  t("sanity: the two instants floor to the SAME Julian day",
     Math.floor(jdMorning) === Math.floor(jdEvening));
-  t("sanity: the later instant really does floor to a different JD",
-    Math.floor(jdNextNext) !== Math.floor(jdMorning));
+  const digestMorning = lifecycleDigest(chart, jdMorning);
+  const digestEvening = lifecycleDigest(chart, jdEvening);
+  t("sanity: their digest content genuinely differs (the shared-shadow-lane sentence) despite the same day — the exact regression a day-bucketed key would have masked",
+    digestMorning.lines.join("|") !== digestEvening.lines.join("|"),
+    `morning: ${digestMorning.lines.join(" / ")}\nevening: ${digestEvening.lines.join(" / ")}`);
 
   const r1 = await interpretChart(chart, jdMorning);
-  const r2 = await interpretChart(chart, jdEvening);
-  t("two targets in the same day-bucket reuse the cached reading — one API call",
+  const r2 = await interpretChart(chart, jdMorning);
+  t("repeating the IDENTICAL target reuses the cached reading — one API call",
     calls === 1 && r1 === r2, `calls=${calls}`);
 
-  const r3 = await interpretChart(chart, jdNextNext);
-  t("a target in a genuinely different day-bucket triggers a fresh call",
+  const r3 = await interpretChart(chart, jdEvening);
+  t("a same-day target whose digest content genuinely differs triggers a fresh call, not a stale hit",
     calls === 2 && r3 !== r1, `calls=${calls}`);
 
   const r4 = await interpretChart(chart);
-  t("omitting jdTarget entirely is its own cache bucket, distinct from any dated one",
+  t("omitting jdTarget entirely is its own cache entry, distinct from any dated one",
     calls === 3 && r4 !== r1 && r4 !== r3, `calls=${calls}`);
 
   const r5 = await interpretChart(chart);
   t("repeating the no-jdTarget call reuses its own cache entry rather than re-fetching",
     calls === 3 && r5 === r4, `calls=${calls}`);
+
+  // ── the export path's ":latest" pointer ────────────────────────────────
+  // buildReadingMarkdown never has a jdTarget to reconstruct the exact
+  // fingerprinted key interpretChart cached under — it looks up a plain
+  // "whatever this chart most recently resolved to" pointer instead,
+  // which interpretChart keeps current on every hit or fresh resolution.
+  const { buildReadingMarkdown } = sb;
+  const md = buildReadingMarkdown(chart, chart.cards);
+  t("the export includes the whole-chart synthesis via the chart's :latest pointer",
+    md.includes("The chart as one") && md.includes(r5), md.slice(0, 250));
 
   return rows;
 }
