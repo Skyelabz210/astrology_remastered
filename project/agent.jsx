@@ -251,18 +251,28 @@ function receptionFor(chart, name) {
   return `Mutual reception (${r.kind}): ${r.a} ↔ ${r.b}.`;
 }
 
-function buildChartPrompt(chart) {
+// `jdTarget` optionally grounds the reading in "right now": the SAME
+// lifecycleDigest (time.jsx) facts narrative.jsx's spoken closing reuses
+// — age, which return is in force, which bodies share their natal shadow
+// lane — given to the model as additional substrate, not asked for as a
+// prediction. Omitted (the default), the prompt is exactly the birth
+// chart with no live-time dependency, as it always was.
+function buildChartPrompt(chart, jdTarget = null) {
   const planets = chart.planets.map(p =>
     `${p.name}${p.retrograde ? "℞" : ""} ${p.lon.toFixed(2)}° (sign ${p.sign}, H${p.house}, dign ${p.dignity.kind} ${p.dignity.score >= 0 ? "+" : ""}${p.dignity.score}, r₁₁=${p.residues.r11}, r₁₃=${p.residues.r13})`
   ).join("\n  ");
+  const lifecycleLines = Number.isFinite(jdTarget) && typeof lifecycleDigest === "function"
+    ? lifecycleDigest(chart, jdTarget).lines
+    : null;
   return [
     `You are a literal interpreter for an astrology engine. The math has run; you translate the numbers into their astrological reading. Nothing more.`,
     ``,
     `Rules (strict):`,
     `- Do not narrate. Do not address the user. Do not editorialize, predict, or advise.`,
     `- No metaphor, no poetry, no adjectives for flavor. Plain astrological terminology only.`,
-    `- One sentence per substrate fact. 4 sentences total. Cite numeric values inline.`,
+    `- One sentence per substrate fact. ${lifecycleLines ? "4 to 5 sentences" : "4 sentences"} total. Cite numeric values inline.`,
     `- Surface at least one mod-11 (shadow-prime) contact as a fact. Do not dramatize it.`,
+    ...(lifecycleLines ? [`- You may spend one sentence on a RIGHT NOW fact below, stated in the present tense — it is a current fact, not a prediction.`] : []),
     `- Output prose only — no headers, no bullets, no asterisks, no quotation marks.`,
     ``,
     `SUBSTRATE`,
@@ -270,6 +280,7 @@ function buildChartPrompt(chart) {
     `Ascendant: ${chart.asc.toFixed(3)}° (${ZODIAC[chart.ascSignIdx].name}).`,
     `Bodies:`,
     `  ${planets}`,
+    ...(lifecycleLines ? ["", `RIGHT NOW`, `  ${lifecycleLines.join("\n  ")}`] : []),
   ].join("\n");
 }
 
@@ -340,12 +351,19 @@ async function interpretCard(card, chart) {
   return promise;
 }
 
-async function interpretChart(chart) {
+async function interpretChart(chart, jdTarget = null) {
   requireAgent();
-  const key = "chart:" + chart.jd.toFixed(3) + ":" + chart.birth.lat + ":" + chart.birth.lng;
+  // Day-bucketed, not the raw jdTarget: cache entries survive a reload
+  // (persistReadings) and "now" always differs by a few seconds from the
+  // last page view, which would otherwise cache-miss every single time.
+  // Crossing an actual day IS a genuine cache miss — the digest itself is
+  // day-granularity (dates, not times) — so this regenerates exactly when
+  // the underlying facts could have changed, no more often.
+  const bucket = Number.isFinite(jdTarget) ? Math.floor(jdTarget) : "none";
+  const key = "chart:" + chart.jd.toFixed(3) + ":" + chart.birth.lat + ":" + chart.birth.lng + ":" + bucket;
   if (__cache.has(key)) return __cache.get(key);
   if (__pending.has(key)) return __pending.get(key);
-  const prompt = buildChartPrompt(chart);
+  const prompt = buildChartPrompt(chart, jdTarget);
   const promise = (async () => {
     try {
       const text = await window.claude.complete(prompt);
@@ -383,19 +401,20 @@ function useAgentReading(card, chart, active) {
   return state;
 }
 
-function useAgentChartReading(chart, active) {
+function useAgentChartReading(chart, active, jdTarget = null) {
   const [state, setState] = React.useState({ loading: false, text: null, error: null });
+  const jdBucket = Number.isFinite(jdTarget) ? Math.floor(jdTarget) : null;
   React.useEffect(() => {
     if (!active || !chart) return;
     if (!agentAvailable()) { setState(AGENT_UNAVAILABLE); return; }
     setState({ loading: true, text: null, error: null });
     let cancelled = false;
-    interpretChart(chart).then(
+    interpretChart(chart, jdTarget).then(
       (text) => { if (!cancelled) setState({ loading: false, text, error: null }); },
       (err)  => { if (!cancelled) setState({ loading: false, text: null, error: String(err && err.message || err) }); }
     );
     return () => { cancelled = true; };
-  }, [active, chart && chart.jd, chart && chart.asc, chart && chart.birth.dateISO]);
+  }, [active, chart && chart.jd, chart && chart.asc, chart && chart.birth.dateISO, jdBucket]);
   return state;
 }
 
