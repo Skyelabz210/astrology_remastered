@@ -11,6 +11,18 @@
 // lifecycleDigest's own prose verbatim, that every existing caller
 // (jdTarget omitted) is byte-for-byte unaffected, and that offsets and
 // chunking still hold with the extra segment present.
+//
+// It also accepts an already-computed `lifecycleText` instead of a
+// jdTarget — added after a Codex review on the PR that introduced
+// jdTarget caught that session.jsx's `narrative` memo also depends on
+// `agent.text` (which changes on every narrated card transition), so
+// passing jdTarget there re-ran lifecycleDigest's two ephemeris-backed
+// return casts on every card change. session.jsx now computes the text
+// once, in its own memo keyed only on [chart, jdSessionNow], and passes
+// the STRING here; this file's own assertions below pin that path too,
+// plus a source-level regression check that session.jsx's split actually
+// holds (no React harness in this repo to catch it at the hook-timing
+// level).
 
 import vm from "node:vm";
 import { readFileSync } from "node:fs";
@@ -119,6 +131,56 @@ export async function run() {
   // since it must short-circuit before ever reaching lifecycleDigest.)
   t("a null chart with jdTarget does not throw and adds nothing",
     JSON.stringify(buildChartNarrative(null, { jdTarget: jdNow })) === JSON.stringify({ text: "", segments: [] }));
+
+  // ── lifecycleText: a precomputed string, used verbatim ────────────────
+  const precomputed = narrativeLifecycle(chart, jdNow);
+  const withText = buildChartNarrative(chart, { lifecycleText: precomputed });
+  const segText = withText.segments[withText.segments.length - 1];
+  t("lifecycleText alone (no jdTarget) still adds exactly one lifecycle segment",
+    withText.segments.filter((s) => s.kind === "lifecycle").length === 1);
+  t("its text is the precomputed string, verbatim", segText.text === precomputed);
+  t("a chart's-worth of other output built via lifecycleText matches the jdTarget path exactly",
+    withText.text === withLife.text);
+  t("lifecycleText takes precedence over jdTarget when both are given — no re-derivation",
+    buildChartNarrative(chart, { jdTarget: chart.jd, lifecycleText: precomputed }).text === withText.text);
+  t("lifecycleText: '' (computed, nothing to say) adds no segment, and is NOT treated as absent",
+    buildChartNarrative(chart, { lifecycleText: "", jdTarget: jdNow }).segments.length === baseCount);
+  t("lifecycleText: null falls back to computing from jdTarget, same as the default",
+    buildChartNarrative(chart, { lifecycleText: null, jdTarget: jdNow }).text === withLife.text);
+
+  // ── regression: session.jsx must not recompute the digest on every
+  //    agent-driven rerender (the bug the lifecycleText option exists to
+  //    avoid). No React harness here to catch this at the hook-timing
+  //    level, so this pins it at the source level instead: the memo that
+  //    depends on agent.text must reference the precomputed lifecycleText,
+  //    never call narrativeLifecycle/lifecycleDigest itself, and the memo
+  //    that computes lifecycleText must not depend on agent.text.
+  // Slices are bounded by adjacent, already-known markers rather than by
+  // matching parens — this source has calls like `f(g(x));` whose FIRST
+  // ");" lands well inside the memo body, long before its real close.
+  const sessionSrc = readFileSync(join(ROOT, "session.jsx"), "utf8");
+
+  const lcStart = sessionSrc.indexOf("const lifecycleText = $sUseMemo(");
+  const nStart = sessionSrc.indexOf("const narrative = $sUseMemo(() => {");
+  const lifecycleMemo = lcStart >= 0 && nStart > lcStart ? sessionSrc.slice(lcStart, nStart) : "";
+  t("session.jsx computes lifecycleText in its own $sUseMemo", lifecycleMemo.length > 0);
+  // An exact match on the array already proves it excludes agent.text —
+  // a separate substring search for "agent.text" would also catch this
+  // very comment block explaining why (it names agent.text in prose).
+  t("that memo's dependency array is exactly [chart, jdSessionNow] — no agent.text",
+    /\$sUseMemo\(\s*\(\) => [^\n]*,\s*\[chart, jdSessionNow\]\s*\)/.test(lifecycleMemo), lifecycleMemo);
+  t("that memo is the one place narrativeLifecycle is actually called",
+    /narrativeLifecycle\(chart, jdSessionNow\)/.test(lifecycleMemo), lifecycleMemo);
+
+  const nextMarker = sessionSrc.indexOf("// Where each narrative segment", nStart);
+  const narrativeMemo = nStart >= 0 && nextMarker > nStart ? sessionSrc.slice(nStart, nextMarker) : "";
+  t("session.jsx's narrative memo exists", narrativeMemo.length > 0);
+  t("the narrative memo's dependency array includes agent.text (that part of the coupling is real and expected)",
+    /\[chart, order, agentOn, agent\.text, lifecycleText\]/.test(narrativeMemo), narrativeMemo);
+  t("...but the narrative memo itself never calls narrativeLifecycle or lifecycleDigest directly",
+    !/narrativeLifecycle\(|lifecycleDigest\(/.test(narrativeMemo), narrativeMemo);
+  t("...and passes the precomputed lifecycleText through to buildChartNarrative instead of a jdTarget",
+    /buildChartNarrative\(chart, \{ agentTexts, lifecycleText \}\)/.test(narrativeMemo), narrativeMemo);
 
   return rows;
 }

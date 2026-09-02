@@ -181,7 +181,7 @@ const JSX_GLOBALS = {
   "isqrtN": "readonly", "kElimWinding": "readonly", "listVoices": "readonly", "lunarPhase": "readonly", "mayaLongCount": "readonly",
   "midheavenDeg": "readonly", "mod360": "readonly", "nAspectMeaning": "readonly", "nDignityMeaning": "readonly", "nHouseTopic": "readonly",
   "nLaneName": "readonly", "nPlanetSignifies": "readonly", "nSignName": "readonly", "narrationCacheKey": "readonly", "narrativeClosing": "readonly",
-  "narrativeForCard": "readonly", "narrativeOpening": "readonly", "nearestAspect": "readonly", "operatorClass": "readonly",
+  "narrativeForCard": "readonly", "narrativeLifecycle": "readonly", "narrativeOpening": "readonly", "nearestAspect": "readonly", "operatorClass": "readonly",
   "phaseSyndrome": "readonly", "pickBrowserVoice": "readonly", "planetDeclination": "readonly", "planetLongitude": "readonly",
   "planetSignifies": "readonly", "planetSpeed": "readonly", "playNarrationChunk": "readonly", "primeElevenAudio": "readonly",
   "progressedAt": "readonly", "putCached": "readonly", "quadrantCuspsFor": "readonly", "rankVoice": "readonly", "readingFor": "readonly",

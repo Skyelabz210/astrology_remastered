@@ -76,6 +76,20 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   // and nothing time-based.
   const jdSessionNow = $sUseMemo(() => (typeof dateToJD === "function" ? dateToJD(new Date()) : null), []);
 
+  // lifecycleDigest casts two full return charts through the real ephemeris
+  // (Sun and Moon returns) — real work, not free. Computed here, keyed ONLY
+  // on the chart and the session's frozen "now", so it runs once for the
+  // life of the session. It must NOT live inside the `narrative` memo below:
+  // that memo also depends on `agent.text`, which changes on every narrated
+  // card transition, and re-running two ephemeris-backed chart casts on
+  // every card change stalls the deck/audio for no reason — the digest
+  // never changes mid-session anyway (bugfix: a Codex review on #31 caught
+  // this coupling before it shipped further).
+  const lifecycleText = $sUseMemo(
+    () => (typeof narrativeLifecycle === "function" ? narrativeLifecycle(chart, jdSessionNow) : ""),
+    [chart, jdSessionNow]
+  );
+
   // The whole-chart narrative. Rebuilt only when the chart itself changes:
   // it is the same piece from the first play to the last, so a re-render
   // must not hand the player a different object mid-reading.
@@ -88,9 +102,11 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   // sequential LLM round trips before the first word, and would send birth
   // data for cards the reader never asked about.
   //
-  // `jdTarget` closes the piece with lifecycleDigest's facts about this
-  // session's "now" — the same reuse-not-refetch principle: nothing new is
-  // computed here that the Cylindrical Time panel doesn't already compute.
+  // `lifecycleText` (precomputed above) closes the piece with
+  // lifecycleDigest's facts about this session's "now" — passed as an
+  // already-computed string specifically so THIS memo's `agent.text`
+  // dependency (which does change every card transition) never re-triggers
+  // the expensive computation, only the cheap string splice.
   const narrative = $sUseMemo(() => {
     if (typeof buildChartNarrative !== "function") return null;
     let agentTexts = null;
@@ -105,8 +121,8 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         } catch { /* cache shape changed — fall back to local text */ }
       });
     }
-    return buildChartNarrative(chart, { agentTexts, jdTarget: jdSessionNow });
-  }, [chart, order, agentOn, agent.text, jdSessionNow]);
+    return buildChartNarrative(chart, { agentTexts, lifecycleText });
+  }, [chart, order, agentOn, agent.text, lifecycleText]);
 
   // Where each narrative segment puts the deck. Segments that are not a
   // card (the opening, the closing) leave the current card alone.
