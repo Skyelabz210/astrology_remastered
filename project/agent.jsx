@@ -258,11 +258,12 @@ function receptionFor(chart, name) {
 // prediction. Omitted (the default), the prompt is exactly the birth
 // chart with no live-time dependency, as it always was.
 //
-// `precomputedDigest`, when given (even `null`, meaning "computed, and
-// there is nothing to say"), is used instead of calling lifecycleDigest
-// here — interpretChart already has to compute it to derive its cache
-// key, so this avoids computing it a second time for the same call.
-function buildChartPrompt(chart, jdTarget = null, precomputedDigest = undefined) {
+// `precomputedDigest`/`precomputedProgressions`, when given (even `null`,
+// meaning "computed, and there is nothing to say"), are used instead of
+// calling lifecycleDigest/progressionsDigest here — interpretChart already
+// has to compute both to derive its cache key, so this avoids computing
+// either a second time for the same call.
+function buildChartPrompt(chart, jdTarget = null, precomputedDigest = undefined, precomputedProgressions = undefined) {
   const planets = chart.planets.map(p =>
     `${p.name}${p.retrograde ? "℞" : ""} ${p.lon.toFixed(2)}° (sign ${p.sign}, H${p.house}, dign ${p.dignity.kind} ${p.dignity.score >= 0 ? "+" : ""}${p.dignity.score}, r₁₁=${p.residues.r11}, r₁₃=${p.residues.r13})`
   ).join("\n  ");
@@ -270,15 +271,26 @@ function buildChartPrompt(chart, jdTarget = null, precomputedDigest = undefined)
     ? precomputedDigest
     : (Number.isFinite(jdTarget) && typeof lifecycleDigest === "function" ? lifecycleDigest(chart, jdTarget) : null);
   const lifecycleLines = digest ? digest.lines : null;
+  const progressions = precomputedProgressions !== undefined
+    ? precomputedProgressions
+    : (Number.isFinite(jdTarget) && typeof progressionsDigest === "function" ? progressionsDigest(chart, jdTarget) : null);
+  const progressionLines = progressions ? progressions.lines : null;
+  // The sentence budget makes room for one MORE sentence per extra block
+  // actually offered — 4 by default, up to 6 when both apply — rather
+  // than a fixed "4 to 5" that would under-budget when both fire or
+  // over-promise when only one does.
+  const extraBlocks = (lifecycleLines ? 1 : 0) + (progressionLines ? 1 : 0);
+  const sentenceBudget = extraBlocks === 0 ? "4 sentences" : `4 to ${4 + extraBlocks} sentences`;
   return [
     `You are a literal interpreter for an astrology engine. The math has run; you translate the numbers into their astrological reading. Nothing more.`,
     ``,
     `Rules (strict):`,
     `- Do not narrate. Do not address the user. Do not editorialize, predict, or advise.`,
     `- No metaphor, no poetry, no adjectives for flavor. Plain astrological terminology only.`,
-    `- One sentence per substrate fact. ${lifecycleLines ? "4 to 5 sentences" : "4 sentences"} total. Cite numeric values inline.`,
+    `- One sentence per substrate fact. ${sentenceBudget} total. Cite numeric values inline.`,
     `- Surface at least one mod-11 (shadow-prime) contact as a fact. Do not dramatize it.`,
     ...(lifecycleLines ? [`- You may spend one sentence on a RIGHT NOW fact below, stated in the present tense — it is a current fact, not a prediction.`] : []),
+    ...(progressionLines ? [`- You may spend one sentence on a BY PROGRESSION fact below, stated in the present tense — it is a current fact, not a prediction.`] : []),
     `- Output prose only — no headers, no bullets, no asterisks, no quotation marks.`,
     ``,
     `SUBSTRATE`,
@@ -287,6 +299,7 @@ function buildChartPrompt(chart, jdTarget = null, precomputedDigest = undefined)
     `Bodies:`,
     `  ${planets}`,
     ...(lifecycleLines ? ["", `RIGHT NOW`, `  ${lifecycleLines.join("\n  ")}`] : []),
+    ...(progressionLines ? ["", `BY PROGRESSION`, `  ${progressionLines.join("\n  ")}`] : []),
   ].join("\n");
 }
 
@@ -374,9 +387,18 @@ async function interpretChart(chart, jdTarget = null) {
   const digest = Number.isFinite(jdTarget) && typeof lifecycleDigest === "function"
     ? lifecycleDigest(chart, jdTarget)
     : null;
-  const fingerprint = digest ? digest.lines.join("|") : "none";
-  // The chart alone, without the lifecycle fingerprint — a stable pointer
-  // to "whatever synthesis this chart most recently had," kept alongside
+  // Same content-derived-key reasoning as the lifecycle digest, extended
+  // to progressionsDigest — its own facts (a slower body's sign change,
+  // the progressed lunar phase) are no more day-granular than lifecycle's
+  // are, so the fingerprint covers both rather than trusting a time
+  // bucket for either.
+  const progressions = Number.isFinite(jdTarget) && typeof progressionsDigest === "function"
+    ? progressionsDigest(chart, jdTarget)
+    : null;
+  const fingerprint = (digest ? digest.lines.join("|") : "none")
+    + "::" + (progressions ? progressions.lines.join("|") : "none");
+  // The chart alone, without the fingerprint — a stable pointer to
+  // "whatever synthesis this chart most recently had," kept alongside
   // the fingerprinted entry so buildReadingMarkdown's export can find it
   // without needing to know which exact jdTarget produced it.
   const chartIdentity = "chart:" + chart.jd.toFixed(3) + ":" + chart.birth.lat + ":" + chart.birth.lng;
@@ -387,7 +409,7 @@ async function interpretChart(chart, jdTarget = null) {
     return cached;
   }
   if (__pending.has(key)) return __pending.get(key);
-  const prompt = buildChartPrompt(chart, jdTarget, digest);
+  const prompt = buildChartPrompt(chart, jdTarget, digest, progressions);
   const promise = (async () => {
     try {
       const text = await window.claude.complete(prompt);
