@@ -22,13 +22,22 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
   // chart and merged for dates that land within a day of each other.
   // Progressive, one body of one chart per tick — twelve steps total —
   // so the year-wide scan (about a second per chart) never blocks
-  // render. "Now" is fixed for the life of this view; there is no
-  // per-instant targeting here yet, unlike the solo lifecycle panel.
-  const jdNow = $synUseMemo(() => dateToJD(new Date()), []);
+  // render. Targetable the same way the solo lifecycle panel is: "now"
+  // keeps ticking, or an arbitrary date re-centers both charts' scans
+  // on that day (noon UTC).
+  const mutualNow = useNow(60000);
+  const [mutualTargetDate, setMutualTargetDate] = $synUseState(null);
+  const mutualTarget = mutualTargetDate ? new Date(`${mutualTargetDate}T12:00:00Z`) : mutualNow;
+  const jdTarget = dateToJD(mutualTarget);
   const [mutualHits, setMutualHits] = $synUseState(null);
+  // Bucketed to a 30-day window of the target, same as the solo panel's
+  // perfections scan — so "now" ticking every minute doesn't retrigger
+  // the twelve-step scan, only crossing into a new window does.
+  const mutualScanKey = `${chartA.jd}:${chartB.jd}:${Math.round(jdTarget / 30)}`;
   $synUseEffect(() => {
     let alive = true;
     setMutualHits(null);
+    const centre = jdTarget;
     const bodies = ["Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
     const steps = bodies.map((b) => ["A", b]).concat(bodies.map((b) => ["B", b]));
     const hitsA = [], hitsB = [];
@@ -39,24 +48,27 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
         return;
       }
       const [who, body] = steps[i];
-      const hits = transitPerfections(who === "A" ? chartA : chartB, jdNow, 366, [body]).hits;
+      const hits = transitPerfections(who === "A" ? chartA : chartB, centre, 366, [body]).hits;
       (who === "A" ? hitsA : hitsB).push(...hits);
       setTimeout(() => runStep(i + 1), 0);
     };
     const timer = setTimeout(() => runStep(0), 0);
     return () => { alive = false; clearTimeout(timer); };
-  }, [chartA.jd, chartB.jd, jdNow]);
+  }, [mutualScanKey]);
 
-  // The dozen nearest "now", restored to chronological order for display
-  // — same two-step sort the solo lifecycle panel's perfections use.
+  // The dozen nearest the target, restored to chronological order for
+  // display — same two-step sort the solo lifecycle panel's perfections use.
   const mutualRows = $synUseMemo(() => {
     if (!mutualHits) return null;
     return mutualHits
-      .map((m) => ({ ...m, dNow: m.jd - jdNow }))
-      .sort((x, y) => Math.abs(x.dNow) - Math.abs(y.dNow))
+      .map((m) => ({ ...m, dTarget: m.jd - jdTarget }))
+      .sort((x, y) => Math.abs(x.dTarget) - Math.abs(y.dTarget))
       .slice(0, 12)
       .sort((x, y) => x.jd - y.jd);
-  }, [mutualHits, jdNow]);
+  }, [mutualHits, jdTarget]);
+  const mutualTargetLabel = mutualTargetDate
+    ? mutualTarget.toLocaleDateString(undefined, { dateStyle: "medium" })
+    : "now";
 
   // Voice the overview
   const voice = useVoice({
@@ -249,18 +261,37 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
           other chart — this only asks whether two already-exact facts
           happen to land close in time. */}
       <div className="syn-ctm">
-        <h3 className="syn-panel-h">Mutual activations · the sky within a day of both charts</h3>
+        <div className="cl-head">
+          <h3 className="syn-panel-h">Mutual activations · the sky within a day of both charts</h3>
+          <div className="cl-target">
+            <button
+              className={`cl-target-btn ${mutualTargetDate === null ? "is-on" : ""}`}
+              onClick={() => setMutualTargetDate(null)}
+              type="button"
+            >now</button>
+            <input
+              className="cl-target-date"
+              type="date"
+              aria-label="target date — scan both charts' skies around this day"
+              value={mutualTargetDate || ""}
+              onChange={(e) => setMutualTargetDate(e.target.value || null)}
+            />
+            <span className="cl-now">{mutualTargetDate
+              ? mutualTargetLabel
+              : mutualNow.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
+          </div>
+        </div>
         <p className="syn-ctm-note syn-mutual-note">
-          Two independent scans of the year around now — the same exact perfection timeline each
+          Two independent scans of the year around {mutualTargetLabel} — the same exact perfection timeline each
           chart has on its own — compared for dates within a day of each other. This is common, not
           rare: two unrelated charts still land a mutual hit roughly a dozen times a year by pure
           chance, so treat closeness in time as suggestive at best, never as evidence the sky is
           doing something to the relationship.
         </p>
         {!mutualRows ? (
-          <div className="cl-row"><span className="l">scanning the year around now for both charts…</span></div>
+          <div className="cl-row"><span className="l">scanning the year around {mutualTargetLabel} for both charts…</span></div>
         ) : mutualRows.length === 0 ? (
-          <div className="cl-row"><span className="l">no mutual activations within a day, this year</span></div>
+          <div className="cl-row"><span className="l">no mutual activations within a day, across the year around {mutualTargetLabel}</span></div>
         ) : (
           <table className="tp-table">
             <thead>
