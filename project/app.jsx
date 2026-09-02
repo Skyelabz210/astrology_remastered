@@ -325,7 +325,7 @@ function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOp
 function Spread({ settings, setTweak, t, dstNote, onBack }) {
   const { banners, pushError, dismiss } = useErrorBanner();
 
-  // Natal computation — runs through Mayan CRT substrate every time.
+  // Natal computation — runs the exact-arcsecond substrate every time.
   const chart = $useMemo(() => {
     try {
       return computeNatal({
@@ -357,7 +357,12 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
   const [flipped, setFlipped] = $useState(null);
   const onFlip = (idx) => setFlipped(f => (f === idx ? null : idx));
 
-  const chartReading = useAgentChartReading(chart, settings.agentOn && !!chart);
+  // Captured once per view, not ticking — the same reason session.jsx's
+  // whole-chart narrative freezes "now" at mount: this grounds the
+  // agent's reading in lifecycleDigest's facts (age, returns in force,
+  // shared shadow lanes) without regenerating the reading every render.
+  const jdSpreadNow = $useMemo(() => (typeof dateToJD === "function" ? dateToJD(new Date()) : null), []);
+  const chartReading = useAgentChartReading(chart, settings.agentOn && !!chart, jdSpreadNow);
 
   if (!chart) {
     return (
