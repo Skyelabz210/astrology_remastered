@@ -69,6 +69,13 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
     return localReading.body.map(line => line.text).join(" ");
   }, [agent.text, localReading]);
 
+  // The instant "right now" means for this reading, captured ONCE at
+  // mount rather than ticking — the narrative below must stay
+  // byte-for-byte stable for the life of the session (voice-sync offsets
+  // are computed against it), the same reason it is keyed on the chart
+  // and nothing time-based.
+  const jdSessionNow = $sUseMemo(() => (typeof dateToJD === "function" ? dateToJD(new Date()) : null), []);
+
   // The whole-chart narrative. Rebuilt only when the chart itself changes:
   // it is the same piece from the first play to the last, so a re-render
   // must not hand the player a different object mid-reading.
@@ -80,6 +87,10 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   // this: composing the whole chart through the agent would mean twelve
   // sequential LLM round trips before the first word, and would send birth
   // data for cards the reader never asked about.
+  //
+  // `jdTarget` closes the piece with lifecycleDigest's facts about this
+  // session's "now" — the same reuse-not-refetch principle: nothing new is
+  // computed here that the Cylindrical Time panel doesn't already compute.
   const narrative = $sUseMemo(() => {
     if (typeof buildChartNarrative !== "function") return null;
     let agentTexts = null;
@@ -94,8 +105,8 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         } catch { /* cache shape changed — fall back to local text */ }
       });
     }
-    return buildChartNarrative(chart, { agentTexts });
-  }, [chart, order, agentOn, agent.text]);
+    return buildChartNarrative(chart, { agentTexts, jdTarget: jdSessionNow });
+  }, [chart, order, agentOn, agent.text, jdSessionNow]);
 
   // Where each narrative segment puts the deck. Segments that are not a
   // card (the opening, the closing) leave the current card alone.

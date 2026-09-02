@@ -262,6 +262,23 @@ function narrativeClosing(chart) {
   return lines.join(" ");
 }
 
+// The chart is not fixed at birth — the same arithmetic reaches forward.
+// This composes lifecycleDigest's (time.jsx) already-computed facts about
+// ONE target instant (age, which return is in force, which bodies share
+// their natal shadow lane) into the same plain-sentence register the
+// opening and closing use. It computes nothing of its own — reusing the
+// identical prose the Cylindrical Time panel shows in table form, so the
+// spoken reading and the panel never say two different things about the
+// same moment. Requires time.jsx's lifecycleDigest to be loaded; returns
+// "" (and buildChartNarrative adds no segment) when it is not, or when no
+// jdTarget is given — this stays fully opt-in.
+function narrativeLifecycle(chart, jdTarget) {
+  if (!chart || typeof lifecycleDigest !== "function" || !Number.isFinite(jdTarget)) return "";
+  const digest = lifecycleDigest(chart, jdTarget);
+  if (!digest || !Array.isArray(digest.lines) || digest.lines.length === 0) return "";
+  return digest.lines.join(" ");
+}
+
 // ── assembly ──────────────────────────────────────────────────────────
 
 /**
@@ -272,11 +289,18 @@ function narrativeClosing(chart) {
  * sentences for that card, so turning the Agent interpreter on upgrades the
  * narration in place instead of switching to a different playback path.
  *
+ * `jdTarget` optionally names the instant "right now" means. When given, one
+ * extra segment closes the piece: the same lifecycleDigest facts the
+ * Cylindrical Time panel shows in tables (age, return status, shared shadow
+ * lanes), read as prose. Omitted (the default), the narrative is exactly
+ * the birth chart with no live-time dependency, as it always was — every
+ * existing caller that does not pass it sees byte-identical output.
+ *
  * Returns `{ text, segments }`. Every segment carries `{ index, kind,
  * cardIdx, title, text, start, end }` where `[start, end)` is its character
  * range inside `text` — the ranges playback syncs the deck against.
  */
-function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n" } = {}) {
+function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarget = null } = {}) {
   if (!chart || !Array.isArray(chart.cards)) return { text: "", segments: [] };
   const order = (typeof deckOrder === "function") ? deckOrder(chart) : chart.cards.map((_, i) => i);
 
@@ -296,6 +320,11 @@ function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n" } = {})
   });
 
   raw.push({ kind: "closing", cardIdx: null, title: "The whole", text: narrativeClosing(chart) });
+
+  if (Number.isFinite(jdTarget)) {
+    const lifecycleText = narrativeLifecycle(chart, jdTarget);
+    if (lifecycleText) raw.push({ kind: "lifecycle", cardIdx: null, title: "Right now", text: lifecycleText });
+  }
 
   // Character ranges are assigned against the SAME joiner the text is built
   // with, so an offset always indexes the string that is actually spoken.
@@ -385,6 +414,7 @@ Object.assign(window, {
   narrativeForCard,
   narrativeOpening,
   narrativeClosing,
+  narrativeLifecycle,
   chunkNarrative,
   segmentTimingsFromAlignment,
   segmentTimingsFromDuration,
