@@ -2425,6 +2425,10 @@ body::before {
   border-radius: 999px;
   color: var(--ink-2);
 }
+.syn-mutual-note {
+  max-width: 70ch;
+  margin-bottom: 14px;
+}
 
 /* ============================================================
    WP-19: input validation & visible errors

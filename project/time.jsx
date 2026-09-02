@@ -492,6 +492,52 @@ function lifecycleDigest(natal, jdTarget) {
   return { ageYears: ctm.ageYears, ageDays: ctm.ageDays, lines };
 }
 
+// ─────────────────── Mutual perfections ───────────────────
+//
+// Everything above addresses one subject's own lifecycle. This is the
+// same "evolving image" idea extended to two: two INDEPENDENT exact
+// scans (transitPerfections, run once per natal chart, unmodified) are
+// merged for the moments where the sky strikes both charts within days
+// of each other. Neither scan is told about the other chart — this
+// function only asks whether two already-exact, already-verified facts
+// happen to land close in time. That coincidence is real and rare (see
+// the test suite for the base rate), but it is a calendar fact about two
+// independent timelines, not a claim that the sky "does" anything to a
+// relationship.
+// "Within a day" — the threshold two independent perfection instants must
+// fall inside to count as a mutual activation. Chosen, not derived: it is
+// the plain reading of "the same day," and it is NOT rare — at this
+// threshold two unrelated charts still land a mutual hit roughly a dozen
+// times a year by pure chance (measured empirically across sample chart
+// pairs), which the UI states rather than hides.
+const MUTUAL_SAME_DAY_WINDOW = 0.5;
+
+function mergeNearPerfections(hitsA, hitsB, nearDays = MUTUAL_SAME_DAY_WINDOW) {
+  const mutual = [];
+  for (const ha of hitsA) {
+    for (const hb of hitsB) {
+      const gapDays = hb.jd - ha.jd;
+      if (Math.abs(gapDays) <= nearDays) {
+        mutual.push({ a: ha, b: hb, gapDays, jd: (ha.jd + hb.jd) / 2 });
+      }
+    }
+  }
+  mutual.sort((x, y) => x.jd - y.jd);
+  return mutual;
+}
+
+/** Convenience wrapper: scans both charts and merges in one call. Mostly
+ *  for tests and any caller that does not need the two scans separately;
+ *  the UI runs the two transitPerfections scans progressively (the same
+ *  per-body chunking the solo lifecycle panel already uses) and calls
+ *  mergeNearPerfections once both are done, rather than paying for two
+ *  full year-wide scans inside one synchronous call. */
+function mutualPerfections(natalA, natalB, jdCenter, spanDays = 366, nearDays = MUTUAL_SAME_DAY_WINDOW) {
+  const hitsA = transitPerfections(natalA, jdCenter, spanDays).hits;
+  const hitsB = transitPerfections(natalB, jdCenter, spanDays).hits;
+  return mergeNearPerfections(hitsA, hitsB, nearDays);
+}
+
 // Expose
 isRetrograde; // silence linter: relies on astro.jsx globals
 Object.assign(window, {
@@ -501,4 +547,5 @@ Object.assign(window, {
   tcoPhase, tcoPeriod, phaseSyndrome,
   ctmState, currentTransits, progressedAt, windingLift, transitPerfections,
   RETURN_BODIES, nearestBodyReturns, returnChart, lifecycleDigest,
+  mergeNearPerfections, mutualPerfections, MUTUAL_SAME_DAY_WINDOW,
 });
