@@ -40,6 +40,43 @@ function LiveStatePanel({ chart }) {
     };
   }, [target.getTime() - (target.getTime() % 60000), chart.jd]);
 
+  // Perfections: a year-wide scan of the real ephemeris, so it runs OFF the
+  // render path — one transiting body per tick, accumulated into state.
+  // Keyed to a 30-day block of the target so scrubbing nearby dates reuses
+  // the same window instead of rescanning; the day offsets shown are
+  // re-derived from the live target at render time.
+  const perfKey = `${chart.jd}:${Math.round(data.jdT / 30)}`;
+  const [perf, setPerf] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    setPerf(null);
+    const centre = data.jdT;
+    const bodies = ["Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
+    const acc = [];
+    const runBody = (i) => {
+      if (!alive) return;
+      if (i >= bodies.length) {
+        acc.sort((a, b) => a.jd - b.jd);
+        setPerf({ hits: acc });
+        return;
+      }
+      acc.push(...transitPerfections(chart, centre, 366, [bodies[i]]).hits);
+      setTimeout(() => runBody(i + 1), 0);
+    };
+    const t = setTimeout(() => runBody(0), 0);
+    return () => { alive = false; clearTimeout(t); };
+  }, [perfKey]);
+
+  // The sixteen perfections nearest the live target, in calendar order.
+  const perfRows = React.useMemo(() => {
+    if (!perf) return null;
+    return perf.hits
+      .map((h) => ({ ...h, dDays: h.jd - data.jdT }))
+      .sort((a, b) => Math.abs(a.dDays) - Math.abs(b.dDays))
+      .slice(0, 16)
+      .sort((a, b) => a.jd - b.jd);
+  }, [perf, data.jdT]);
+
   // Secondary progressions at current age
   const prog = React.useMemo(
     () => progressedAt(chart.jd, data.ctm.ageYears),
@@ -132,6 +169,41 @@ function LiveStatePanel({ chart }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="cl-card cl-card-wide">
+        <h4>Perfections · the road behind and ahead</h4>
+        <p className="cl-note">
+          The exact instants the slow sky strikes this chart, inside the year around the target —
+          each date is when the aspect actually perfects, found on the full ephemeris and refined to
+          the second. A retrograde loop that crosses, backs over, and re-crosses a natal point
+          reports all three passes. A body's conjunction to its own natal place is its return.
+        </p>
+        {!perfRows ? (
+          <div className="cl-row"><span className="l">charting the year around the target…</span></div>
+        ) : perfRows.length === 0 ? (
+          <div className="cl-row"><span className="l">no perfections from the slow bodies in this window</span></div>
+        ) : (
+          <table className="tp-table">
+            <thead>
+              <tr><th>date</th><th>transit</th><th>aspect</th><th>natal</th><th className="num">from target</th></tr>
+            </thead>
+            <tbody>
+              {perfRows.map((h, i) => (
+                <tr key={i} className={Math.abs(h.dDays) < 7 ? "is-near" : ""}>
+                  <td>{h.dateISO.slice(0, 10)}</td>
+                  <td><span className="pl-gl">{h.transitGlyph}</span> {h.transit}{h.retrograde ? " ℞" : ""}</td>
+                  <td>{h.aspect}</td>
+                  <td><span className="pl-gl">{h.natalGlyph}</span> {h.natal}</td>
+                  <td className="num">{h.dDays >= 0 ? "+" : ""}{Math.round(h.dDays)} d</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {perf && perf.hits.length > 16 && (
+          <div className="cl-row"><span className="l">{perf.hits.length} perfections in the full year — the sixteen nearest the target are shown</span></div>
+        )}
       </div>
 
       <div className="cl-card cl-card-wide">

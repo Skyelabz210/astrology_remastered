@@ -2043,6 +2043,7 @@ body::before {
   border-radius: 6px;
   color-scheme: dark;
 }
+.tp-table tr.is-near td { color: var(--ink); }
 .cl-note {
   font-family: var(--sans);
   font-size: 12px;
