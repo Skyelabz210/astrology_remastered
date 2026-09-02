@@ -296,11 +296,23 @@ function narrativeLifecycle(chart, jdTarget) {
  * the birth chart with no live-time dependency, as it always was — every
  * existing caller that does not pass it sees byte-identical output.
  *
+ * `lifecycleText`, when given (even ""), is used verbatim for that segment
+ * INSTEAD of computing it from `jdTarget` — for a caller that recomposes the
+ * narrative on every render for reasons unrelated to the target instant
+ * (session.jsx rebuilds it whenever the Agent interpreter's text for the
+ * on-screen card changes) and would otherwise re-run lifecycleDigest's
+ * ephemeris-backed return casts on every one of those reruns. Compute it
+ * once, in a memo keyed only on the chart and the target, and pass the
+ * string here; `jdTarget` stays the direct, self-contained way to ask for
+ * the same segment when recomputing it every call is cheap enough (as it is
+ * for a one-off call, a test, or any caller whose own memo already keys on
+ * exactly `[chart, jdTarget]`).
+ *
  * Returns `{ text, segments }`. Every segment carries `{ index, kind,
  * cardIdx, title, text, start, end }` where `[start, end)` is its character
  * range inside `text` — the ranges playback syncs the deck against.
  */
-function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarget = null } = {}) {
+function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarget = null, lifecycleText = null } = {}) {
   if (!chart || !Array.isArray(chart.cards)) return { text: "", segments: [] };
   const order = (typeof deckOrder === "function") ? deckOrder(chart) : chart.cards.map((_, i) => i);
 
@@ -321,10 +333,10 @@ function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarg
 
   raw.push({ kind: "closing", cardIdx: null, title: "The whole", text: narrativeClosing(chart) });
 
-  if (Number.isFinite(jdTarget)) {
-    const lifecycleText = narrativeLifecycle(chart, jdTarget);
-    if (lifecycleText) raw.push({ kind: "lifecycle", cardIdx: null, title: "Right now", text: lifecycleText });
-  }
+  const resolvedLifecycleText = lifecycleText != null
+    ? lifecycleText
+    : (Number.isFinite(jdTarget) ? narrativeLifecycle(chart, jdTarget) : "");
+  if (resolvedLifecycleText) raw.push({ kind: "lifecycle", cardIdx: null, title: "Right now", text: resolvedLifecycleText });
 
   // Character ranges are assigned against the SAME joiner the text is built
   // with, so an offset always indexes the string that is actually spoken.

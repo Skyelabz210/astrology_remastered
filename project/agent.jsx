@@ -257,13 +257,19 @@ function receptionFor(chart, name) {
 // lane — given to the model as additional substrate, not asked for as a
 // prediction. Omitted (the default), the prompt is exactly the birth
 // chart with no live-time dependency, as it always was.
-function buildChartPrompt(chart, jdTarget = null) {
+//
+// `precomputedDigest`, when given (even `null`, meaning "computed, and
+// there is nothing to say"), is used instead of calling lifecycleDigest
+// here — interpretChart already has to compute it to derive its cache
+// key, so this avoids computing it a second time for the same call.
+function buildChartPrompt(chart, jdTarget = null, precomputedDigest = undefined) {
   const planets = chart.planets.map(p =>
     `${p.name}${p.retrograde ? "℞" : ""} ${p.lon.toFixed(2)}° (sign ${p.sign}, H${p.house}, dign ${p.dignity.kind} ${p.dignity.score >= 0 ? "+" : ""}${p.dignity.score}, r₁₁=${p.residues.r11}, r₁₃=${p.residues.r13})`
   ).join("\n  ");
-  const lifecycleLines = Number.isFinite(jdTarget) && typeof lifecycleDigest === "function"
-    ? lifecycleDigest(chart, jdTarget).lines
-    : null;
+  const digest = precomputedDigest !== undefined
+    ? precomputedDigest
+    : (Number.isFinite(jdTarget) && typeof lifecycleDigest === "function" ? lifecycleDigest(chart, jdTarget) : null);
+  const lifecycleLines = digest ? digest.lines : null;
   return [
     `You are a literal interpreter for an astrology engine. The math has run; you translate the numbers into their astrological reading. Nothing more.`,
     ``,
@@ -353,22 +359,41 @@ async function interpretCard(card, chart) {
 
 async function interpretChart(chart, jdTarget = null) {
   requireAgent();
-  // Day-bucketed, not the raw jdTarget: cache entries survive a reload
-  // (persistReadings) and "now" always differs by a few seconds from the
-  // last page view, which would otherwise cache-miss every single time.
-  // Crossing an actual day IS a genuine cache miss — the digest itself is
-  // day-granularity (dates, not times) — so this regenerates exactly when
-  // the underlying facts could have changed, no more often.
-  const bucket = Number.isFinite(jdTarget) ? Math.floor(jdTarget) : "none";
-  const key = "chart:" + chart.jd.toFixed(3) + ":" + chart.birth.lat + ":" + chart.birth.lng + ":" + bucket;
-  if (__cache.has(key)) return __cache.get(key);
+  // The key's lifecycle component is derived from the DIGEST'S OWN
+  // content, not from a day bucket: lifecycleDigest is not day-granular
+  // — a shared shadow lane can flip within hours, a return can begin
+  // intraday, and the lived-day count itself changes at the birth
+  // time-of-day boundary, not at midnight. A day-bucketed key served a
+  // stale RIGHT NOW statement for however many hours were left in that
+  // bucket after the facts actually changed (caught by a Codex review on
+  // the PR that introduced the day-bucket). Deriving the key from the
+  // computed lines instead means it changes exactly when what the prompt
+  // would say changes, and — usefully — stays stable across calls whose
+  // facts happen to be identical even at different exact instants, which
+  // is MORE cache-friendly than day-bucketing, not less.
+  const digest = Number.isFinite(jdTarget) && typeof lifecycleDigest === "function"
+    ? lifecycleDigest(chart, jdTarget)
+    : null;
+  const fingerprint = digest ? digest.lines.join("|") : "none";
+  // The chart alone, without the lifecycle fingerprint — a stable pointer
+  // to "whatever synthesis this chart most recently had," kept alongside
+  // the fingerprinted entry so buildReadingMarkdown's export can find it
+  // without needing to know which exact jdTarget produced it.
+  const chartIdentity = "chart:" + chart.jd.toFixed(3) + ":" + chart.birth.lat + ":" + chart.birth.lng;
+  const key = chartIdentity + ":" + fingerprint;
+  if (__cache.has(key)) {
+    const cached = __cache.get(key);
+    remember(chartIdentity + ":latest", cached);
+    return cached;
+  }
   if (__pending.has(key)) return __pending.get(key);
-  const prompt = buildChartPrompt(chart, jdTarget);
+  const prompt = buildChartPrompt(chart, jdTarget, digest);
   const promise = (async () => {
     try {
       const text = await window.claude.complete(prompt);
       const clean = stripMd((text || "").trim());
       remember(key, clean);
+      remember(chartIdentity + ":latest", clean);
       __pending.delete(key);
       return clean;
     } catch (err) {
@@ -600,7 +625,11 @@ function buildReadingMarkdown(chart, cards) {
     }
   });
 
-  const chartKey = "chart:" + chart.jd.toFixed(3) + ":" + b.lat + ":" + b.lng;
+  // ":latest" — not the fingerprinted key interpretChart actually caches
+  // under (that depends on a jdTarget this function is never given) —
+  // interpretChart keeps this pointer updated to whatever it most
+  // recently resolved for this exact chart, fingerprint aside.
+  const chartKey = "chart:" + chart.jd.toFixed(3) + ":" + b.lat + ":" + b.lng + ":latest";
   const synthesis = __cache.get(chartKey);
   if (synthesis) {
     lines.push("", "## The chart as one", "", synthesis);

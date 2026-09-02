@@ -122,8 +122,13 @@ export async function run() {
       `${calls.complete.length} interpreter calls`);
     t("the provenance count is honest", md.includes("1 of 2 readings are agent-interpreted"));
 
-    // chart-level synthesis rides along when it exists
-    sandbox.remember("chart:2444534.397:35.1408:-79.0058", "One life, reading as one chart.");
+    // chart-level synthesis rides along when it exists. Keyed ":latest" —
+    // not the fingerprinted key interpretChart actually caches a live
+    // reading under (see agent-lifecycle.test.js) — because
+    // buildReadingMarkdown is never given a jdTarget to reconstruct that
+    // fingerprint from; it looks up interpretChart's own "most recently
+    // resolved for this chart" pointer instead.
+    sandbox.remember("chart:2444534.397:35.1408:-79.0058:latest", "One life, reading as one chart.");
     const md2 = sandbox.buildReadingMarkdown(chart, cards);
     t("the chart-level synthesis is included when cached",
       md2.includes("## The chart as one") && md2.includes("One life, reading as one chart."));
