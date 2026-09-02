@@ -119,14 +119,31 @@ export async function run() {
   t("away from birth, the 2026 target is free to carry the shared-lane sentence or not, honestly",
     typeof seg.text === "string");
 
-  // ── an unknown birth time does not crash the lifecycle segment ───────
+  // ── an unknown birth time does not crash the lifecycle segment, and
+  //    withholds the shadow-lane sentence specifically ───────────────────
   // (windingLift/returnChart/ctmState read only .jd and planet longitudes
-  // — none of the lifecycle facts depend on houses or the angles.)
+  // — none of the lifecycle facts depend on houses or the angles, so the
+  // segment itself still forms. But lifecycleDigest's shadow-lane sentence
+  // is an ARCSECOND-level residue that an assumed-noon birth time scrambles
+  // rather than merely blurs — see time.jsx's lifecycleDigest — so it must
+  // be absent here specifically, not just "some text or other.")
+  // Positive control first: `seg` (this same chart+jdNow, declared above)
+  // already carries a real shadow-lane sentence (Mars and Saturn, at this
+  // target) — confirming the check below suppresses a real fact, not the
+  // absence of one that was never going to appear anyway.
+  t("sanity: the known-time chart's segment at this target carries a real shadow-lane sentence to suppress",
+    /shadow lane/i.test(seg.text), seg.text);
   const unknownChart = computeNatal({ dateISO: "1980-10-21T21:31:00Z", lat: 35.1408, lng: -79.0058, houseSystem: "whole", timeUnknown: true });
   const withUnknownTime = buildChartNarrative(unknownChart, { jdTarget: jdNow, progressionsText: "" });
   const segUnknown = withUnknownTime.segments[withUnknownTime.segments.length - 1];
   t("an unknown-birth-time chart still gets a well-formed lifecycle segment",
     !!segUnknown && segUnknown.kind === "lifecycle" && segUnknown.text.length > 20, segUnknown && segUnknown.text);
+  t("...but the shadow-lane sentence is withheld from it, unlike the known-time chart at the same target",
+    !/shadow lane/i.test(segUnknown.text), segUnknown.text);
+  t("the age line is still present in the unknown-time segment (only the arcsecond-sensitive sentence is withheld)",
+    /years into the chart's history/.test(segUnknown.text), segUnknown.text);
+  t("return-status lines are still present in the unknown-time segment",
+    /return/i.test(segUnknown.text), segUnknown.text);
 
   // ── degenerate input still behaves as documented ─────────────────────
   // (A cardless chart is otherwise-unrealistic — computeNatal never

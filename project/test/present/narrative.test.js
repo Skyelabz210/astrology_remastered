@@ -55,7 +55,9 @@ const SIGNS = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo",
 /**
  * A chart of the shape astro.jsx's computeNatal() returns, populated far
  * enough for every branch of the composer: twelve cards, a principal body
- * on each, dignities, one aspect, retrogradation, the shadow lane, plus the
+ * on each, dignities, one aspect, retrogradation, the shadow lane (both the
+ * per-card residue AND, via matching residues on chart.planets, the
+ * closing's cross-body pairing and lane-zero closure), plus the
  * chart-level fields the opening and closing read (sect, phase, shape,
  * element balance, stelliums, void-of-course).
  */
@@ -85,7 +87,7 @@ function makeChart({ timeUnknown = false } = {}) {
     timeUnknown,
     ascSignIdx: 4,
     isDayChart: true,
-    planets: cards.map(c => ({ name: c.principal.name, sign: c.principal.sign })),
+    planets: cards.map(c => ({ name: c.principal.name, sign: c.principal.sign, residues: c.principal.residues })),
     phase: { phase: "Waxing Gibbous", illumination: 0.8, elongDeg: 130 },
     shape: { shape: "Bowl", occupiedArcDeg: 172.4, largestGapDeg: 187.6 },
     elementCount: { Fire: 4, Earth: 3, Air: 3, Water: 2 },
@@ -158,6 +160,23 @@ export function run() {
     /\bwas rising\b/i.test(n.text));
   t("sect is stated on both, since it needs no birth time",
     /day chart/i.test(n.text) && /day chart/i.test(unknown.text));
+
+  // The closing's two shadow-lane facts (a shared-lane pairing, a lane-zero
+  // closure) are r11 residues — the same ARCSECOND-level precision the
+  // houses and Ascendant depend on — so they follow the identical gate.
+  // makeChart()'s Sun (i=0) and NorthNode (i=11) both land on r11=0,
+  // guaranteeing both a pairing and a closure to find in the positive
+  // control. Found via this file's own Playwright verification of the
+  // sibling timeUnknown fix in time.jsx's digests, not by a bot review —
+  // the same class of bug, in a third place it hadn't been checked yet.
+  t("a known-time narrative DOES carry the shared eleventh-lane pairing sentence",
+    /in the eleventh lane/i.test(n.text), n.text);
+  t("a known-time narrative DOES carry the lane-zero closure sentence",
+    /lane zero/i.test(n.text), n.text);
+  t("an unknown-time narrative withholds the shared eleventh-lane pairing sentence",
+    !/in the eleventh lane/i.test(unknown.text), unknown.text);
+  t("an unknown-time narrative withholds the lane-zero closure sentence",
+    !/lane zero/i.test(unknown.text), unknown.text);
 
   // ── content actually derived from the chart, not boilerplate ─────────
   t("the opening names the birth date and place",

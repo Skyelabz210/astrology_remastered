@@ -93,6 +93,27 @@ export async function run() {
   t("no chart yields an empty string", narrativeProgressions(null, jdNow) === "");
   t("a real chart and target yields real prose", narrativeProgressions(chart, jdNow).length > 20);
 
+  // ── an unknown birth time collapses the segment to just the caveat ─────
+  // (Codex review: the Moon moves ~13°/day, so an assumed-noon birth time
+  // is not merely imprecise here, it can flip which sign or phase gets
+  // reported as settled fact. progressionsDigest already withholds every
+  // fact line for timeUnknown charts — see progressions-digest.test.js —
+  // this pins that the narrative segment built from it reflects exactly
+  // that: the caveat sentence, and nothing else.)
+  t("sanity: the known-time chart's segment at this target carries the real Moon-sign fact being withheld below",
+    seg.text.includes("the Moon has reached"), seg.text);
+  const unknownChart = computeNatal({ dateISO: "1980-10-21T21:31:00Z", lat: 35.1408, lng: -79.0058, houseSystem: "whole", timeUnknown: true });
+  const withUnknownTime = buildChartNarrative(unknownChart, { jdTarget: jdNow, lifecycleText: "" });
+  const segUnknown = withUnknownTime.segments[withUnknownTime.segments.length - 1];
+  t("an unknown-birth-time chart still gets a well-formed progressions segment",
+    !!segUnknown && segUnknown.kind === "progressions" && segUnknown.text.length > 20, segUnknown && segUnknown.text);
+  t("...but it carries the caveat explaining why, not a Moon-sign fact",
+    /birth time is unknown/i.test(segUnknown.text) && !segUnknown.text.includes("the Moon has reached"),
+    segUnknown.text);
+  t("...and no sign-change or phase language leaks through either",
+    !segUnknown.text.includes("has moved from") && !segUnknown.text.includes("relationship"),
+    segUnknown.text);
+
   // ── progressionsText: a precomputed string, used verbatim ──────────────
   const precomputed = narrativeProgressions(chart, jdNow);
   const withText = buildChartNarrative(chart, { progressionsText: precomputed });

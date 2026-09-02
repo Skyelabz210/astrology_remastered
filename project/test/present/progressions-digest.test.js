@@ -106,6 +106,44 @@ export async function run() {
     !/\brare\b|\bcommon\b|\bfrequently\b|\bmilestone\b|\bunusual\b|\bevery \d/.test(allText),
     allText);
 
+  // ── an unknown birth time withholds every progressed fact, not just
+  //    some of them ──
+  // (Codex review: the Moon moves ~13°/day, so an assumed-noon birth time
+  // uncertain by hours is enough to flip its progressed sign or the
+  // progressed Sun-Moon phase relationship — these lines would otherwise
+  // report exactly that uncertain instant as settled fact. Unlike
+  // lifecycleDigest's shadow-lane sentence, EVERY fact this function
+  // produces traces back to the Moon or to exact longitudes at the
+  // progressed instant, so there is no partial fact left safe to keep —
+  // the whole digest collapses to one explanatory line, for any target.)
+  {
+    // Positive control: `d` (declared above, same chart+jdNow) already
+    // carries real progressed content — the Moon-sign line at minimum —
+    // confirming the unknown-time check below suppresses a real fact
+    // rather than one that was never going to appear anyway.
+    t("sanity: the known-time chart's digest at this target carries real progressed content to suppress",
+      d.lines.some((l) => l.includes("the Moon has reached")), d.lines.join(" | "));
+
+    const unknownChart = { ...chart, timeUnknown: true };
+    for (const jdOffset of [jdNow, chart.jd, chart.jd + 45 * 365.25]) {
+      const dUnknown = sb.progressionsDigest(unknownChart, jdOffset);
+      t(`timeUnknown: exactly one line (the caveat), no fact lines, at jd=${jdOffset.toFixed(1)}`,
+        dUnknown.lines.length === 1, dUnknown.lines.join(" | "));
+      t(`timeUnknown: the caveat explains why, at jd=${jdOffset.toFixed(1)}`,
+        /birth time is unknown/i.test(dUnknown.lines[0]), dUnknown.lines[0]);
+      t(`timeUnknown: no Moon-sign fact leaks through, at jd=${jdOffset.toFixed(1)}`,
+        !dUnknown.lines.some((l) => l.includes("the Moon has reached")));
+      t(`timeUnknown: no sign-change fact leaks through, at jd=${jdOffset.toFixed(1)}`,
+        !dUnknown.lines.some((l) => l.includes("has moved from")));
+      t(`timeUnknown: no phase fact leaks through, at jd=${jdOffset.toFixed(1)}`,
+        !dUnknown.lines.some((l) => l.includes("relationship")));
+      t(`timeUnknown: ageYears is still computed (not itself withheld), at jd=${jdOffset.toFixed(1)}`,
+        Math.abs(dUnknown.ageYears - (jdOffset - chart.jd) / 365.25) < 1e-9);
+      t(`timeUnknown: progressedJd is still finite (not itself withheld), at jd=${jdOffset.toFixed(1)}`,
+        Number.isFinite(dUnknown.progressedJd));
+    }
+  }
+
   // ── degenerate inputs do not crash ──
   t("a null chart does not throw",
     (() => { try { sb.progressionsDigest(null, jdNow); return false; } catch { return true; } })());

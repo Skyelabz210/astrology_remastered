@@ -246,16 +246,28 @@ function narrativeClosing(chart) {
   // The substrate's own two closing facts — both computed from this chart's
   // actual arcseconds, both stated as coincidences rather than aspects, per
   // CLAIM_BOUNDARY: no meaning is asserted that the arithmetic doesn't carry.
-  const contacts = shadowLaneContacts(chart);
-  if (contacts.length > 0) {
-    const c = contacts[0];
-    const others = contacts.length - 1;
-    lines.push(`In the eleventh lane, ${c.a} and ${c.b} fall together — lane ${c.lane}, ${nLaneName(c.lane)}${others > 0 ? `, with ${others} more such ${others === 1 ? "pairing" : "pairings"} behind it` : ""}. That is a substrate coincidence, not a classical aspect — most charts carry several — but it is a correspondence the traditional reading has no name for.`);
-  }
-  const closures = (chart.planets || []).filter(p => SHADOW_CONTACT_BODIES.includes(p.name) && p.residues && p.residues.r11 === 0);
-  if (closures.length > 0) {
-    const names = closures.map(p => p.name).join(" and ");
-    lines.push(`${names} ${closures.length === 1 ? "sits" : "sit"} at lane zero — the shadow lane's closure point, a property of the exact arcsecond, not of the sign.`);
+  //
+  // Both are withheld entirely on an unknown-birth-time chart, for the same
+  // reason time.jsx's lifecycleDigest withholds its own shared-lane sentence
+  // (found via this file's own Playwright verification, the same class of
+  // bug a Codex review had already caught twice in the sibling digests):
+  // r11 is an ARCSECOND-level residue, and an assumed noon uncertain by
+  // hours does not blur a fast body's residue, it scrambles it. Slow bodies
+  // would stay meaningful even then, but this follows the houses/Ascendant
+  // precedent's all-or-nothing shape (this file's header) rather than
+  // filtering SHADOW_CONTACT_BODIES by speed.
+  if (!chart.timeUnknown) {
+    const contacts = shadowLaneContacts(chart);
+    if (contacts.length > 0) {
+      const c = contacts[0];
+      const others = contacts.length - 1;
+      lines.push(`In the eleventh lane, ${c.a} and ${c.b} fall together — lane ${c.lane}, ${nLaneName(c.lane)}${others > 0 ? `, with ${others} more such ${others === 1 ? "pairing" : "pairings"} behind it` : ""}. That is a substrate coincidence, not a classical aspect — most charts carry several — but it is a correspondence the traditional reading has no name for.`);
+    }
+    const closures = (chart.planets || []).filter(p => SHADOW_CONTACT_BODIES.includes(p.name) && p.residues && p.residues.r11 === 0);
+    if (closures.length > 0) {
+      const names = closures.map(p => p.name).join(" and ");
+      lines.push(`${names} ${closures.length === 1 ? "sits" : "sit"} at lane zero — the shadow lane's closure point, a property of the exact arcsecond, not of the sign.`);
+    }
   }
 
   lines.push("The classical reading is the reading. The eleventh lane only adds what it could never see.");
