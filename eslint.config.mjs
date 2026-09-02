@@ -184,7 +184,7 @@ const JSX_GLOBALS = {
   "narrativeForCard": "readonly", "narrativeLifecycle": "readonly", "narrativeOpening": "readonly", "nearestAspect": "readonly", "operatorClass": "readonly",
   "phaseSyndrome": "readonly", "pickBrowserVoice": "readonly", "planetDeclination": "readonly", "planetLongitude": "readonly",
   "planetSignifies": "readonly", "planetSpeed": "readonly", "playNarrationChunk": "readonly", "primeElevenAudio": "readonly",
-  "progressedAt": "readonly", "putCached": "readonly", "quadrantCuspsFor": "readonly", "rankVoice": "readonly", "readingFor": "readonly",
+  "progressedAt": "readonly", "progressionsDigest": "readonly", "putCached": "readonly", "quadrantCuspsFor": "readonly", "rankVoice": "readonly", "readingFor": "readonly",
   "realAngles": "readonly", "realEclipticLatitudeDeg": "readonly", "realEclipticLongitudeDeg": "readonly", "realPlanetSpeedDegPerDay": "readonly",
   "receptionFor": "readonly", "registerRow": "readonly", "renderNarrationChunk": "readonly", "requireCore": "readonly", "residues": "readonly",
   "residues8": "readonly", "resolveProvider": "readonly", "rigorousFor": "readonly", "roman": "readonly", "runAllSuites": "readonly",

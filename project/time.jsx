@@ -207,6 +207,52 @@ function progressedAt(natalJd, ageYears) {
   return { progressedJd, bodies };
 }
 
+// A digest over progressedAt, matching lifecycleDigest's register: the
+// same facts the progressions table already shows, read as prose. Two
+// things a raw longitude table doesn't say plainly — which body (if any)
+// has actually changed sign since birth, and what phase relationship the
+// progressed Sun and Moon now stand in (the same lunarPhase arithmetic
+// the birth chart itself carries, run forward at the progressed rate,
+// classically read as a life-phase marker over roughly a 29.5-YEAR
+// cycle, since the Moon's ~29.5-day synodic period is what "one day per
+// year" stretches into years). No frequency or rarity is asserted for
+// either fact — unlike the shadow-lane sentence's measured "about half
+// of all moments," this file has not measured how often a given body's
+// progressed sign changes across a lifetime, so it states what happened,
+// not how often it happens.
+function progressionsDigest(natal, jdTarget) {
+  const ageYears = (jdTarget - natal.jd) / 365.25;
+  const prog = progressedAt(natal.jd, ageYears);
+  const lines = [];
+
+  const progMoon = prog.bodies.find((b) => b.name === "Moon");
+  if (progMoon) {
+    lines.push(
+      `By secondary progression — one day of ephemeris motion standing for each year lived — the Moon has reached ${progMoon.signName}.`
+    );
+  }
+
+  const changed = prog.bodies.filter((b) => {
+    if (b.name === "Moon") return false;
+    const natalP = natal.planets.find((p) => p.name === b.name);
+    return natalP && b.sign !== natalP.sign;
+  });
+  for (const b of changed) {
+    const natalP = natal.planets.find((p) => p.name === b.name);
+    lines.push(`Since birth, the progressed ${b.name} has moved from ${ZODIAC[natalP.sign].name} into ${b.signName}.`);
+  }
+
+  const progSun = prog.bodies.find((b) => b.name === "Sun");
+  if (progSun && progMoon && typeof lunarPhase === "function") {
+    const phase = lunarPhase(progSun.lon, progMoon.lon);
+    lines.push(
+      `The progressed Sun and Moon stand in a ${phase.phase.toLowerCase()} relationship — the same lunar-phase arithmetic the birth chart itself carries, run forward at the progressed rate.`
+    );
+  }
+
+  return { ageYears, progressedJd: prog.progressedJd, lines };
+}
+
 // ─────────────────── The winding lift ───────────────────
 //
 // Address any point in the chart's lifecycle. For each body, two numbers
@@ -545,7 +591,7 @@ Object.assign(window, {
   TZOLKIN_SIGNS, HAAB_MONTHS,
   mayaLongCount, tzolkin, haab, calendarRound,
   tcoPhase, tcoPeriod, phaseSyndrome,
-  ctmState, currentTransits, progressedAt, windingLift, transitPerfections,
+  ctmState, currentTransits, progressedAt, progressionsDigest, windingLift, transitPerfections,
   RETURN_BODIES, nearestBodyReturns, returnChart, lifecycleDigest,
   mergeNearPerfections, mutualPerfections, MUTUAL_SAME_DAY_WINDOW,
 });

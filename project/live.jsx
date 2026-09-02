@@ -83,6 +83,15 @@ function LiveStatePanel({ chart }) {
     () => progressedAt(chart.jd, data.ctm.ageYears),
     [chart.jd, data.ctm.ageYears]
   );
+  // The same table, read as a lead-in sentence first — which body (if
+  // any) has actually changed sign since birth, and the progressed
+  // Sun-Moon phase relationship. Cheap (five planetLongitude calls, no
+  // ephemeris chart-casting), so recomputed plainly rather than needing
+  // the return-charts/perfections style of scan-avoidance memoization.
+  const progDigest = React.useMemo(
+    () => (typeof progressionsDigest === "function" ? progressionsDigest(chart, data.jdT) : null),
+    [chart, data.jdT]
+  );
 
   // Return charts: the Sun's and Moon's own natal-degree returns, cast in
   // full at the natal place. Cheap (two extra computeNatal calls, unlike
@@ -288,6 +297,9 @@ function LiveStatePanel({ chart }) {
 
       <div className="cl-card cl-card-wide">
         <h4>Secondary progressions at the target age (one day per year of life)</h4>
+        {progDigest && progDigest.lines.length > 0 && (
+          <p className="cl-note">{progDigest.lines.join(" ")}</p>
+        )}
         <table className="tp-table">
           <thead><tr><th>body</th><th className="num">progressed λ</th><th>sign</th><th className="num">natal λ</th><th className="num">Δ</th></tr></thead>
           <tbody>
