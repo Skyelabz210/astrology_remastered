@@ -130,6 +130,8 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
         </div>
       </div>
 
+      <FollowUpQuestions mode="synastry" syn={syn} agentOn={agentOn} />
+
       <div className="syn-grid">
         {/* cross-aspect grid */}
         <div className="syn-panel">

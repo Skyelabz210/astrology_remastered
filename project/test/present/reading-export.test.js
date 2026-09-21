@@ -128,7 +128,7 @@ export async function run() {
     // buildReadingMarkdown is never given a jdTarget to reconstruct that
     // fingerprint from; it looks up interpretChart's own "most recently
     // resolved for this chart" pointer instead.
-    sandbox.remember("chart:2444534.397:35.1408:-79.0058:latest", "One life, reading as one chart.");
+    sandbox.remember(`chart:${sandbox.chartIdentityKey(chart)}:latest`, "One life, reading as one chart.");
     const md2 = sandbox.buildReadingMarkdown(chart, cards);
     t("the chart-level synthesis is included when cached",
       md2.includes("## The chart as one") && md2.includes("One life, reading as one chart."));

@@ -297,6 +297,8 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
           onPick={i => { stopNarration(); setPos(i); }}
         />
       )}
+
+      {shuffled && <FollowUpQuestions mode="natal" chart={chart} agentOn={agentOn} />}
     </div>
   );
 }
