@@ -188,6 +188,163 @@ body::before {
   50%      { opacity: 1;   transform: scale(1.4); }
 }
 
+/* ------- agent follow-up questions --------- */
+.follow-up {
+  margin: 0 0 28px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: oklch(0.93 0.008 80 / 0.022);
+}
+.follow-up-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.follow-up-kicker,
+.follow-up-label,
+.follow-up-scope,
+.follow-up-question span,
+.follow-up-answer span,
+.follow-up-note,
+.follow-up-error {
+  font-family: var(--mono);
+}
+.follow-up-kicker {
+  color: var(--ink-dim);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.follow-up-title {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 500;
+}
+.follow-up-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 48%;
+  padding: 7px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.follow-up-scope-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 8px var(--ink);
+}
+.follow-up-turns {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.follow-up-turn {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(280px, 3fr);
+  gap: 18px;
+  padding: 15px 0;
+  border-top: 1px solid var(--line);
+}
+.follow-up-question,
+.follow-up-answer {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.55;
+}
+.follow-up-question span,
+.follow-up-answer span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ink-dim);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.follow-up-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.follow-up-compose {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+.follow-up-compose textarea {
+  min-height: 62px;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  outline: none;
+  background: oklch(0.15 0.008 70);
+  color: var(--ink);
+  font: 16px/1.45 var(--serif);
+}
+.follow-up-compose textarea:focus {
+  border-color: var(--ink-dim);
+  box-shadow: 0 0 0 1px var(--ink-dim);
+}
+.follow-up-compose textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.follow-up-compose button {
+  align-self: stretch;
+  min-width: 86px;
+  padding: 0 16px;
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.follow-up-compose button:disabled {
+  border-color: var(--line-2);
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: not-allowed;
+}
+.follow-up-note,
+.follow-up-error {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.follow-up-note { color: var(--ink-dim); }
+.follow-up-error { color: oklch(0.72 0.12 30); }
+.synastry > .follow-up { margin-bottom: 24px; }
+.rs > .follow-up {
+  width: min(980px, 100%);
+  margin: 24px auto 10px;
+}
+@media (max-width: 700px) {
+  .follow-up-head { flex-direction: column; }
+  .follow-up-scope { max-width: 100%; }
+  .follow-up-turn { grid-template-columns: 1fr; gap: 8px; }
+  .follow-up-compose { grid-template-columns: 1fr; }
+  .follow-up-compose button { min-height: 44px; }
+}
+
 /* ============================================================
    THE CARD
    ============================================================ */

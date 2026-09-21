@@ -117,7 +117,7 @@ export async function run() {
     const progEnd = text.indexOf("\n\nBY PROGRESSION\n");
     const candidates = [rightNowEnd, progEnd].filter((i) => i !== -1);
     const end = candidates.length ? Math.min(...candidates) : -1;
-    return text.slice(text.indexOf("SUBSTRATE"), end === -1 ? text.length : end);
+    return text.slice(text.indexOf("SOURCE OF TRUTH"), end === -1 ? text.length : end);
   };
   t("the SUBSTRATE section itself is byte-for-byte unchanged by adding a target",
     substrateOf(withTarget).trimEnd() === substrateOf(base).trimEnd(),
@@ -162,7 +162,10 @@ export async function run() {
 
   // ── interpretChart: the cache key reflects the digest's OWN content ───
   let calls = 0;
-  sb.window.claude = { complete: async (prompt) => { calls += 1; return "READING #" + calls + ": " + prompt.length; } };
+  const groundedReply = chart.planets.slice(0, 3).map((p) =>
+    `Your ${p.name} is in ${sb.ZODIAC[p.sign].name}.`
+  ).join(" ");
+  sb.window.claude = { complete: async (prompt) => { calls += 1; return `READING #${calls}: ${groundedReply} Source length ${prompt.length}.`; } };
   const { interpretChart } = sb;
 
   const jdMorning = dateToJD(new Date("2026-09-02T14:00:00Z"));

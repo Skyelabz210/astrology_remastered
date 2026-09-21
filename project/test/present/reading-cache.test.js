@@ -74,6 +74,10 @@ function makeSandbox({ storage = makeStorage(), completions = [] } = {}) {
   // agent.jsx runs as a sloppy-mode script, so its top-level functions bind
   // to the sandbox global and the prompt builder can be stubbed after load.
   sandbox.buildCardPrompt = (card) => `prompt for ${card.principal.name}`;
+  // Grounding is covered against real computed charts in
+  // agent-grounding.test.js. This suite isolates persistence and scoping,
+  // so its deliberately tiny fixtures accept their canned reading strings.
+  sandbox.validateNatalGrounding = () => ({ ok: true, factCount: 1, citedFacts: ["fixture"], errors: [] });
   return { sandbox, calls, storage };
 }
 
@@ -131,7 +135,7 @@ export async function run() {
     t("the same chart twice is the same key",
       keyA === sandbox.cacheKey(a.card, a.chart));
     t("the key carries the chart's identity",
-      keyA.startsWith("2444534.3970,35.1408,-79.0058,0|"), keyA.slice(0, 40));
+      keyA.includes("1980-10-21T17:31:00-04:00|35.1408|-79.0058"), keyA.slice(0, 80));
   }
   {
     // exploring a second chart must not evict or reuse the first

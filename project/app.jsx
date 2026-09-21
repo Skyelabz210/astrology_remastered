@@ -382,6 +382,12 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
 
       <Synthesis reading={chartReading} settings={settings} />
 
+      <FollowUpQuestions
+        mode="natal"
+        chart={chart}
+        agentOn={settings.agentOn === true}
+      />
+
       <main className={`spread spread-${settings.spread}`}>
         {cards.map((card, i) => (
           <ZodiacCard
@@ -427,6 +433,7 @@ function Header({ chart, settings, setTweak, onBack }) {
   // Birth-place clock, not device clock — see AstroCore.birthClockParts.
   const { dateStr, timeStr } = AstroCore.birthClockParts(chart.birth.dateISO, chart.birth.tz);
   const ascSign = ZODIAC[chart.ascSignIdx].name;
+  const agentOn = settings.agentOn === true;
   return (
     <header className="hdr">
       <div className="hdr-brand">
@@ -445,12 +452,12 @@ function Header({ chart, settings, setTweak, onBack }) {
       </div>
       <div className="hdr-toggles">
         <button
-          className={`hdr-pill ${settings.agentOn !== false ? 'is-on' : ''}`}
-          onClick={() => setTweak('agentOn', settings.agentOn === false)}
-          title={settings.agentOn !== false
+          className={`hdr-pill ${agentOn ? 'is-on' : ''}`}
+          onClick={() => setTweak('agentOn', !agentOn)}
+          title={agentOn
             ? "Agent interpreter on — sends birth data to Claude for each reading. Click to turn off."
             : "Agent interpreter off — readings stay local. Click to turn on."}
-          aria-pressed={settings.agentOn !== false}
+          aria-pressed={agentOn}
         >
           agent
         </button>
