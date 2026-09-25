@@ -45,7 +45,7 @@ export const FRAMES = [
   { id: "raman", label: "Sidereal · B. V. Raman", offset_arcsec: 80568n, status: "DEFINED" },
   { id: "krishnamurti", label: "Sidereal · Krishnamurti (KP)", offset_arcsec: 85691n, status: "DEFINED" },
   { id: "draconic", label: "Draconic (North Node origin)", offset_arcsec: null, status: "DEFINED" },
-  { id: "heliocentric", label: "Heliocentric projection", offset_arcsec: null, status: "OPEN" },
+  { id: "heliocentric", label: "Heliocentric projection", offset_arcsec: null, status: "LEDGER" },
 ];
 
 /**
