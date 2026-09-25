@@ -197,6 +197,34 @@ function chapterIndex(chapters, chapter) {
   return chapters.indexOf(chapter) + 1;
 }
 
+/**
+ * activeChapter(chapters, natal, nowJd) -> { place, source } | null
+ *
+ * The ONE question every chapter-aware cast asks: "which place should this
+ * be computed for right now?" Answer, in order of precedence:
+ *   1. the chapter covering `nowJd`, if any ("chapter");
+ *   2. the LAST chapter in the list when they are all in the past —
+ *      someone who entered their whole history but never ticked "still
+ *      here" on the final row still means that row to be current
+ *      ("last-chapter");
+ *   3. null — no usable history, callers fall back to the NATAL place,
+ *      which is exactly the pre-chapters behavior (graceful by design:
+ *      a profile with zero chapters changes nothing anywhere).
+ * `place` carries lat/lng/tz/label/placeKey so time.jsx's return casts can
+ * pass it straight through as { lat, lng } without knowing about cities.
+ */
+function activeChapter(chapters, natal, nowJd) {
+  const list = Array.isArray(chapters) ? chapters : [];
+  const cover = chapterAt(list, nowJd, nowJd, natal && natal.jd);
+  if (cover) return { place: cover, source: "chapter" };
+  if (list.length > 0) {
+    // chapterAt already ordered them by start; the last one is the most
+    // recent residence even when its end date has passed.
+    return { place: list[list.length - 1], source: "last-chapter" };
+  }
+  return null;
+}
+
 // ─────────────────── relocation ───────────────────
 /**
  * relocatedChart(natal, place) -> lightweight relocated chart object
@@ -217,7 +245,7 @@ function relocatedChart(natal, place) {
   if (!natal || !place) return null;
   const date = new Date((natal.jd - 2440587.5) * 86400000);
   const asc = ascendantDeg(date, place.lat, place.lng);
-  const mc = midheavenDeg(date, place.lng); // astro.jsx signature: (date, lng)
+  const mc = midheavenDegOf(date, place.lng); // adapter below guards astro.jsx's (date, lng) signature
   const desc = mod360(asc + 180);
   const ic = mod360(mc + 180);
   const ascSignIdx = Math.floor(asc / 30);
@@ -242,6 +270,12 @@ function relocatedChart(natal, place) {
     house: houseOf(p.lon, p.sign),
   }));
 
+  // residues().r11 IS floor-mod of the arcsecond value (astro-core's
+  // residues is a plain Math.floor + % family), so this agrees with
+  // astro.jsx computeNatal's `Math.floor(asc * 3600) % 11` ASC-lane
+  // formula to the arcsecond — verified by test/present/chapters.test.js
+  // rather than asserted here. Going through residues() keeps the whole
+  // presentation layer on one definition of "the r11 lane".
   const ascR11 = residues(asc * 3600).r11;
 
   return {
@@ -315,6 +349,37 @@ function chapterDigest(natal, chapters) {
   return lines;
 }
 
+// ─────────────────── chapter-aware return casting ───────────────────
+/**
+ * chapterAware(natal, chaptersRaw, nowJd) -> { chapters, dropped, active }
+ *
+ * The single entry point time.jsx (and anything else that casts for a
+ * place other than the birthplace) uses. It deliberately returns null on
+ * ANY of the graceful-degradation conditions rather than throwing or
+ * half-working:
+ *   - chapters.jsx's dependencies not loaded on this page (a host that
+ *     omits the <script> tags — every caller keeps pre-chapters behavior),
+ *   - NO usable chapters after normalization — including the case where
+ *     the ONLY rows dropped were "the same city as the natal place":
+ *     a relocated chart identical to the natal one is noise, not a
+ *     feature, so a reader who grew up at home and never moved sees the
+ *     app exactly as they did before chapters existed,
+ *   - an unknown birth TIME: relocation is angle math, and angles are
+ *     already flagged unreliable (WP-18) — casting them for another city
+ *     would multiply an admitted guess instead of informing anyone.
+ * `active` comes from activeChapter(): the covering chapter, else the
+ * latest past chapter, else null (caller falls back to natal place).
+ */
+function chapterAware(natal, chaptersRaw, nowJd) {
+  if (!natal || typeof chapterCity !== "function" || typeof CITIES === "undefined") return null;
+  const { chapters, dropped } = normalizeChapters(chaptersRaw, natal);
+  const natalKey = natal.placeKey || (natal.birth && natal.birth.placeKey) || null;
+  const distinct = chapters.filter((ch) => !natalKey || ch.placeKey !== natalKey);
+  if (distinct.length === 0) return null;
+  if (natal.timeUnknown) return { chapters: distinct, dropped, active: null, timeUnknown: true };
+  return { chapters: distinct, dropped, active: activeChapter(distinct, natal, nowJd), timeUnknown: false };
+}
+
 // ─────────────────── local profile storage ───────────────────
 /**
  * ProfileStore — the single source of truth for the user's local profile.
@@ -364,7 +429,9 @@ Object.assign(window, {
   parseChapterDate,
   chapterAt,
   chapterIndex,
+  activeChapter,
   relocatedChart,
   chapterDigest,
+  chapterAware,
   ProfileStore,
 });
