@@ -201,11 +201,11 @@ export async function run() {
   // check; these patterns just need to tolerate its presence rather than
   // expect the pre-progressions exact shape.
   t("the narrative memo's dependency array includes agent.text (that part of the coupling is real and expected)",
-    /\[chart, order, agentOn, agent\.text, lifecycleText, progressionsText\]/.test(narrativeMemo), narrativeMemo);
+    /\[chart, order, agentOn, agent\.text, lifecycleText, progressionsText, eclipseText\]/.test(narrativeMemo), narrativeMemo);
   t("...but the narrative memo itself never calls narrativeLifecycle or lifecycleDigest directly",
     !/narrativeLifecycle\(|lifecycleDigest\(/.test(narrativeMemo), narrativeMemo);
   t("...and passes the precomputed lifecycleText through to buildChartNarrative instead of a jdTarget",
-    /buildChartNarrative\(chart, \{ agentTexts, lifecycleText, progressionsText \}\)/.test(narrativeMemo), narrativeMemo);
+    /buildChartNarrative\(chart, \{ agentTexts, lifecycleText, progressionsText, eclipseText \}\)/.test(narrativeMemo), narrativeMemo);
 
   return rows;
 }

@@ -102,6 +102,12 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
     [chart, jdSessionNow]
   );
 
+  const eclipseText = $sUseMemo(() => {
+    if (!window.EnhancedReading || !window.Astronomy || window.EPHEMERIS_MODE === "SYNTHETIC") return "";
+    try { return window.EnhancedReading.natalEclipseText(window.Astronomy, chart, Number(settings.eclipseOrb)>0 ? Number(settings.eclipseOrb) : 2.5); }
+    catch { return "Eclipse interpretation is unavailable for this calculation."; }
+  }, [chart, settings.eclipseOrb]);
+
   // The whole-chart narrative. Rebuilt only when the chart itself changes:
   // it is the same piece from the first play to the last, so a re-render
   // must not hand the player a different object mid-reading.
@@ -134,8 +140,8 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         } catch { /* cache shape changed — fall back to local text */ }
       });
     }
-    return buildChartNarrative(chart, { agentTexts, lifecycleText, progressionsText });
-  }, [chart, order, agentOn, agent.text, lifecycleText, progressionsText]);
+    return buildChartNarrative(chart, { agentTexts, lifecycleText, progressionsText, eclipseText });
+  }, [chart, order, agentOn, agent.text, lifecycleText, progressionsText, eclipseText]);
 
   // Where each narrative segment puts the deck. Segments that are not a
   // card (the opening, the closing) leave the current card alone.
