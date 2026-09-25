@@ -45,6 +45,7 @@ const { useState: $ecState, useEffect: $ecEffect, useMemo: $ecMemo } = React;
  * eclipse orb; one who wants a longer list widens it.
  */
 function eclipsePointsFor(chart) {
+  if (window.EnhancedReading) return window.EnhancedReading.realEclipsePoints(window.Astronomy, chart);
   const pts = chart.planets
     .filter(p => p.name !== "SouthNode")
     .map(p => ({ name: p.name, lon: p.lon }));
@@ -249,13 +250,14 @@ function BirthGeophysics({ chart }) {
  * paint of the whole spread behind it.
  */
 function EclipsePanel({ chart, settings }) {
-  const [profile, setProfile] = $ecState(null);
+  const [profileResult, setProfile] = $ecState(null);
+  const profile = profileResult && profileResult.chart === chart ? profileResult.data : null;
   const [error, setError] = $ecState(null);
   const [showAll, setShowAll] = $ecState(false);
 
   const orbDeg = Number(settings && settings.eclipseOrb) > 0 ? Number(settings.eclipseOrb) : 2.5;
   const futureYears = Number(settings && settings.eclipseWindow) > 0 ? Number(settings.eclipseWindow) : 2;
-  const engineReady = typeof window !== "undefined" && !!window.Eclipses && !!window.Astronomy;
+  const engineReady = typeof window !== "undefined" && !!window.Eclipses && !!window.Astronomy && window.EPHEMERIS_MODE !== "SYNTHETIC";
 
   $ecEffect(() => {
     if (!engineReady) return undefined;
@@ -273,13 +275,13 @@ function EclipsePanel({ chart, settings }) {
           futureYears,
           orbDeg,
         });
-        if (!cancelled) setProfile(p);
+        if (!cancelled) setProfile({chart, data:p});
       } catch (e) {
         if (!cancelled) setError(e && e.message ? e.message : String(e));
       }
     }, 0);
     return () => { cancelled = true; clearTimeout(id); };
-  }, [chart.birth.dateISO, chart.birth.lat, chart.birth.lng, chart.timeUnknown, orbDeg, futureYears, engineReady]);
+  }, [chart, orbDeg, futureYears, engineReady]);
 
   if (!engineReady) {
     return (
@@ -332,12 +334,12 @@ function EclipsePanel({ chart, settings }) {
             <PrenatalCard
               title="Prenatal solar eclipse"
               rec={profile.prenatal.solar}
-              note="The last solar eclipse before birth — classically the seed degree the nativity grows out of."
+              note={window.EnhancedReading ? window.EnhancedReading.eclipseReading(profile.prenatal.solar,chart) : "The last solar eclipse before birth."}
             />
             <PrenatalCard
               title="Prenatal lunar eclipse"
               rec={profile.prenatal.lunar}
-              note="Its counterweight: the last lunar eclipse before birth."
+              note={window.EnhancedReading ? window.EnhancedReading.eclipseReading(profile.prenatal.lunar,chart) : "The last lunar eclipse before birth."}
             />
             <BirthGeophysics chart={chart} />
           </div>
@@ -371,6 +373,7 @@ function EclipsePanel({ chart, settings }) {
           <div className="tp-card" style={{ marginTop: 16 }}>
             <h4>Still ahead</h4>
             <EclipseRows rows={profile.upcoming} emptyText="none within the configured window" />
+            {window.EnhancedReading && profile.upcoming.map(rec => <p key={`${rec.type}-${rec.peakISO}`}><strong>{fmtDate(rec.peakISO)}</strong> · {window.EnhancedReading.eclipseReading(rec,chart)}</p>)}
           </div>
         </>
       )}

@@ -349,7 +349,7 @@ function narrativeProgressions(chart, jdTarget) {
  * cardIdx, title, text, start, end }` where `[start, end)` is its character
  * range inside `text` — the ranges playback syncs the deck against.
  */
-function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarget = null, lifecycleText = null, progressionsText = null } = {}) {
+function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarget = null, lifecycleText = null, progressionsText = null, eclipseText = null } = {}) {
   if (!chart || !Array.isArray(chart.cards)) return { text: "", segments: [] };
   const order = (typeof deckOrder === "function") ? deckOrder(chart) : chart.cards.map((_, i) => i);
 
@@ -379,6 +379,8 @@ function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarg
     ? progressionsText
     : (Number.isFinite(jdTarget) ? narrativeProgressions(chart, jdTarget) : "");
   if (resolvedProgressionsText) raw.push({ kind: "progressions", cardIdx: null, title: "By progression", text: resolvedProgressionsText });
+
+  if (eclipseText) raw.push({kind:"eclipses", cardIdx:null, title:"Prenatal eclipses", text:eclipseText});
 
   // Character ranges are assigned against the SAME joiner the text is built
   // with, so an offset always indexes the string that is actually spoken.

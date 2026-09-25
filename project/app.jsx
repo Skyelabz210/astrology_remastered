@@ -416,6 +416,8 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
           tag renders the rest of the spread instead of throwing. */}
       {typeof window !== "undefined" && window.EclipsePanel && <EclipsePanel chart={chart} settings={settings} />}
 
+      {typeof window !== "undefined" && window.EnhancedReadingPanel && <window.EnhancedReadingPanel chart={chart} />}
+
       <LiveStatePanel chart={chart} />
 
       {settings.primeLayer && <PrimeLayer chart={chart} />}
