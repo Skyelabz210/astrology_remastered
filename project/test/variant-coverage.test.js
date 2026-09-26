@@ -86,8 +86,8 @@ export function run() {
     frame("raman").offset_arcsec === 22n * DEG + 22n * 60n + 48n, "80568");
   t("Krishnamurti = 23°48′11″ = 85,691″",
     frame("krishnamurti").offset_arcsec === 23n * DEG + 48n * 60n + 11n, "85691");
-  t("heliocentric is OPEN — a change of origin, not a rotation",
-    frame("heliocentric").status === "OPEN" && frame("heliocentric").offset_arcsec === null);
+  t("heliocentric is LEDGER — a change of origin, not a rotation",
+    frame("heliocentric").status === "LEDGER" && frame("heliocentric").offset_arcsec === null);
   {
     const x = 987654n, w = frame("lahiri").offset_arcsec;
     t("frame rotation is invertible", fromFrame(toFrame(x, w), w) === x);

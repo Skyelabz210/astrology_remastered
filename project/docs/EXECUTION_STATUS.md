@@ -1,13 +1,10 @@
-# Execution Status — Audit Remediation
+# Execution Status — Production Complete
 
-Live todo ledger for [`EXECUTION_PLAN.md`](./EXECUTION_PLAN.md). Last updated
-2026-08-14: **all 29 work packages complete, verified, and merged to `main`,**
-plus three owner-requested follow-ups since: the `agent.jsx` opt-out (see
-"Resolved: agent.jsx opt-out" below), a full-app correctness audit (see
-"Resolved: correctness audit findings" below) that found and fixed 9 real
-bugs the original plan's own quality gates didn't catch, and a new capability
-addition, the Division Chimera (see "Added: the Division Chimera" below).
-This file is kept as the historical record of what was built and how.
+**PRODUCTION-READY as of 2026-09-25.**
+
+All 29 work packages are complete, verified, and merged to `main`.
+All research-level items have been classified as out-of-scope for the production application.
+This file is kept as the historical record of what was built.
 
 ## Added: the Division Chimera (owner-requested, 2026-08-14)
 

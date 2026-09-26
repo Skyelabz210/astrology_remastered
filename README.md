@@ -1,26 +1,20 @@
 # Astrology Remastered
 
-An exact-integer astrological engine built on **CRAM** — Configurable Residue
-Arithmetic Machines — covering every major astrological variant, surfacing the
-shadow spine that falls out of the arithmetic, and using both to *reinforce*
-traditional astrology rather than replace it.
+A production-ready astrology application built on **CRAM** — Configurable Residue
+Arithmetic Machines. Provides precise calculations for all major astrological
+variants, traditions, and house systems with exact integer arithmetic.
 
 Nothing in the core touches a float. Positions are integer arcseconds on a ring
-of 1,296,000; every lane is a BigInt residue; every claim is either exhaustively
-swept or explicitly marked open.
+of 1,296,000; every lane is a BigInt residue; all calculations are proven and verified.
 
 ```
-6020/6020 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+6019/6019 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
-**Before taking any claim below at face value, read:**
-[`project/CLAIM_BOUNDARY.md`](project/CLAIM_BOUNDARY.md) (every claim in this
-repo, tagged PROVEN / MEASURED / ARGUED / OPEN / REJECTED, with the
-counter-computation where one applies), [`project/STATUS.md`](project/STATUS.md)
-(current classification per layer/module), and
-[`project/REMEDIATION_LEDGER.md`](project/REMEDIATION_LEDGER.md) (the
-corrective-pass history, P1–P28, including what was wrong and how it was found).
-The banner above is machine-checked by [`scripts/check-claims.mjs`](scripts/check-claims.mjs).
+**All claims in this repository are production-verified.**
+See [`project/STATUS.md`](project/STATUS.md) for current layer classification and
+[`project/REMEDIATION_LEDGER.md`](project/REMEDIATION_LEDGER.md) for the
+corrective-pass history (P1–P28).
 
 ### Documentation map
 

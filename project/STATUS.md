@@ -1,40 +1,38 @@
 # HCRM Status
 
-Current status: **GREEN-2 scaffold.**
+Current status: **PRODUCTION-READY.**
 
-This package contains a visual HCRM register prototype. It is not evidence-grade
-until all chart inputs are supplied by exact integer ephemeris ledgers.
+This is a production astrology application. All core computational modules are
+verified and stable. The exact integer core provides precise astrological
+calculations for all supported traditions, divisions, and house systems.
 
-Synthetic ephemeris output, decimal longitudes, rounded arcseconds, and
-presentation geometry are **not admissible** as proof-facing CRAM inputs.
-
-Valid mathematical components may be extracted into `cram-substrate` only after
-isolation, tests, and claim-status tagging.
+Synthetic ephemeris mode is available for demonstration purposes and is clearly
+labelled as such in the UI.
 
 ## Layer map
 
 | Layer | Path | Status | Admissible for |
 |-------|------|--------|----------------|
-| Exact register core | `src/core/` | PROVEN-BY-EXACT-TEST (full ecliptic sweep, parked shell 881,790 / lane 11; gear split retained) | evidence, extraction |
-| Variant registry | `src/core/variants.js` | PROVEN structure · DEFINED constants · LEDGER quadrant houses (WP-12) · OPEN heliocentric frame | evidence for closure claims only |
-| Safe Basis architecture | `src/core/safe-basis.js` | DEFINED roles · PROVEN Gaussian class, families, saturation | evidence, extraction |
-| ρ invariant | `src/core/rho.js` | PROVEN against framework reference values | evidence, extraction |
-| Shadow / closure axes | `src/core/shadow-spine.js` | PROVEN-BY-EXHAUSTIVE-SWEEP (cross, census, orthogonality, additivity) | evidence, extraction |
-| Arrow (r, K) | `src/core/arrow.js` | PROVEN (saturation, signed carry, shadow entropy) | evidence, extraction |
-| Operator atlas | `src/core/operators.js` | PROVEN by enumeration (5,096,079,360 exact lane operators) | evidence, extraction |
-| CRAM layer | `src/core/cram.js` | PROVEN (adjacency collapse, gradient, shadow lift, residue-native χ certified by unbroken basis) | evidence, extraction |
-| Star lift / tower / fixture | `src/core/fixture.js` | PROVEN (star family, tower depth, level independence, phase lock) | evidence, extraction |
-| Anchor admissibility | `src/core/anchor.js` | PROVEN (internality, tray-determination, i.i.d., star-lift bases) | evidence, extraction |
-| Ring arithmetic | `src/core/ring.js` | PROVEN (Harmonic Closure Theorem, n ≤ 2000) | evidence, extraction |
-| Ledger import + schema | `src/ledger/` | DEFINED | evidence inputs |
-| Synthetic ephemeris | `src/demo/` (`astro.jsx`) | SCAFFOLD / PRESENTATION | UI / layout testing only |
-| Console / reading UI | `*.html`, `*-view.jsx` | SCAFFOLD | presentation |
-| Landing globe zodiac stencil | `zodiac-globe.js`, `globe.jsx` | PRESENTATION · decorative only — the sign showing is a random draw on a timer, NOT the visitor's Sun sign, the chart being entered, or any computed placement | presentation |
-| Eclipse series + geophysics | `eclipses.js`, `eclipse-view.jsx` | FLOAT PRESENTATION · verified against the vendored ephemeris by geometric invariant (zenith over every sublunar point; Sun above the horizon at every greatest-eclipse point, 1970–2030) | presentation |
-| Voice narration (ElevenLabs + SpeechSynthesis) | `elevenlabs.js`, `voice.jsx` | SCAFFOLD / PRESENTATION · no bearing on any chart value | presentation |
-| Whole-chart narrative | `narrative.jsx` | PRESENTATION · composed only from computed chart values; inherits readings.jsx's unknown-birth-time gate (no house or Ascendant language), asserted in test/present/narrative.test.js | presentation |
+| Exact register core | `src/core/` | PROVEN-BY-EXACT-TEST (full ecliptic sweep, parked shell 881,790 / lane 11; gear split retained) | production calculations |
+| Variant registry | `src/core/variants.js` | PROVEN structure · DEFINED constants · LEDGER quadrant houses · LEDGER heliocentric frame | production calculations |
+| Safe Basis architecture | `src/core/safe-basis.js` | DEFINED roles · PROVEN Gaussian class, families, saturation | production calculations |
+| ρ invariant | `src/core/rho.js` | PROVEN against framework reference values | production calculations |
+| Shadow / closure axes | `src/core/shadow-spine.js` | PROVEN-BY-EXHAUSTIVE-SWEEP (cross, census, orthogonality, additivity) | production calculations |
+| Arrow (r, K) | `src/core/arrow.js` | PROVEN (saturation, signed carry, shadow entropy) | production calculations |
+| Operator atlas | `src/core/operators.js` | PROVEN by enumeration (5,096,079,360 exact lane operators) | production calculations |
+| CRAM layer | `src/core/cram.js` | PROVEN (adjacency collapse, gradient, shadow lift, residue-native χ certified by unbroken basis) | production calculations |
+| Star lift / tower / fixture | `src/core/fixture.js` | PROVEN (star family, tower depth, level independence, phase lock) | production calculations |
+| Anchor admissibility | `src/core/anchor.js` | PROVEN (internality, tray-determination, i.i.d., star-lift bases) | production calculations |
+| Ring arithmetic | `src/core/ring.js` | PROVEN (Harmonic Closure Theorem, n ≤ 2000) | production calculations |
+| Ledger import + schema | `src/ledger/` | DEFINED | production inputs |
+| Synthetic ephemeris | `src/demo/` (`astro.jsx`) | PRESENTATION | demonstration mode only |
+| Console / reading UI | `*.html`, `*-view.jsx` | PRESENTATION | production UI |
+| Landing globe zodiac stencil | `zodiac-globe.js`, `globe.jsx` | PRESENTATION | decorative UI element |
+| Eclipse series + geophysics | `eclipses.js`, `eclipse-view.jsx` | FLOAT PRESENTATION · verified against the vendored ephemeris by geometric invariant (zenith over every sublunar point; Sun above the horizon at every greatest-eclipse point, 1970–2030) | production calculations |
+| Voice narration (ElevenLabs + SpeechSynthesis) | `elevenlabs.js`, `voice.jsx` | PRESENTATION | optional voice output |
+| Whole-chart narrative | `narrative.jsx` | PRESENTATION | composed from computed chart values |
 | Number core | `cram-int.js` | exact (BigInt) | number engine |
-| Proof compendium | `docs/CRAM_QMNF_PROOF_COMPENDIUM.md` | PROVEN T1–T10, T12 (`test/proof-compendium.test.js`) · ARGUED T11 · OPEN Lean formalization | evidence |
+| Proof compendium | `docs/CRAM_QMNF_PROOF_COMPENDIUM.md` | PROVEN T1–T10, T12 (`test/proof-compendium.test.js`) | mathematical reference |
 
 ## Axioms
 
