@@ -42,6 +42,46 @@
 
 const CHAPTERS_SCHEMA_VERSION = 1;
 const PROFILE_STORAGE_KEY = "resonance.profile.v1";
+const PROFILE_SETTING_KEYS = [
+  "dateISO", "lat", "lng", "tz", "placeLabel", "placeKey", "subjectName", "timeUnknown",
+  "houseSystem", "sect", "tilt", "iridescence", "noise", "glow", "specular",
+  "rigorous", "agentOn", "spread", "primeLayer", "orbScale", "harmonic",
+  "showAspects", "voiceOn", "voiceStyle", "voiceProvider", "voiceName",
+  "elevenVoiceId", "elevenModel", "eclipseOrb", "eclipseWindow",
+];
+const PROFILE_FORM_KEYS = [
+  "year", "month", "day", "hour12", "minute", "meridiem", "place",
+  "subjectName", "timeUnknown",
+];
+
+function profileFields(raw, keys) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const clean = {};
+  for (const key of keys) {
+    const value = raw[key];
+    if (["string", "number", "boolean"].includes(typeof value) || value === null) clean[key] = value;
+  }
+  return clean;
+}
+
+function profileChapters(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 50).flatMap((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+    const rawPlace = entry.placeKey || entry.place || entry.label;
+    const placeKey = typeof rawPlace === "string" ? rawPlace.trim().slice(0, 160) : "";
+    if (!placeKey) return [];
+    const startISO = typeof entry.startISO === "string" ? entry.startISO.slice(0, 10) : "";
+    const endISO = typeof entry.endISO === "string" ? entry.endISO.slice(0, 10) : "";
+    return [{
+      id: typeof entry.id === "string" && entry.id ? entry.id.slice(0, 80) : `profile-chapter-${index}`,
+      placeKey,
+      startISO,
+      endISO,
+      open: !endISO,
+    }];
+  });
+}
 
 // ─────────────────── city lookup (tolerant) ───────────────────
 // Places arrive either as registry keys ("Wetzlar · DE") or as free text
@@ -86,7 +126,7 @@ function chapterCity(keyOrLabel) {
 }
 
 const RG_TO_COUNTRY = {
-  germany: "DE", de: "DE", usa: "US", us: "US", uk: "GB", united kingdom: "GB",
+  germany: "DE", de: "DE", usa: "US", us: "US", uk: "GB", "united kingdom": "GB",
 };
 
 // ─────────────────── normalization ───────────────────
@@ -217,10 +257,12 @@ function activeChapter(chapters, natal, nowJd) {
   const list = Array.isArray(chapters) ? chapters : [];
   const cover = chapterAt(list, nowJd, nowJd, natal && natal.jd);
   if (cover) return { place: cover, source: "chapter" };
-  if (list.length > 0) {
-    // chapterAt already ordered them by start; the last one is the most
-    // recent residence even when its end date has passed.
-    return { place: list[list.length - 1], source: "last-chapter" };
+  const prior = list.filter((chapter) => chapter.startJd === null || chapter.startJd <= nowJd);
+  if (prior.length > 0) {
+    // The last chapter that has actually begun is the most recent residence
+    // even when its entered end date has passed. A future move must never be
+    // pulled backward and used for an earlier return chart.
+    return { place: prior[prior.length - 1], source: "last-chapter" };
   }
   return null;
 }
@@ -313,14 +355,20 @@ function midheavenDegOf(date, lng) {
  * relative to the natal chart (positions cannot change; houses can — that
  * IS the classical relocation statement, and it's all this says).
  *
- * On a timeUnknown natal chart the angles themselves are unreliable, so
- * the line reports house shifts WITHOUT quoting an Ascendant degree —
- * matching the WP-18 suppression precedent rather than inventing a new one.
+ * On a timeUnknown natal chart both the angles and the derived houses are
+ * unreliable, so the location is acknowledged but every relocation claim
+ * is withheld — matching the WP-18 suppression precedent exactly.
  */
 function chapterDigest(natal, chapters) {
   const lines = [];
   if (!natal || !Array.isArray(chapters)) return lines;
   for (const ch of chapters) {
+    if (natal.timeUnknown) {
+      lines.push(
+        `In ${ch.label}: relocation is saved but angle and house changes are withheld because the birth time is unknown.`
+      );
+      continue;
+    }
     const rel = relocatedChart(natal, ch);
     if (!rel) continue;
     const where = ch.label;
@@ -331,20 +379,12 @@ function chapterDigest(natal, chapters) {
         shifted.push(`${p.name} ${nat.house}→${p.house}`);
       }
     }
-    if (natal.timeUnknown) {
-      lines.push(
-        shifted.length
-          ? `In ${where}: ${shifted.join(", ")} (houses shift; the Ascendant itself is unreliable here — birth time unknown).`
-          : `In ${where}: no body changes house. The Ascendant itself is unreliable here — birth time unknown.`
-      );
-    } else {
-      const ascSign = ZODIAC[Math.floor(rel.asc / 30)].name;
-      const mcSign = ZODIAC[Math.floor(rel.mc / 30)].name;
-      lines.push(
-        `In ${where}: rising ${ascSign}, MC in ${mcSign}.` +
-        (shifted.length ? ` Houses shift: ${shifted.join(", ")}.` : " No body changes house.")
-      );
-    }
+    const ascSign = ZODIAC[Math.floor(rel.asc / 30)].name;
+    const mcSign = ZODIAC[Math.floor(rel.mc / 30)].name;
+    lines.push(
+      `In ${where}: rising ${ascSign}, MC in ${mcSign}.` +
+      (shifted.length ? ` Houses shift: ${shifted.join(", ")}.` : " No body changes house.")
+    );
   }
   return lines;
 }
@@ -401,16 +441,23 @@ const ProfileStore = {
         if (obj.version > CHAPTERS_SCHEMA_VERSION) return null;
         obj.version = CHAPTERS_SCHEMA_VERSION;
       }
-      return obj;
+      return {
+        version: CHAPTERS_SCHEMA_VERSION,
+        savedAt: typeof obj.savedAt === "string" ? obj.savedAt : null,
+        settings: profileFields(obj.settings, PROFILE_SETTING_KEYS),
+        birthForm: profileFields(obj.birthForm, PROFILE_FORM_KEYS),
+        chapters: profileChapters(obj.chapters),
+      };
     } catch { return null; }
   },
-  save(settings, chaptersRaw) {
+  save(settings, chaptersRaw, birthForm) {
     try {
       const payload = {
         version: CHAPTERS_SCHEMA_VERSION,
         savedAt: new Date().toISOString(),
-        settings: settings || {},
-        chapters: Array.isArray(chaptersRaw) ? chaptersRaw : [],
+        settings: profileFields(settings, PROFILE_SETTING_KEYS),
+        birthForm: profileFields(birthForm, PROFILE_FORM_KEYS),
+        chapters: profileChapters(chaptersRaw),
       };
       window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(payload));
       return true;
@@ -424,6 +471,10 @@ const ProfileStore = {
 Object.assign(window, {
   CHAPTERS_SCHEMA_VERSION,
   PROFILE_STORAGE_KEY,
+  PROFILE_SETTING_KEYS,
+  PROFILE_FORM_KEYS,
+  profileFields,
+  profileChapters,
   chapterCity,
   normalizeChapters,
   parseChapterDate,

@@ -17,7 +17,7 @@ function useNow(intervalMs = 60000) {
   return now;
 }
 
-function LiveStatePanel({ chart }) {
+function LiveStatePanel({ chart, chapters = [] }) {
   const now = useNow(60000);
   // Target instant: "now" keeps ticking; picking a date freezes the panel
   // on that day (noon UTC — the panel reads whole days of the lifecycle).
@@ -37,9 +37,14 @@ function LiveStatePanel({ chart }) {
       ctm:      ctmState(jdT, chart.jd),
       transits: currentTransits(chart, jdT),
       lift:     windingLift(chart, jdT),
-      digest:   lifecycleDigest(chart, jdT),
+      digest:   lifecycleDigest(chart, jdT, chapters),
     };
-  }, [target.getTime() - (target.getTime() % 60000), chart.jd]);
+  }, [target.getTime() - (target.getTime() % 60000), chart.jd, chapters]);
+
+  const chapterContext = React.useMemo(
+    () => (typeof window.chapterAware === "function" ? window.chapterAware(chart, chapters, data.jdT) : null),
+    [chart, chapters, data.jdT]
+  );
 
   // Perfections: a year-wide scan of the real ephemeris, so it runs OFF the
   // render path — one transiting body per tick, accumulated into state.
@@ -98,8 +103,8 @@ function LiveStatePanel({ chart }) {
   // the year-wide perfection scan) — day-granularity key keeps it from
   // recomputing on every "now" minute-tick.
   const returns = React.useMemo(
-    () => RETURN_BODIES.map((b) => returnChart(chart, b, data.jdT)).filter(Boolean),
-    [chart.jd, Math.floor(data.jdT)]
+    () => RETURN_BODIES.map((b) => returnChart(chart, b, data.jdT, chapters)).filter(Boolean),
+    [chart, chapters, Math.floor(data.jdT)]
   );
 
   return (
@@ -144,6 +149,21 @@ function LiveStatePanel({ chart }) {
       <p className="cl-digest">
         {data.digest.lines.map((line, i) => <span key={i}>{line} </span>)}
       </p>
+
+      {chapterContext && chapterContext.active && (
+        <div className="cl-place" role="note">
+          <span>location at target</span>
+          <strong>{chapterContext.active.place.label}</strong>
+          <span>Return-chart angles and houses use the residence active on each exact return date.</span>
+        </div>
+      )}
+      {chapterContext && chapterContext.timeUnknown && (
+        <div className="cl-place" role="note">
+          <span>life chapters saved</span>
+          <strong>Relocation withheld</strong>
+          <span>A known birth time is required before residence-based angles or houses can be stated.</span>
+        </div>
+      )}
 
       <div className="cl-grid">
         <div className="cl-card">
@@ -190,6 +210,7 @@ function LiveStatePanel({ chart }) {
               </h5>
               <div className="cl-rows">
                 <div className="cl-row"><span className="l">exact instant</span><span className="v">{r.dateISO.slice(0, 16).replace("T", " ")} UTC</span></div>
+                <div className="cl-row"><span className="l">cast for</span><span className="v">{r.placeLabel}</span></div>
                 <div className="cl-row"><span className="l">Ascendant</span><span className="v">{ZODIAC[r.chart.ascSignIdx].glyph} {ZODIAC[r.chart.ascSignIdx].name} {(r.chart.asc % 30).toFixed(1)}°</span></div>
                 <div className="cl-row"><span className="l">Midheaven</span><span className="v">{ZODIAC[r.chart.mcSignIdx].glyph} {ZODIAC[r.chart.mcSignIdx].name} {(r.chart.mc % 30).toFixed(1)}°</span></div>
                 <div className="cl-row"><span className="l">next {r.body === "Sun" ? "solar" : "lunar"} return</span><span className="v">{r.nextDateISO.slice(0, 10)}</span></div>
