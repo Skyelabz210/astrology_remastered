@@ -15,7 +15,7 @@
 
 const { useState: $sUseState, useEffect: $sUseEffect, useRef: $sUseRef, useMemo: $sUseMemo } = React;
 
-function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastry, onBack }) {
+function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastry, onBack, chapters }) {
   const order = $sUseMemo(() => deckOrder(chart), [chart]);
   const cards  = $sUseMemo(() => order.map(i => chart.cards[i]), [chart, order]);
 
@@ -258,6 +258,10 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         agentOn={agentOn}
         onToggleAgent={() => setTweak('agentOn', !agentOn)}
       />
+
+      {typeof window !== "undefined" && window.LifeChapterSummary && (
+        <window.LifeChapterSummary chart={chart} chapters={chapters} />
+      )}
 
       {!shuffled
         ? <ShuffleAnimation />

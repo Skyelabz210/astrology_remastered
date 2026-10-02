@@ -139,7 +139,10 @@ function SearchablePicker({ label, value, options, onChange, placeholder }) {
   );
 }
 
-function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
+function Landing({
+  initial, onCast, mode, onBack, agentOn, onToggleAgent,
+  chapters, onChaptersChange, profileState, onSaveProfile, onClearProfile,
+}) {
   const isPartner = mode === "partner";
   const isHcrm = mode === "hcrm";
   const pad = (n) => String(n).padStart(2, "0");
@@ -188,8 +191,7 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
   const hours   = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   const minutes = Array.from({ length: 60 }, (_, i) => i);
 
-  const submit = (e) => {
-    if (e) e.preventDefault();
+  const buildPayload = () => {
     setFormError(null);
     // WP-19: real-calendar date validation (leap years etc.). The
     // Month/Day/Year pickers above are already constrained to real dates
@@ -203,17 +205,8 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
     // trusting the picker silently.
     if (typeof window !== "undefined" && window.Validate && !window.Validate.isValidCalendarDate({ year, month, day })) {
       setFormError(`${months[month - 1]} ${day}, ${year} is not a real calendar date.`);
-      return;
+      return null;
     }
-    // Prime SpeechSynthesis inside the user-gesture so the first
-    // narration isn't silently blocked by autoplay policy.
-    try {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        const u = new SpeechSynthesisUtterance(" ");
-        u.volume = 0;
-        window.speechSynthesis.speak(u);
-      }
-    } catch {}
     const city = findCity(place);
     const h24 = meridiem === "AM"
       ? (hour12 === 12 ? 0  : hour12)
@@ -259,7 +252,7 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
       dateISO = buildBirthISO({ year, month, day, hour: effHour, minute: effMinute, off: city.off });
     }
 
-    onCast({
+    return {
       dateISO,
       lat: city.lat,
       lng: city.lng,
@@ -270,11 +263,28 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
       // behavior.
       tz: city.tz || null,
       placeLabel: `${city.name} · ${city.region}`,
+      placeKey: cityKey(city),
       subjectName: (subjectName || "").trim() || (isPartner ? "Them" : "You"),
       timeUnknown,
       dstNote,
       formState: { year, month, day, hour12, minute, meridiem, place, subjectName, timeUnknown },
-    });
+    };
+  };
+
+  const submit = (e) => {
+    if (e) e.preventDefault();
+    const payload = buildPayload();
+    if (!payload) return;
+    // Prime SpeechSynthesis inside the user-gesture so the first
+    // narration isn't silently blocked by autoplay policy.
+    try {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        const u = new SpeechSynthesisUtterance(" ");
+        u.volume = 0;
+        window.speechSynthesis.speak(u);
+      }
+    } catch {}
+    onCast(payload);
   };
 
   return (
@@ -301,10 +311,10 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
           </p>
 
           <form className="landing-form" onSubmit={submit}>
-            {isPartner && (
+            {!isHcrm && (
               <fieldset className="lf-set">
-                <legend className="lf-leg">Their name</legend>
-                <TweakLikeText value={subjectName} onChange={setSubjectName} placeholder="a name or initial" />
+                <legend className="lf-leg">{isPartner ? "Their name" : "Name for the reading"}</legend>
+                <TweakLikeText value={subjectName} onChange={setSubjectName} placeholder={isPartner ? "a name or initial" : "your name or initial"} />
               </fieldset>
             )}
             <fieldset className="lf-set">
@@ -442,9 +452,23 @@ function Landing({ initial, onCast, mode, onBack, agentOn, onToggleAgent }) {
                 : "Chart math — positions, houses, aspects, dignities, eclipses — is computed entirely in your browser; none of it is sent anywhere. " + (voiceEgress
                     ? "Voice narration is set to ElevenLabs and a key is stored, so the text of each reading (and that key) is sent to ElevenLabs to be spoken aloud — no birth data or placements travel with it; switch the voice engine to \"Browser\" in the tweaks panel to keep narration offline. "
                     : "") + (agentOn === true
-                    ? "Because you ticked the checkbox above, right after you submit this form this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "your birth date, time, and location") + " to Claude (Anthropic) to generate the spoken-style \"Agent interpreter\" reading — untick it to keep everything local."
+                    ? "Because you ticked the checkbox above, right after you submit this form this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "the name you enter above and your birth date, time, and location") + " to Claude (Anthropic) to generate the spoken-style \"Agent interpreter\" reading — untick it to keep everything local."
                     : "The checkbox above is off by default, so nothing is sent to Claude (Anthropic) — every reading uses the local, non-AI text instead.")}
             </p>
+
+            {!isPartner && !isHcrm && typeof window !== "undefined" && window.LifeChaptersEditor && (
+              <window.LifeChaptersEditor
+                chapters={chapters}
+                birthPlaceKey={place}
+                onChange={onChaptersChange}
+                profileState={profileState}
+                onSave={() => {
+                  const payload = buildPayload();
+                  if (payload && onSaveProfile) onSaveProfile(payload);
+                }}
+                onClear={onClearProfile}
+              />
+            )}
           </form>
         </section>
 

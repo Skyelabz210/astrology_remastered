@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = /*EDITMODE-BEGIN*/{
   "lng":           -79.0058,
   "tz":            "America/New_York",
   "placeLabel":    "Fort Liberty (Bragg) · NC",
+  "subjectName":   "You",
   "timeUnknown":   false,
   "houseSystem":   "whole",
   "sect":          "auto",
@@ -70,10 +71,32 @@ function Boundary({ children }) {
 }
 
 function App() {
-  const [settings, setTweak] = useTweaks(DEFAULT_SETTINGS);
+  // The local profile is opt-in and stays in this browser. Hydrate it once,
+  // before useTweaks takes its initial snapshot, so a reload opens with the
+  // reader's own birth record rather than briefly rendering the repository
+  // default and then replacing it.
+  const [storedProfile] = $useState(() => (
+    typeof window !== "undefined" && window.ProfileStore
+      ? window.ProfileStore.load()
+      : null
+  ));
+  const [settings, setTweak] = useTweaks({
+    ...DEFAULT_SETTINGS,
+    ...(storedProfile && storedProfile.settings ? storedProfile.settings : {}),
+  });
   const t = { tweaks: settings, setTweak };
   const [screen, setScreen] = $useState("landing");
-  const [landingState, setLandingState] = $useState(null);
+  const [landingState, setLandingState] = $useState(
+    storedProfile && storedProfile.birthForm ? storedProfile.birthForm : null
+  );
+  const [chapters, setChapters] = $useState(
+    storedProfile && Array.isArray(storedProfile.chapters) ? storedProfile.chapters : []
+  );
+  const [profileState, setProfileState] = $useState({
+    savedAt: storedProfile && storedProfile.savedAt ? storedProfile.savedAt : null,
+    message: storedProfile ? "Your local profile is loaded." : null,
+    error: false,
+  });
   const [partner, setPartner] = $useState(null);       // partner birth payload
   const [partnerState, setPartnerState] = $useState(null);
   // WP-19: the DST ambiguous/nonexistent note landing.jsx computes at
@@ -97,11 +120,43 @@ function App() {
       lng:         payload.lng,
       tz:          payload.tz || null,
       placeLabel:  payload.placeLabel,
+      placeKey:    payload.placeKey || payload.formState.place,
+      subjectName: payload.subjectName || "You",
       timeUnknown: !!payload.timeUnknown,
     });
     setLandingState(payload.formState);
     setDstNote(payload.dstNote || null);
     setScreen("session");
+  };
+
+  const onSaveProfile = (payload) => {
+    const birthSettings = {
+      dateISO: payload.dateISO,
+      lat: payload.lat,
+      lng: payload.lng,
+      tz: payload.tz || null,
+      placeLabel: payload.placeLabel,
+      placeKey: payload.placeKey || payload.formState.place,
+      subjectName: payload.subjectName || "You",
+      timeUnknown: !!payload.timeUnknown,
+    };
+    const nextSettings = { ...settings, ...birthSettings };
+    const ok = typeof window !== "undefined" && window.ProfileStore
+      ? window.ProfileStore.save(nextSettings, chapters, payload.formState)
+      : false;
+    if (!ok) {
+      setProfileState({ savedAt: null, message: "This browser blocked local profile storage.", error: true });
+      return;
+    }
+    const savedAt = new Date().toISOString();
+    setTweak(birthSettings);
+    setLandingState(payload.formState);
+    setProfileState({ savedAt, message: "Saved on this device. Nothing was uploaded.", error: false });
+  };
+
+  const onClearProfile = () => {
+    if (typeof window !== "undefined" && window.ProfileStore) window.ProfileStore.clear();
+    setProfileState({ savedAt: null, message: "Saved copy removed. The current form is unchanged.", error: false });
   };
 
   const onCastPartner = (payload) => {
@@ -114,7 +169,10 @@ function App() {
     return (
       <Boundary>
         <Landing initial={landingState} onCast={onCast}
-                 agentOn={settings.agentOn} onToggleAgent={(v) => setTweak('agentOn', v)} />
+                 agentOn={settings.agentOn} onToggleAgent={(v) => setTweak('agentOn', v)}
+                 chapters={chapters} onChaptersChange={setChapters}
+                 profileState={profileState} onSaveProfile={onSaveProfile}
+                 onClearProfile={onClearProfile} />
       </Boundary>
     );
   }
@@ -128,6 +186,7 @@ function App() {
           onBack={() => setScreen("landing")}
           onOpenSpread={() => setScreen("spread")}
           onOpenSynastry={() => setScreen("partner")}
+          chapters={chapters}
         />
       </Boundary>
     );
@@ -162,6 +221,7 @@ function App() {
   return (
     <Boundary>
       <Spread settings={settings} setTweak={setTweak} t={t} dstNote={dstNote}
+              chapters={chapters}
               onBack={() => setScreen("session")}
               onOpenSynastry={() => setScreen("partner")} />
     </Boundary>
@@ -232,11 +292,12 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
         dateISO: settings.dateISO, lat: settings.lat, lng: settings.lng,
         tz: settings.tz || null,
         houseSystem: settings.houseSystem, sect: settings.sect,
-        placeLabel: settings.placeLabel, subjectName: "You",
+        placeLabel: settings.placeLabel, placeKey: settings.placeKey || settings.placeLabel,
+        subjectName: settings.subjectName || "You",
         timeUnknown: !!settings.timeUnknown,
       });
     } catch (e) { pushError(e, "your chart"); return null; }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown, pushError]);
+  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.placeKey, settings.subjectName, settings.timeUnknown, pushError]);
 
   const chartB = $useMemo(() => {
     if (!partner) return null;
@@ -245,7 +306,8 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
         dateISO: partner.dateISO, lat: partner.lat, lng: partner.lng,
         tz: partner.tz || null,
         houseSystem: settings.houseSystem, sect: settings.sect,
-        placeLabel: partner.placeLabel, subjectName: partner.subjectName || "Them",
+        placeLabel: partner.placeLabel, placeKey: partner.placeKey || (partner.formState && partner.formState.place),
+        subjectName: partner.subjectName || "Them",
         timeUnknown: !!partner.timeUnknown,
       });
     } catch (e) { pushError(e, "their chart"); return null; }
@@ -286,7 +348,7 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
   );
 }
 
-function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOpenSynastry }) {
+function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOpenSynastry, chapters }) {
   const { banners, pushError, dismiss } = useErrorBanner();
 
   const chart = $useMemo(() => {
@@ -299,10 +361,12 @@ function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOp
         houseSystem: settings.houseSystem,
         sect: settings.sect,
         placeLabel: settings.placeLabel,
+        placeKey: settings.placeKey || settings.placeLabel,
+        subjectName: settings.subjectName || "You",
         timeUnknown: !!settings.timeUnknown,
       });
     } catch (e) { pushError(e, "natal chart"); return null; }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown, pushError]);
+  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.placeKey, settings.subjectName, settings.timeUnknown, pushError]);
 
   if (!chart) {
     return (
@@ -317,12 +381,12 @@ function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOp
   return (
     <>
       <ChartStatusBanners chart={chart} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
-      <ReadingSession chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} onOpenSpread={onOpenSpread} onOpenSynastry={onOpenSynastry} />
+      <ReadingSession chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} onOpenSpread={onOpenSpread} onOpenSynastry={onOpenSynastry} chapters={chapters} />
     </>
   );
 }
 
-function Spread({ settings, setTweak, t, dstNote, onBack }) {
+function Spread({ settings, setTweak, t, dstNote, onBack, chapters }) {
   const { banners, pushError, dismiss } = useErrorBanner();
 
   // Natal computation — runs the exact-arcsecond substrate every time.
@@ -336,13 +400,15 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
         houseSystem: settings.houseSystem,
         sect: settings.sect,
         placeLabel: settings.placeLabel,
+        placeKey: settings.placeKey || settings.placeLabel,
+        subjectName: settings.subjectName || "You",
         timeUnknown: !!settings.timeUnknown,
       });
     } catch (e) {
       pushError(e, "natal chart");
       return null;
     }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.timeUnknown, pushError]);
+  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.placeKey, settings.subjectName, settings.timeUnknown, pushError]);
 
   const cards = $useMemo(() => {
     if (!chart) return [];
@@ -418,7 +484,7 @@ function Spread({ settings, setTweak, t, dstNote, onBack }) {
 
       {typeof window !== "undefined" && window.EnhancedReadingPanel && <window.EnhancedReadingPanel chart={chart} />}
 
-      <LiveStatePanel chart={chart} />
+      <LiveStatePanel chart={chart} chapters={chapters} />
 
       {settings.primeLayer && <PrimeLayer chart={chart} />}
 

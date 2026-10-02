@@ -8,7 +8,7 @@ Nothing in the core touches a float. Positions are integer arcseconds on a ring
 of 1,296,000; every lane is a BigInt residue; all calculations are proven and verified.
 
 ```
-6019/6019 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+6034/6034 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 **All claims in this repository are production-verified.**
@@ -127,8 +127,8 @@ ledger — that path is specific to the exact-register demo); otherwise it
 falls back to a synthetic orbital model and sets `window.EPHEMERIS_MODE =
 "SYNTHETIC"` so the UI can badge it honestly.
 
-`agent.jsx`'s optional LLM chart-interpretation feature defaults to on and
-sends raw birth data to it (`window.claude.complete()`). This was originally
+`agent.jsx`'s optional LLM chart-interpretation feature defaults to off and
+sends the chart data to `window.claude.complete()` only after the reader opts in. It was originally
 shipped as a disclosed, unresolved finding — no reachable off-switch existed
 in a standalone deployment, and (found while fixing it) some screens ignored
 the in-repo toggle entirely. Both gaps are now fixed: a real checkbox on the
@@ -136,6 +136,20 @@ landing form and an `agent` toggle pill on every reading screen turn it off,
 and every agent call site now honors that setting, falling back to the
 existing local, non-AI reading. Full history: see ["Resolved: agent.jsx
 opt-out" in `project/docs/EXECUTION_STATUS.md`](project/docs/EXECUTION_STATUS.md#resolved-agentjsx-opt-out-owner-requested-2026-08-12).
+
+#### Local profiles and Life Chapters
+
+The natal entry can be named and saved explicitly as a local profile, together
+with an ordered residence history. The saved copy is allowlisted, versioned,
+and stored only in browser `localStorage`; the landing screen provides a
+two-step “forget saved profile” control. Reloading restores the birth form,
+reading name, app settings, and residence chapters without uploading them.
+
+Life Chapters keep the natal planets fixed and recompute only the
+location-dependent angles and houses. Solar and lunar returns are cast for the
+residence active on each exact return date, while the UI names that place beside
+the result. If the birth time is unknown, relocated Ascendant, Midheaven, and
+house claims are withheld rather than inferred from the noon placeholder.
 
 #### Eclipses and geophysical coordinates
 

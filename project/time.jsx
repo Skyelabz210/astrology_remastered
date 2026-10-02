@@ -483,19 +483,29 @@ function nearestBodyReturns(natal, body, targetJd) {
 
 /** The full chart cast at `body`'s return nearest `targetJd` — the return
  *  in force at the target if one has happened, else the upcoming one.
- *  Cast at the natal place; sect is always re-derived for the return
- *  instant itself (`sect: "auto"`), never inherited from the natal
+ *  Cast at the residence active on the exact return date when a saved Life
+ *  Chapters profile supplies one, otherwise at the natal place. Sect is
+ *  always re-derived for the return instant itself (`sect: "auto"`), never inherited from the natal
  *  chart's own setting. Returns null only if `body` has never returned
  *  and none is found ahead either, which does not happen in practice
  *  (nearestBodyReturns' window always contains at least one crossing). */
-function returnChart(natal, body, targetJd) {
+function returnChart(natal, body, targetJd, chaptersRaw = null) {
   const { prev, next } = nearestBodyReturns(natal, body, targetJd);
   const jd = prev !== undefined ? prev : next;
   if (jd === undefined) return null;
   const dateISO = new Date((jd - 2440587.5) * 86400000).toISOString();
   const birth = natal.birth || {};
+  const chapterContext = Array.isArray(chaptersRaw) && typeof window.chapterAware === "function"
+    ? window.chapterAware(natal, chaptersRaw, jd)
+    : null;
+  const returnPlace = chapterContext && chapterContext.active ? chapterContext.active.place : null;
   const chart = computeNatal({
-    dateISO, lat: birth.lat, lng: birth.lng,
+    dateISO,
+    lat: returnPlace ? returnPlace.lat : birth.lat,
+    lng: returnPlace ? returnPlace.lng : birth.lng,
+    tz: returnPlace ? returnPlace.tz : birth.tz,
+    placeLabel: returnPlace ? returnPlace.label : birth.placeLabel,
+    placeKey: returnPlace ? returnPlace.placeKey : birth.placeKey,
     houseSystem: birth.houseSystem, sect: "auto",
   });
   const periodDays = PLANET_PERIODS[body] * 365.25;
@@ -504,6 +514,8 @@ function returnChart(natal, body, targetJd) {
     body, jd, dateISO, K,
     isCurrent: jd === prev,
     chart,
+    placeLabel: returnPlace ? returnPlace.label : (birth.placeLabel || "natal place"),
+    relocated: !!returnPlace,
     nextJd: next,
     nextDateISO: next !== undefined ? new Date((next - 2440587.5) * 86400000).toISOString() : null,
   };
@@ -524,7 +536,7 @@ function returnChart(natal, body, targetJd) {
 // shadow lane purely by chance (10 bodies, 11 lanes, so P(at least one
 // match) = 1 − (10/11)^10 ≈ 0.58) — the sentence says so, the same
 // honesty the narrative's own shadow-contact line already practices.
-function lifecycleDigest(natal, jdTarget) {
+function lifecycleDigest(natal, jdTarget, chaptersRaw = null) {
   const fmtDate = (iso) => iso.slice(0, 10);
   const ctm = ctmState(jdTarget, natal.jd);
   const lift = windingLift(natal, jdTarget);
@@ -536,7 +548,7 @@ function lifecycleDigest(natal, jdTarget) {
   );
 
   for (const body of RETURN_BODIES) {
-    const r = returnChart(natal, body, jdTarget);
+    const r = returnChart(natal, body, jdTarget, chaptersRaw);
     if (!r) continue;
     const label = body === "Sun" ? "Solar" : "Lunar";
     lines.push(r.isCurrent
