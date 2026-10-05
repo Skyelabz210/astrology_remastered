@@ -15,7 +15,7 @@
 
 const { useState: $sUseState, useEffect: $sUseEffect, useRef: $sUseRef, useMemo: $sUseMemo } = React;
 
-function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastry, onBack, chapters }) {
+function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastry, onOpenPersona, onBack, chapters }) {
   const order = $sUseMemo(() => deckOrder(chart), [chart]);
   const cards  = $sUseMemo(() => order.map(i => chart.cards[i]), [chart, order]);
 
@@ -248,6 +248,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         chart={chart}
         onOpenSpread={onOpenSpread}
         onOpenSynastry={onOpenSynastry}
+        onOpenPersona={onOpenPersona}
         onBack={onBack}
         onExport={() => exportReading(chart, cards)}
         voiceOn={settings.voiceOn}
@@ -527,6 +528,9 @@ function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onBack, onExport,
           <button className="hdr-pill hdr-pill-syn" onClick={onOpenSynastry}>synastry</button>
         )}
         <button className="hdr-pill" onClick={onOpenSpread}>full spread</button>
+        {onOpenPersona && (
+          <button className="hdr-pill" onClick={onOpenPersona}>persona</button>
+        )}
         <button
           className="hdr-pill"
           onClick={onExport}

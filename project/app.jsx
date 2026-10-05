@@ -186,6 +186,7 @@ function App() {
           onBack={() => setScreen("landing")}
           onOpenSpread={() => setScreen("spread")}
           onOpenSynastry={() => setScreen("partner")}
+          onOpenPersona={() => setScreen("persona")}
           chapters={chapters}
         />
       </Boundary>
@@ -214,6 +215,16 @@ function App() {
           partner={partner}
           dstNote={dstNote}
           onBack={() => setScreen("session")}
+        />
+      </Boundary>
+    );
+  }
+  if (screen === "persona") {
+    return (
+      <Boundary>
+        <PersonaPage
+          onBack={() => setScreen("session")}
+          settings={settings}
         />
       </Boundary>
     );
@@ -348,7 +359,7 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
   );
 }
 
-function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOpenSynastry, chapters }) {
+function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOpenSynastry, onOpenPersona, chapters }) {
   const { banners, pushError, dismiss } = useErrorBanner();
 
   const chart = $useMemo(() => {
@@ -381,7 +392,7 @@ function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOp
   return (
     <>
       <ChartStatusBanners chart={chart} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
-      <ReadingSession chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} onOpenSpread={onOpenSpread} onOpenSynastry={onOpenSynastry} chapters={chapters} />
+      <ReadingSession chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} onOpenSpread={onOpenSpread} onOpenSynastry={onOpenSynastry} onOpenPersona={onOpenPersona} chapters={chapters} />
     </>
   );
 }
