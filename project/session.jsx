@@ -15,7 +15,8 @@
 
 const { useState: $sUseState, useEffect: $sUseEffect, useRef: $sUseRef, useMemo: $sUseMemo } = React;
 
-function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastry, onOpenPersona, onBack, chapters }) {
+function ReadingSession({ chart: natalChart, settings, setTweak, onOpenSpread, onOpenSynastry, onOpenPersona, onBack, chapters }) {
+  const { chart, context } = window.usePersonalReading(natalChart, chapters, settings);
   const order = $sUseMemo(() => deckOrder(chart), [chart]);
   const cards  = $sUseMemo(() => order.map(i => chart.cards[i]), [chart, order]);
 
@@ -74,7 +75,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   // byte-for-byte stable for the life of the session (voice-sync offsets
   // are computed against it), the same reason it is keyed on the chart
   // and nothing time-based.
-  const jdSessionNow = $sUseMemo(() => (typeof dateToJD === "function" ? dateToJD(new Date()) : null), []);
+  const jdSessionNow = context ? context.jd : null;
 
   // lifecycleDigest casts two full return charts through the real ephemeris
   // (Sun and Moon returns) — real work, not free. Computed here, keyed ONLY
@@ -86,8 +87,8 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   // never changes mid-session anyway (bugfix: a Codex review on #31 caught
   // this coupling before it shipped further).
   const lifecycleText = $sUseMemo(
-    () => (typeof narrativeLifecycle === "function" ? narrativeLifecycle(chart, jdSessionNow) : ""),
-    [chart, jdSessionNow]
+    () => (typeof narrativeLifecycle === "function" ? context ? context.lifecycleText : narrativeLifecycle(chart, jdSessionNow, chapters) : ""),
+    [chart, context, chapters, jdSessionNow]
   );
 
   // Cheap by comparison (no ephemeris chart-casting — five planetLongitude
@@ -98,15 +99,16 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
   // agent.text, not to judge case by case whether a given digest happens
   // to be cheap enough to get away with it.
   const progressionsText = $sUseMemo(
-    () => (typeof narrativeProgressions === "function" ? narrativeProgressions(chart, jdSessionNow) : ""),
+    () => (typeof narrativeProgressions === "function" ? context ? context.progressionsText : narrativeProgressions(chart, jdSessionNow) : ""),
     [chart, jdSessionNow]
   );
 
   const eclipseText = $sUseMemo(() => {
+    if (context) return context.eclipseText;
     if (!window.EnhancedReading || !window.Astronomy || window.EPHEMERIS_MODE === "SYNTHETIC") return "";
     try { return window.EnhancedReading.natalEclipseText(window.Astronomy, chart, Number(settings.eclipseOrb)>0 ? Number(settings.eclipseOrb) : 2.5); }
     catch { return "Eclipse interpretation is unavailable for this calculation."; }
-  }, [chart, settings.eclipseOrb]);
+  }, [chart, context, settings.eclipseOrb]);
 
   // The whole-chart narrative. Rebuilt only when the chart itself changes:
   // it is the same piece from the first play to the last, so a re-render
@@ -140,8 +142,8 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         } catch { /* cache shape changed — fall back to local text */ }
       });
     }
-    return buildChartNarrative(chart, { agentTexts, lifecycleText, progressionsText, eclipseText });
-  }, [chart, order, agentOn, agent.text, lifecycleText, progressionsText, eclipseText]);
+    return buildChartNarrative(chart, { agentTexts, lifecycleText, progressionsText, eclipseText, personalText: context && context.personalText });
+  }, [chart, order, agentOn, agent.text, lifecycleText, progressionsText, eclipseText, context]);
 
   // Where each narrative segment puts the deck. Segments that are not a
   // card (the opening, the closing) leave the current card alone.
@@ -250,7 +252,7 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
         onOpenSynastry={onOpenSynastry}
         onOpenPersona={onOpenPersona}
         onBack={onBack}
-        onExport={() => exportReading(chart, cards)}
+        onExport={() => exportReading(chart, cards, narrative)}
         voiceOn={settings.voiceOn}
         voiceSpeaking={voice.speaking}
         voiceBlocked={voice.blocked}
@@ -263,6 +265,8 @@ function ReadingSession({ chart, settings, setTweak, onOpenSpread, onOpenSynastr
       {typeof window !== "undefined" && window.LifeChapterSummary && (
         <window.LifeChapterSummary chart={chart} chapters={chapters} />
       )}
+
+      <window.PersonalReadingHistory chart={chart} context={context} narrative={narrative} />
 
       {!shuffled
         ? <ShuffleAnimation />
@@ -343,10 +347,10 @@ function CinematicStage({ card, timeUnknown, ascLane, agent, localReading, spoke
           <span className="cs-title">
             {narrating && narrationSegment && narrationSegment.cardIdx == null
               ? narrationSegment.title
-              : `${p.name} in ${card.name}`}
+              : `${p.name} in ${ZODIAC[p.sign].name}`}
           </span>
           {p.retrograde && <span className="cs-retro">℞</span>}
-          <span className="cs-house">{timeUnknown ? "House —" : `House ${roman(card.house)}`}</span>
+          <span className="cs-house">{timeUnknown ? "House —" : `House ${roman(p.house)}`}</span>
           <span className={`cs-dig cs-dig-${card.dignity.kind}`}>{card.dignity.kind}</span>
         </div>
 
@@ -486,7 +490,7 @@ function ShuffleAnimation() {
   );
 }
 
-function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onBack, onExport,
+function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onOpenPersona, onBack, onExport,
                          voiceOn, voiceSpeaking, voiceBlocked, onToggleVoice,
                          agentOn, onToggleAgent }) {
   // Birth-place clock, not device clock — see AstroCore.birthClockParts.
@@ -566,8 +570,8 @@ function SessionControls({ pos, total, cards, narrating, onPrev, onNext, onPick 
             key={i}
             className={`rs-dot ${i === pos ? "is-active" : ""} ${i < pos ? "is-past" : ""}`}
             onClick={() => onPick(i)}
-            title={`${c.principal.name} in ${c.name}`}
-            aria-label={`${c.principal.name} in ${c.name}${i === pos ? " (current)" : ""}`}
+            title={`${c.principal.name} in ${ZODIAC[c.principal.sign].name}`}
+            aria-label={`${c.principal.name} in ${ZODIAC[c.principal.sign].name}${i === pos ? " (current)" : ""}`}
             aria-current={i === pos ? "true" : undefined}
             style={{ "--resonance": c.resonance.toFixed(2) }}
           />

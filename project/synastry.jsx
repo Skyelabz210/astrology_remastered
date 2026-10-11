@@ -24,7 +24,7 @@ const SYN_ASPECTS = [
 const SYN_BODIES = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","Chiron","NorthNode"];
 
 function synAspect(deltaDeg) {
-  const d = Math.abs(((deltaDeg + 180) % 360) - 180);
+  const d = Math.abs(mod360(deltaDeg + 180) - 180);
   let best = null;
   for (const a of SYN_ASPECTS) {
     const sep = Math.abs(d - a.angle);
@@ -82,7 +82,8 @@ function houseOverlays(hostChart, guestChart) {
   return guestChart.planets
     .filter(p => SYN_BODIES.includes(p.name))
     .map(p => {
-      const house = hostChart.birth.houseSystem === "whole"
+      const house = hostChart.houseCusps ? AstroCore.houseForCusps(p.lon, hostChart.houseCusps)
+        : (hostChart.houseSystemActual || hostChart.birth.houseSystem) === "whole"
         ? ((p.sign - ascSignIdx + 12) % 12) + 1
         : Math.floor(mod360(p.lon - asc) / 30) + 1;
       return { planet: p.name, glyph: p.glyph, sign: ZODIAC[p.sign].name, house };
@@ -93,7 +94,7 @@ function houseOverlays(hostChart, guestChart) {
 function crossReceptions(chartA, chartB) {
   const DOM = {
     Sun:[4], Moon:[3], Mercury:[2,5], Venus:[1,6], Mars:[0,7],
-    Jupiter:[8,11], Saturn:[9,10], Uranus:[10], Neptune:[11], Pluto:[7],
+    Jupiter:[8,11], Saturn:[9,10],
   };
   const out = [];
   for (const A of chartA.planets) {
@@ -118,7 +119,7 @@ function compatibilityScore(hits) {
     else if (h.hard) friction += h.weight;
     else if (h.conj) { harmony += h.weight * 0.6; friction += h.weight * 0.4; }
   }
-  const ratio = total > 0 ? harmony / (harmony + friction) : 0.5;
+  const ratio = harmony + friction > 0 ? harmony / (harmony + friction) : 0.5;
   return {
     harmony, friction, total,
     ratio,                            // 0..1 — share of harmonious weight
@@ -158,7 +159,9 @@ function synastryCTM(chartA, chartB) {
     }
   }
   // composite midpoint phase
-  const midTheta = phaseSyndrome((tcoA.theta + tcoB.theta) / 2, 0);
+  const x = Math.cos(tcoA.theta) + Math.cos(tcoB.theta);
+  const y = Math.sin(tcoA.theta) + Math.sin(tcoB.theta);
+  const midTheta = Math.hypot(x, y) < 1e-12 ? null : phaseSyndrome(Math.atan2(y, x), 0);
   // The directional syndrome S = θA − θB is antisymmetric: swapping who is
   // entered first maps S to 360° − S, which used to flip the spoken verdict
   // from "aligned rhythm" to "counterphase" for the SAME two people. The
@@ -171,7 +174,7 @@ function synastryCTM(chartA, chartB) {
     tcoA, tcoB,
     syndrome, syndromeDeg, syndromeFoldDeg,
     sharedLanes, lanesReliable,
-    midTheta, midThetaDeg: midTheta * 180 / Math.PI,
+    midTheta, midThetaDeg: midTheta === null ? null : midTheta * 180 / Math.PI,
   };
 }
 

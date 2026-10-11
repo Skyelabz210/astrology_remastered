@@ -67,7 +67,7 @@ function makeCard() {
       name: "Sun",
       lon: 135.5,
       arcsec: 135.5 * 3600,
-      sign: 4,
+      sign: 4, house: 5,
       retrograde: false,
       residues: { r2: 1, r3: 0, r5: 0, r7: 2, r11: 3, r13: 5 },
     },

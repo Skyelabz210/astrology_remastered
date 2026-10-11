@@ -75,10 +75,10 @@ export async function run() {
     justBefore.rows.every((r) => !Object.is(r.K, -0)),
     JSON.stringify(justBefore.rows.map((r) => [r.name, r.K])));
 
-  // ── lanes are genuine arcsec mod 11 of the target position ──
+  // ── lanes are rounded arcsec mod 11 of the target position ──
   const at9000 = sb.windingLift(chart, chart.jd + 9000);
   t("every target lane re-derives from the target longitude",
-    at9000.rows.every((r) => r.lane11 === Math.floor(sb.planetLongitude(r.name, chart.jd + 9000) * 3600) % 11));
+    at9000.rows.every((r) => r.lane11 === (Math.round(sb.planetLongitude(r.name, chart.jd + 9000) * 3600) % 1296000) % 11));
   t("every return flag is exactly lane equality",
     at9000.rows.every((r) => r.isReturn === (r.lane11 === r.natalLane)));
   t("natal lanes quote the chart's own residues",

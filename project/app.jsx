@@ -187,7 +187,7 @@ function App() {
           onOpenSpread={() => setScreen("spread")}
           onOpenSynastry={() => setScreen("partner")}
           onOpenPersona={() => setScreen("persona")}
-          chapters={chapters}
+            chapters={chapters}
         />
       </Boundary>
     );
@@ -215,6 +215,7 @@ function App() {
           partner={partner}
           dstNote={dstNote}
           onBack={() => setScreen("session")}
+        chapters={chapters}
         />
       </Boundary>
     );
@@ -225,6 +226,7 @@ function App() {
         <PersonaPage
           onBack={() => setScreen("session")}
           settings={settings}
+          chapters={chapters}
         />
       </Boundary>
     );
@@ -254,7 +256,7 @@ function ChartStatusBanners({ chart, settings, dstNote, banners, onDismiss }) {
     notes.push({
       id: "synthetic-mode",
       kind: "info",
-      text: "Offline / synthetic ephemeris — planetary positions come from the built-in mean-motion model, not the full verified astronomical tables. Expect lower precision (typically a few arcminutes to roughly a degree).",
+      text: "Offline / synthetic ephemeris — planetary positions come from the built-in mean-motion model, not the full verified astronomical tables. These are illustrative demo positions and may differ substantially from the actual sky.",
     });
   }
 
@@ -265,6 +267,9 @@ function ChartStatusBanners({ chart, settings, dstNote, banners, onDismiss }) {
     if (warning) notes.push({ id: "polar-house", kind: "warn", text: warning.message });
   }
 
+  if (chart && chart.positionWarnings) {
+    chart.positionWarnings.forEach((text, i) => notes.push({ id: `position-source-${i}`, kind: "info", text }));
+  }
   if (dstNote) {
     notes.push({ id: "dst-note", kind: "warn", text: dstNote });
   }
@@ -294,7 +299,7 @@ function ChartStatusBanners({ chart, settings, dstNote, banners, onDismiss }) {
   );
 }
 
-function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
+function SynastryScreen({ chapters = [], settings, setTweak, partner, dstNote, onBack }) {
   const { banners, pushError, dismiss } = useErrorBanner();
 
   const chartA = $useMemo(() => {
@@ -302,13 +307,14 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
       return computeNatal({
         dateISO: settings.dateISO, lat: settings.lat, lng: settings.lng,
         tz: settings.tz || null,
-        houseSystem: settings.houseSystem, sect: settings.sect,
+        houseSystem: settings.houseSystem,
+        orbScale: settings.orbScale ?? 1, sect: settings.sect,
         placeLabel: settings.placeLabel, placeKey: settings.placeKey || settings.placeLabel,
         subjectName: settings.subjectName || "You",
         timeUnknown: !!settings.timeUnknown,
       });
     } catch (e) { pushError(e, "your chart"); return null; }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.placeKey, settings.subjectName, settings.timeUnknown, pushError]);
+  }, [settings.dateISO, settings.tz, settings.lat, settings.lng, settings.houseSystem, settings.orbScale, settings.sect, settings.placeLabel, settings.placeKey, settings.subjectName, settings.timeUnknown, pushError]);
 
   const chartB = $useMemo(() => {
     if (!partner) return null;
@@ -316,13 +322,14 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
       return computeNatal({
         dateISO: partner.dateISO, lat: partner.lat, lng: partner.lng,
         tz: partner.tz || null,
-        houseSystem: settings.houseSystem, sect: settings.sect,
+        houseSystem: settings.houseSystem,
+        orbScale: settings.orbScale ?? 1, sect: settings.sect,
         placeLabel: partner.placeLabel, placeKey: partner.placeKey || (partner.formState && partner.formState.place),
         subjectName: partner.subjectName || "Them",
         timeUnknown: !!partner.timeUnknown,
       });
     } catch (e) { pushError(e, "their chart"); return null; }
-  }, [partner, settings.houseSystem, settings.sect, pushError]);
+  }, [partner, settings.houseSystem, settings.orbScale, settings.sect, pushError]);
 
   if (!chartA || !chartB) {
     return (
@@ -354,7 +361,7 @@ function SynastryScreen({ settings, setTweak, partner, dstNote, onBack }) {
         banners={banners}
         onDismiss={dismiss}
       />
-      <SynastryView chartA={chartA} chartB={chartB} settings={settings} setTweak={setTweak} onBack={onBack} />
+      <SynastryView chapters={chapters} chartA={chartA} chartB={chartB} settings={settings} setTweak={setTweak} onBack={onBack} />
     </>
   );
 }
@@ -370,6 +377,7 @@ function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOp
         lng: settings.lng,
         tz: settings.tz || null,
         houseSystem: settings.houseSystem,
+        orbScale: settings.orbScale ?? 1,
         sect: settings.sect,
         placeLabel: settings.placeLabel,
         placeKey: settings.placeKey || settings.placeLabel,
@@ -377,7 +385,7 @@ function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOp
         timeUnknown: !!settings.timeUnknown,
       });
     } catch (e) { pushError(e, "natal chart"); return null; }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.placeKey, settings.subjectName, settings.timeUnknown, pushError]);
+  }, [settings.dateISO, settings.tz, settings.lat, settings.lng, settings.houseSystem, settings.orbScale, settings.sect, settings.placeLabel, settings.placeKey, settings.subjectName, settings.timeUnknown, pushError]);
 
   if (!chart) {
     return (
@@ -401,7 +409,7 @@ function Spread({ settings, setTweak, t, dstNote, onBack, chapters }) {
   const { banners, pushError, dismiss } = useErrorBanner();
 
   // Natal computation — runs the exact-arcsecond substrate every time.
-  const chart = $useMemo(() => {
+  const natalChart = $useMemo(() => {
     try {
       return computeNatal({
         dateISO: settings.dateISO,
@@ -409,6 +417,7 @@ function Spread({ settings, setTweak, t, dstNote, onBack, chapters }) {
         lng: settings.lng,
         tz: settings.tz || null,
         houseSystem: settings.houseSystem,
+        orbScale: settings.orbScale ?? 1,
         sect: settings.sect,
         placeLabel: settings.placeLabel,
         placeKey: settings.placeKey || settings.placeLabel,
@@ -419,17 +428,10 @@ function Spread({ settings, setTweak, t, dstNote, onBack, chapters }) {
       pushError(e, "natal chart");
       return null;
     }
-  }, [settings.dateISO, settings.lat, settings.lng, settings.houseSystem, settings.sect, settings.placeLabel, settings.placeKey, settings.subjectName, settings.timeUnknown, pushError]);
+  }, [settings.dateISO, settings.tz, settings.lat, settings.lng, settings.houseSystem, settings.orbScale, settings.sect, settings.placeLabel, settings.placeKey, settings.subjectName, settings.timeUnknown, pushError]);
 
-  const cards = $useMemo(() => {
-    if (!chart) return [];
-    return chart.cards.map(c => {
-      if (!c.aspect) return c;
-      const scaledOrb = c.aspect.orb * settings.orbScale;
-      if (c.aspect.sep > scaledOrb) return { ...c, aspect: null };
-      return c;
-    });
-  }, [chart, settings.orbScale]);
+  const { chart, context } = window.usePersonalReading(natalChart, chapters, settings);
+  const cards = chart ? chart.cards : [];
 
   const [flipped, setFlipped] = $useState(null);
   const onFlip = (idx) => setFlipped(f => (f === idx ? null : idx));
@@ -440,6 +442,12 @@ function Spread({ settings, setTweak, t, dstNote, onBack, chapters }) {
   // shared shadow lanes) without regenerating the reading every render.
   const jdSpreadNow = $useMemo(() => (typeof dateToJD === "function" ? dateToJD(new Date()) : null), []);
   const chartReading = useAgentChartReading(chart, settings.agentOn && !!chart, jdSpreadNow);
+
+  const narrative = $useMemo(() => chart && window.buildChartNarrative(chart, {
+    lifecycleText: context.lifecycleText, progressionsText: context.progressionsText,
+    eclipseText: context.eclipseText, personalText: context.personalText, synthesisText: chartReading.text,
+  }), [chart, context, chartReading.text]);
+
 
   if (!chart) {
     return (
@@ -482,6 +490,8 @@ function Spread({ settings, setTweak, t, dstNote, onBack, chapters }) {
           a11y-table.jsx's own header for the "always in the a11y tree,
           also toggleable for sighted users" design rationale. */}
       {typeof window !== "undefined" && window.A11yChartTable && <A11yChartTable chart={chart} title="Natal chart placements" />}
+
+      <window.PersonalReadingHistory chart={chart} context={context} narrative={narrative} />
 
       <TraditionalPanel chart={chart} />
 
@@ -693,6 +703,7 @@ function NatalTweaks({ t }) {
       <TweakRadio label="House system" value={t.tweaks.houseSystem} options={[
         { value: 'whole', label: 'Whole' },
         { value: 'equal', label: 'Equal' },
+        { value: 'porphyry', label: 'Porphyry' },
         { value: 'placidus', label: 'Placidus' },
         { value: 'koch', label: 'Koch' },
         { value: 'regiomontanus', label: 'Regiomontanus' },
@@ -999,7 +1010,7 @@ function TraditionalPanel({ chart }) {
                 <td style={{ color: "var(--ink-dim)" }}>
                   {d.crit === "anaretic" && "29° anaretic "}
                   {d.crit === "critical" && "critical deg "}
-                  {Math.abs(d.decl) > 23.45 && "out-of-bounds"}
+                  {Math.abs(d.decl) > (chart.obliquity || 23.4393) && "out-of-bounds"}
                 </td>
               </tr>
             ))}

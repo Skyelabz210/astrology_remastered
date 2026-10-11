@@ -307,7 +307,7 @@ function Landing({
               ? "Enter the second chart. The engine compares the two across every cross-aspect, house overlay, and — uniquely — the phase between your two birth points on the time-cylinder."
               : isHcrm
               ? "Enter a birth event. Every body is projected to exact integer arcseconds and reduced through the full prime basis 2·3·5·7·11·13·17·19 — the chart becomes a residue map of the human, with the shadow-prime witness lanes exposed."
-              : "Classical astrology, rigorously derived: every body computed to the exact arcsecond and reduced through the full prime basis, so every familiar mechanic reads more precisely. And beneath them, the Shadow Prime — lane eleven — carries the threads the tradition could never see."}
+              : "Explore your natal chart with astronomical planetary positions, traditional techniques, and exact integer residue calculations. The prime lanes offer a mathematical lens for symbolic interpretation."}
           </p>
 
           <form className="landing-form" onSubmit={submit}>
@@ -473,7 +473,7 @@ function Landing({
         </section>
 
         <section className="landing-right">
-          <DotmatrixGlobe
+          <MoonPhaseGlobe
             size={500}
             selectedKey={place}
             onSelect={setPlace}

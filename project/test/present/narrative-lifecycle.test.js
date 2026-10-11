@@ -188,10 +188,10 @@ export async function run() {
   // An exact match on the array already proves it excludes agent.text —
   // a separate substring search for "agent.text" would also catch this
   // very comment block explaining why (it names agent.text in prose).
-  t("that memo's dependency array is exactly [chart, jdSessionNow] — no agent.text",
-    /\$sUseMemo\(\s*\(\) => [^\n]*,\s*\[chart, jdSessionNow\]\s*\)/.test(lifecycleMemo), lifecycleMemo);
+  t("that memo's dependency array is the chart, chapters and frozen context — no agent.text",
+    /\$sUseMemo\(\s*\(\) => [^\n]*,\s*\[chart, context, chapters, jdSessionNow\]\s*\)/.test(lifecycleMemo), lifecycleMemo);
   t("that memo is the one place narrativeLifecycle is actually called",
-    /narrativeLifecycle\(chart, jdSessionNow\)/.test(lifecycleMemo), lifecycleMemo);
+    /narrativeLifecycle\(chart, jdSessionNow, chapters\)/.test(lifecycleMemo), lifecycleMemo);
 
   const nextMarker = sessionSrc.indexOf("// Where each narrative segment", nStart);
   const narrativeMemo = nStart >= 0 && nextMarker > nStart ? sessionSrc.slice(nStart, nextMarker) : "";
@@ -201,11 +201,11 @@ export async function run() {
   // check; these patterns just need to tolerate its presence rather than
   // expect the pre-progressions exact shape.
   t("the narrative memo's dependency array includes agent.text (that part of the coupling is real and expected)",
-    /\[chart, order, agentOn, agent\.text, lifecycleText, progressionsText, eclipseText\]/.test(narrativeMemo), narrativeMemo);
+    /\[chart, order, agentOn, agent\.text, lifecycleText, progressionsText, eclipseText, context\]/.test(narrativeMemo), narrativeMemo);
   t("...but the narrative memo itself never calls narrativeLifecycle or lifecycleDigest directly",
     !/narrativeLifecycle\(|lifecycleDigest\(/.test(narrativeMemo), narrativeMemo);
   t("...and passes the precomputed lifecycleText through to buildChartNarrative instead of a jdTarget",
-    /buildChartNarrative\(chart, \{ agentTexts, lifecycleText, progressionsText, eclipseText \}\)/.test(narrativeMemo), narrativeMemo);
+    /buildChartNarrative\(chart, \{ agentTexts, lifecycleText, progressionsText, eclipseText, personalText: context && context\.personalText \}\)/.test(narrativeMemo), narrativeMemo);
 
   return rows;
 }

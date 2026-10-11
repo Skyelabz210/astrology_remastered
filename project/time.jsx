@@ -151,7 +151,7 @@ function ctmState(jd, natalJd) {
 // For each natal body, locate the current transiting body's longitude and
 // any tight (≤ 2°) aspect. This is the "live" overlay on the natal chart.
 function currentTransits(natal, jdNow) {
-  const transBodies = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","Chiron","NorthNode"];
+  const transBodies = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","NorthNode"];
   const trans = transBodies.map(name => {
     const lon = planetLongitude(name, jdNow);
     return {
@@ -160,7 +160,7 @@ function currentTransits(natal, jdNow) {
       lon,
       sign: Math.floor(lon / 30),
       retrograde: isRetrograde(name, jdNow),
-      speed: planetSpeed(name),
+      speed: planetSpeed(name, jdNow),
     };
   });
 
@@ -297,10 +297,10 @@ function windingLift(natal, jdTarget) {
   const rows = bodies.map(name => {
     const natalP = natal.planets.find(p => p.name === name);
     const lon = planetLongitude(name, jdTarget);
-    const lane11 = Math.floor(lon * 3600) % 11;
+    const lane11 = (Math.round(lon * 3600) % 1296000) % 11;
     const natalLane = natalP && natalP.residues
       ? natalP.residues.r11
-      : Math.floor((natalP ? natalP.lon : 0) * 3600) % 11;
+      : (Math.round((natalP ? natalP.lon : 0) * 3600) % 1296000) % 11;
     const periodDays = PLANET_PERIODS[name] * 365.25;
     // `|| 0` folds Math.trunc's negative zero (a target minutes before
     // birth) into plain zero, so no row ever prints "-0 circuits".
@@ -321,6 +321,7 @@ function windingLift(natal, jdTarget) {
     ageDays,
     ageYears: ageDays / 365.25,
     rows,
+    circuitCountSource: "Mean orbital periods; not integrated geocentric winding",
     returns: rows.filter(r => r.isReturn).map(r => r.name),
   };
 }
@@ -506,7 +507,7 @@ function returnChart(natal, body, targetJd, chaptersRaw = null) {
     tz: returnPlace ? returnPlace.tz : birth.tz,
     placeLabel: returnPlace ? returnPlace.label : birth.placeLabel,
     placeKey: returnPlace ? returnPlace.placeKey : birth.placeKey,
-    houseSystem: birth.houseSystem, sect: "auto",
+    houseSystem: birth.houseSystem, sect: "auto", timeUnknown: !!natal.timeUnknown,
   });
   const periodDays = PLANET_PERIODS[body] * 365.25;
   const K = Math.round((jd - natal.jd) / periodDays);
@@ -552,7 +553,7 @@ function lifecycleDigest(natal, jdTarget, chaptersRaw = null) {
     if (!r) continue;
     const label = body === "Sun" ? "Solar" : "Lunar";
     lines.push(r.isCurrent
-      ? `${label} Return #${r.K} has been in force since ${fmtDate(r.dateISO)}, governing until the next on ${fmtDate(r.nextDateISO)}.`
+      ? `${label} Return #${r.K} has been in force since ${fmtDate(r.dateISO)}, governing until the next on ${fmtDate(r.nextDateISO)}${r.placeLabel ? `; cast for ${r.placeLabel}` : ""}.`
       : `No ${label.toLowerCase()} return has happened yet — the first, #${r.K}, falls on ${fmtDate(r.dateISO)}.`);
   }
 

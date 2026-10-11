@@ -39,7 +39,7 @@ function LiveStatePanel({ chart, chapters = [] }) {
       lift:     windingLift(chart, jdT),
       digest:   lifecycleDigest(chart, jdT, chapters),
     };
-  }, [target.getTime() - (target.getTime() % 60000), chart.jd, chapters]);
+  }, [target.getTime() - (target.getTime() % 60000), chart, chapters]);
 
   const chapterContext = React.useMemo(
     () => (typeof window.chapterAware === "function" ? window.chapterAware(chart, chapters, data.jdT) : null),
@@ -51,7 +51,7 @@ function LiveStatePanel({ chart, chapters = [] }) {
   // Keyed to a 30-day block of the target so scrubbing nearby dates reuses
   // the same window instead of rescanning; the day offsets shown are
   // re-derived from the live target at render time.
-  const perfKey = `${chart.jd}:${Math.round(data.jdT / 30)}`;
+  const perfKey = `${chart.birth.dateISO}:${chart.birth.lat}:${chart.birth.lng}:${chart.timeUnknown}:${Math.round(data.jdT / 30)}`;
   const [perf, setPerf] = React.useState(null);
   React.useEffect(() => {
     let alive = true;
@@ -104,7 +104,7 @@ function LiveStatePanel({ chart, chapters = [] }) {
   // recomputing on every "now" minute-tick.
   const returns = React.useMemo(
     () => RETURN_BODIES.map((b) => returnChart(chart, b, data.jdT, chapters)).filter(Boolean),
-    [chart, chapters, Math.floor(data.jdT)]
+    [chart, chapters, data.jdT]
   );
 
   return (
@@ -196,7 +196,7 @@ function LiveStatePanel({ chart, chapters = [] }) {
         <h4>Return charts · the subject, sampled once a cycle</h4>
         <p className="cl-note">
           Classical technique, cast whole: the exact instant this body returns to its own natal
-          degree, with a full chart drawn for that moment at the natal place — its own Ascendant,
+          degree, with a full chart drawn for that moment at the residence active on that return date (or the birthplace) — its own Ascendant,
           its own houses, its own sky. Strung together over a lifetime, one return after another is
           this apparatus's evolving image of the subject — the natal chart is a single instant; the
           returns are the same subject, sampled once a cycle, forever.
@@ -234,15 +234,14 @@ function LiveStatePanel({ chart, chapters = [] }) {
       <div className="cl-card cl-card-wide">
         <h4>The winding lift · K against the shadow prime</h4>
         <p className="cl-note">
-          Each body's state at the target is two numbers: K, the circuits it has closed since birth
+          The target longitude comes from the ephemeris. K estimates circuits from mean orbital periods since birth
           (negative before birth — earlier states are reached the same way), and its shadow-lane residue
-          (arcsec mod 11) beside the natal one. Residue and winding together name the whole path — the
-          register's K-elimination, run along the chart's own history. ↺ marks a shadow-lane return.
+          (arcsec mod 11) beside the natal one. K does not integrate the actual geocentric path or retrograde loops. ↺ marks a lane match between these quantized positions; it is an experimental correspondence.
           {chart.timeUnknown && " The birth time is unknown, so the natal lane and return column below are withheld: an assumed noon can be off by hours, and arcsecond width is so narrow that every body's natal lane cycles through all eleven residues inside a single day of that uncertainty. K and the target's own lane are unaffected — like the age above, they carry only the same sub-day imprecision the assumed clock time already has."}
         </p>
         <table className="tp-table">
           <thead>
-            <tr><th>body</th><th className="num">circuits K</th><th className="num">lane₁₁ at target</th><th className="num">natal lane₁₁</th><th>return</th></tr>
+            <tr><th>body</th><th className="num">estimated circuits K</th><th className="num">lane₁₁ at target</th><th className="num">natal lane₁₁</th><th>return</th></tr>
           </thead>
           <tbody>
             {data.lift.rows.map((r) => (

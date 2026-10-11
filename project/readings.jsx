@@ -123,12 +123,13 @@ const ASPECT_FAMILY_SOURCE_TAG = {
 function readingFor(card, chart) {
   chart = chart || {};
   const p = card.principal;
-  const sign = card.name;
-  const houseFn = HOUSE_FUNCTION[card.house];
+  const actualSign = typeof ZODIAC !== "undefined" && ZODIAC[p.sign] || card;
+  const sign = actualSign.name;
+  const houseFn = HOUSE_FUNCTION[p.house];
   const dig     = DIGNITY_STATEMENT[card.dignity.kind];
   const planetFn  = PLANET_FN[p.name] || "agent.";
-  const elemFn    = ELEMENT_FN[card.element];
-  const modeFn    = MODALITY_FN[card.modality];
+  const elemFn    = ELEMENT_FN[actualSign.element];
+  const modeFn    = MODALITY_FN[actualSign.modality];
   const timeKnown = !chart.timeUnknown;
 
   const body = [];
@@ -142,7 +143,7 @@ function readingFor(card, chart) {
   });
 
   body.push({
-    text: `${sign}: ${card.element} (${elemFn}) · ${card.modality} (${modeFn})`,
+    text: `${p.name} in ${sign}: ${actualSign.element} (${elemFn}) · ${actualSign.modality} (${modeFn})`,
     sourceTag: QUALITY_SOURCE_TAG,
   });
 
@@ -156,7 +157,7 @@ function readingFor(card, chart) {
   // Ascendant in that case. We don't have a direct isDayChart-was-derived-
   // from-Asc flag here, so when the time is unknown we soften the sect
   // line to flag that uncertainty rather than asserting it outright. ─────
-  if (typeof chart.isDayChart === "boolean") {
+  if (timeKnown && typeof chart.isDayChart === "boolean") {
     const sectWord = chart.isDayChart ? "day" : "night";
     const uncertainty = timeKnown ? "" : " (birth time unknown — this determination may be unreliable)";
     body.push({
@@ -166,7 +167,7 @@ function readingFor(card, chart) {
 
     if (card.tripLord) {
       body.push({
-        text: `Triplicity: for a ${card.element}-triplicity sign in a ${sectWord} chart, the ruler is ${card.tripLord}${card.tripPart ? ` (participating: ${card.tripPart})` : ""} — this often colors the placement's underlying temperament.`,
+        text: `Triplicity: for a ${actualSign.element}-triplicity sign in a ${sectWord} chart, the ruler is ${card.tripLord}${card.tripPart ? ` (participating: ${card.tripPart})` : ""} — this often colors the placement's underlying temperament.`,
         sourceTag: "Dorothean triplicity",
       });
     }
@@ -229,12 +230,12 @@ function readingFor(card, chart) {
   // time, so it is withheld from the reading text rather than presented
   // as fact. ──────────────────────────────────────────────────────────────
   const subtitle = timeKnown
-    ? `House ${roman(card.house)}`
+    ? `House ${roman(p.house)}`
     : `Birth time unknown · house placement withheld`;
 
   if (timeKnown) {
     body.push({
-      text: `House ${roman(card.house)}: ${houseFn}`,
+      text: `House ${roman(p.house)}: ${houseFn}`,
       sourceTag: "Whole-sign / equal house placement",
     });
   }
@@ -278,8 +279,8 @@ function rigorousFor(card, chart) {
   return [
     { label: "λ arcsec",         value: Math.floor(p.arcsec).toLocaleString() },
     { label: "λ degrees",        value: p.lon.toFixed(4) + "°" },
-    { label: "sign-index",       value: `${p.sign} (${card.name})` },
-    { label: "house",            value: chart.timeUnknown ? "— (birth time unknown)" : `H${card.house}` },
+    { label: "sign-index",       value: `${p.sign} (${typeof ZODIAC !== "undefined" ? ZODIAC[p.sign].name : card.name})` },
+    { label: "house",            value: chart.timeUnknown ? "— (birth time unknown)" : `H${p.house}` },
     { label: "dignity",          value: `${card.dignity.kind} (${card.dignity.score >= 0 ? "+" : ""}${card.dignity.score})` },
     { label: "retrograde",       value: p.retrograde ? "℞ yes" : "no" },
     { label: "r₂",               value: r.r2,  note: "parity" },

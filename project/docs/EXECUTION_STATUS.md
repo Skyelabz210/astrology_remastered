@@ -1,6 +1,8 @@
 # Execution Status — Production Complete
 
-**PRODUCTION-READY as of 2026-09-25.**
+**Historical work-package record, 2026-09-25.**
+
+The original completeness assessment is superseded by [FULL_APP_AUDIT.md](FULL_APP_AUDIT.md). Work-package completion does not certify full astrology coverage.
 
 All 29 work packages are complete, verified, and merged to `main`.
 All research-level items have been classified as out-of-scope for the production application.

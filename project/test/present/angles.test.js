@@ -66,9 +66,8 @@ const CHARTS = [
 // budget. The Swiss Ephemeris accuracy claim itself is houses.test.js's job.
 const IDENTITY_TOL_DEG = 1e-9;
 
-// The fallback must miss by more than this for the discriminator to be
-// meaningful. Observed spread is 26.8-108.9 deg; 1 deg is a safe floor.
-const DISCRIMINATOR_MIN_DEG = 1.0;
+// Sampled closed-form fallback budget, compared against the verified solver.
+const FALLBACK_SAMPLE_MAX_DEG = 0.02;
 
 function circDiffDeg(a, b) {
   return ((a - b) % 360 + 540) % 360 - 180;
@@ -119,8 +118,8 @@ export async function run() {
       Math.abs(circDiffDeg(chart.desc, ref.ascDeg + 180)) < 1e-9);
   }
 
-  // 5. Discriminator: the retained fallback must be measurably WRONG, so a
-  //    silent regression to it cannot pass this suite.
+  // 5. The corrected fallback must select the same horizon branch.
+  //    Its approximation is independently checked against the verified solver.
   const fallback = makeSandbox({ withHouses: false });
   t("ANGLES_MODE reports APPROX without houses.js",
     fallback.ANGLES_MODE === "APPROX", `got ${fallback.ANGLES_MODE}`);
@@ -131,11 +130,11 @@ export async function run() {
     const ref = housesModule.ascMcFromDate(date, lat, lng);
     const err = Math.abs(circDiffDeg(fallback.ascendantDeg(date, lat, lng), ref.ascDeg));
     worstFallbackErr = Math.max(worstFallbackErr, err);
-    t(`${label} · fallback ASC is detectably wrong`, err > DISCRIMINATOR_MIN_DEG,
-      `err=${err.toFixed(2)}deg — if this fails the discriminator is toothless`);
+    t(`${label} · fallback ASC selects the correct branch`, err < FALLBACK_SAMPLE_MAX_DEG,
+      `err=${err.toFixed(2)}deg against the verified reference`);
   }
-  t("fallback ASC error exceeds a full sign somewhere",
-    worstFallbackErr > 30, `worst=${worstFallbackErr.toFixed(2)}deg`);
+  t("fallback ASC stays within the sampled approximation budget",
+    worstFallbackErr < FALLBACK_SAMPLE_MAX_DEG, `worst=${worstFallbackErr.toFixed(2)}deg`);
 
   // 6. A page missing the module must degrade, not crash.
   t("fallback path still produces a usable chart",

@@ -6,8 +6,17 @@
 
 const { useState: $synUseState, useMemo: $synUseMemo, useEffect: $synUseEffect } = React;
 
-function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
-  const syn = $synUseMemo(() => computeSynastry(chartA, chartB), [chartA, chartB]);
+function SynastryView({ chartA, chartB, chapters = [], settings, setTweak, onBack }) {
+  const rawSyn = $synUseMemo(() => computeSynastry(chartA, chartB), [chartA, chartB]);
+  const personal = window.usePersonalReading(chartA, chapters, settings);
+  const context = $synUseMemo(() => {
+    const c = personal.context;
+    const input = { ...c.input, kind: 'synastry', partnerBirth: { ...chartB.birth } };
+    const evidence = { ...c.evidence, synastry: { status: 'ready', value: rawSyn } };
+    return { ...c, input, evidence, cacheFingerprint: window.ReadingRuns.evidenceFingerprint([c.at, input, evidence]) };
+  }, [personal.context, rawSyn, chartB]);
+  const archiveChart = $synUseMemo(() => ({ ...chartA, readingContext: context }), [chartA, context]);
+  const syn = $synUseMemo(() => ({ ...rawSyn, readingContext: context }), [rawSyn, context]);
   // `=== true`, not `!== false`: DEFAULT_SETTINGS.agentOn is opt-in now, so a
   // settings object that simply lacks the key must read as OFF.
   const agentOn = settings.agentOn === true;
@@ -130,6 +139,8 @@ function SynastryView({ chartA, chartB, settings, setTweak, onBack }) {
         </div>
       </div>
 
+      <window.PersonalReadingHistory chart={archiveChart} context={context} narrative={{ text: reading.text ||
+        `${A} and ${B}: closest relationship contacts are ${syn.hits.slice(0, 5).map(h => `${A}'s ${h.a} ${h.aspect.toLowerCase()} ${B}'s ${h.b}, ${h.orb.toFixed(2)} degrees from exact`).join('; ')}.` }} />
       <FollowUpQuestions mode="synastry" syn={syn} agentOn={agentOn} />
 
       <div className="syn-grid">

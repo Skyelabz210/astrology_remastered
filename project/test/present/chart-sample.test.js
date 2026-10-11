@@ -162,8 +162,8 @@ export async function run() {
         p.sign === Math.floor(p.lon / 30), `${id}: ${p.name}`);
       check("degInSign decomposes the longitude",
         Math.abs(p.degInSign - (p.lon - p.sign * 30)) < 1e-9, `${id}: ${p.name}`);
-      check("arcsec is exactly lon * 3600",
-        Math.abs(p.arcsec - p.lon * 3600) < 1e-6, `${id}: ${p.name}`);
+      check("arcsec is longitude rounded to the ledger ring",
+        p.arcsec === Math.round(p.lon * 3600) % 1296000, `${id}: ${p.name}`);
 
       // — the remastery invariant: residues really are arcsec mod prime —
       for (const [key, prime] of Object.entries(LANE_PRIMES)) {
@@ -253,7 +253,7 @@ export async function run() {
         return c.laneR11 === cardArcsec % 11 && c.laneR13 === cardArcsec % 13;
       }), id);
     check("the chart names the Ascendant's own shadow lane",
-      chart.ascR11 === Math.floor(chart.asc * 3600) % 11, id);
+      chart.ascR11 === Math.round(chart.asc * 3600) % 11, id);
 
     check("void-of-course carries a verdict and a sign-change horizon",
       chart.voidOfCourse && typeof chart.voidOfCourse.isVoc === "boolean" &&

@@ -68,7 +68,7 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
       onFlip(card.idx);
     }
   };
-  const cardLabel = `${p.name} in ${card.name}, house ${card.house}. ${isFlipped ? "Showing reading — press to flip back." : "Press to flip for the reading."}`;
+  const cardLabel = `${p.name} in ${ZODIAC[p.sign].name}, ${chart && chart.timeUnknown ? "house unavailable" : `house ${p.house}`}. ${isFlipped ? "Showing reading — press to flip back." : "Press to flip for the reading."}`;
 
   return (
     <div
@@ -128,6 +128,7 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
             <div className="zc-big-glyph">{card.glyph}</div>
             <div className="zc-name">{card.name}</div>
             <div className="zc-latin">{card.latin}</div>
+            <div className="zc-placement">{p.name} in {ZODIAC[p.sign].name}</div>
             <div className="zc-meta">
               <span>{card.element}</span>
               <i className="zc-dot"></i>

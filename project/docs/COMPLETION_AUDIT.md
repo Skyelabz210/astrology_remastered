@@ -1,12 +1,13 @@
 # Production Readiness Audit
 
 **Date:** 2026-09-25  
-**Status:** PRODUCTION-READY  
+**Status:** HISTORICAL — conclusions superseded
 **Audited at:** `e731ff2` (main branch)
 
-**Conclusion:** The astrology_remastered repository is **production-ready**. All core
-computational modules are verified, stable, and complete. All research-level
-items have been properly classified as out-of-scope for the production application.
+**Current assessment:** The completeness and production-readiness conclusions below
+were too broad. Consult [FULL_APP_AUDIT.md](FULL_APP_AUDIT.md) for the current
+calculation coverage, repaired defects and explicit gaps. The remaining text is
+the earlier audit record, not a current certification.
 
 ---
 
