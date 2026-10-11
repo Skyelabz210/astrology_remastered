@@ -1,17 +1,19 @@
 # Astrology Remastered
 
-A production-ready astrology application built on **CRAM** — Configurable Residue
-Arithmetic Machines. Provides precise calculations for all major astrological
-variants, traditions, and house systems with exact integer arithmetic.
+A browser astrology application combining astronomical planetary positions,
+traditional interpretation, and **CRAM** (Configurable Residue Arithmetic Machines).
 
-Nothing in the core touches a float. Positions are integer arcseconds on a ring
-of 1,296,000; every lane is a BigInt residue; all calculations are proven and verified.
+The core uses BigInt to preserve quantized integer arcseconds exactly. Astronomy
+is computed outside that core with floating-point ephemerides: exact residue
+arithmetic does not make the input observations exact. The main chart uses
+Astronomy Engine for ten planets, mean elements for lunar nodes and Lilith, and
+omits unsupported Chiron by default. See the [whole-app coverage and personal-reading audit](project/docs/FULL_APP_AUDIT.md) and [Persona repair report](project/docs/PERSONA_ACCURACY_REPAIR.md).
 
 ```
-6034/6034 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+6797/6797 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
-**All claims in this repository are production-verified.**
+The test banner records automated checks, not proof of every mathematical or interpretive claim in this repository.
 See [`project/STATUS.md`](project/STATUS.md) for current layer classification and
 [`project/REMEDIATION_LEDGER.md`](project/REMEDIATION_LEDGER.md) for the
 corrective-pass history (P1–P28).
@@ -59,6 +61,10 @@ No install beyond `npm ci` in `project/` is required for tests; the producer
 CLI needs the pinned `astronomy-engine` dependency, which `npm ci` also
 installs.
 
+The native runtime/tests support Node 20+. For the Babel 8 standalone build,
+use Node 22.18+ or Node 24.11+, then run `npm run build`. Browser checks use
+`npx playwright install chromium` followed by `npm run test:browser`.
+
 ---
 
 ## Architecture
@@ -70,7 +76,7 @@ Four layers, with a hard rule about which ones floats are allowed in:
 │ PRESENTATION   *.jsx, *.html — React, floats legal                   │
 │  astro.jsx / src/present/astro-core.js — dignities, aspects, chart   │
 │  logic; real ephemeris in-browser via a vendored astronomy-engine    │
-│  build when present, else a labeled SYNTHETIC fallback               │
+│  build; explicitly selected synthetic demo otherwise                │
 │  hcrm.jsx / hcrm-view.jsx — the exact-register console UI            │
 └──────────────────────────────────────────────────────────────────────┘
                  │ float degrees, rounded to an integer arcsecond,
@@ -123,9 +129,10 @@ presenting rounded floats as exact register data.
 The chart UI (`astro.jsx`, `app.jsx`, and friends) is a separate, more
 conventional presentation path: when a vendored astronomy-engine build is
 loaded in the browser it computes real positions client-side (not through the
-ledger — that path is specific to the exact-register demo); otherwise it
-falls back to a synthetic orbital model and sets `window.EPHEMERIS_MODE =
-"SYNTHETIC"` so the UI can badge it honestly.
+ledger — that path is specific to the exact-register demo). An explicitly
+selected synthetic demonstration is labelled with `window.EPHEMERIS_MODE =
+"SYNTHETIC"`; failed real calculations raise errors rather than silently
+switching to invented positions.
 
 `agent.jsx`'s optional LLM chart-interpretation feature defaults to off and
 sends the chart data to `window.claude.complete()` only after the reader opts in. It was originally
@@ -145,11 +152,25 @@ and stored only in browser `localStorage`; the landing screen provides a
 two-step “forget saved profile” control. Reloading restores the birth form,
 reading name, app settings, and residence chapters without uploading them.
 
-Life Chapters keep the natal planets fixed and recompute only the
-location-dependent angles and houses. Solar and lunar returns are cast for the
+Life Chapters keep the natal longitudes fixed and recompute location-dependent
+angles, houses, sect, Lots and card context. Solar and lunar returns are cast for the
 residence active on each exact return date, while the UI names that place beside
 the result. If the birth time is unknown, relocated Ascendant, Midheaven, and
 house claims are withheld rather than inferred from the noon placeholder.
+
+Each reading now retains a frozen calculation instant, birth record, settings,
+residence history, computed evidence and narration in a profile-scoped local
+history. The browser keeps the latest 50 runs across profiles. AI completions
+and follow-up answers stay attached to their original run.
+
+**Export all my data as ZIP** collects the selected user's chart, current and
+saved readings, return/relocated charts, progressions, eclipse profile and
+admitted ledger diagnostics. Extract the ZIP and open `report.html` to read it
+offline; the archive also includes a vector natal chart and calculation JSON.
+Unrelated profiles and credential fields are excluded. Relevant relationship
+data includes the partner entered for that relationship. Save the download
+to preserve the snapshot beyond browser storage; there is no hosted account
+or automatic cross-device backup.
 
 #### Eclipses and geophysical coordinates
 

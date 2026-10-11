@@ -1,10 +1,12 @@
 # HCRM Status
 
-Current status: **PRODUCTION-READY.**
+Current status: **tested integer core and numerical astronomy; known coverage limits.**
 
-This is a production astrology application. All core computational modules are
-verified and stable. The exact integer core provides precise astrological
-calculations for all supported traditions, divisions, and house systems.
+The current whole-app assessment is [docs/FULL_APP_AUDIT.md](docs/FULL_APP_AUDIT.md).
+Exact BigInt operations do not make ephemeris positions, interpretive claims or
+every named tradition exact or complete. The layer table below classifies the
+framework modules; test-supported arithmetic identities are not evidence of
+physical effects.
 
 Synthetic ephemeris mode is available for demonstration purposes and is clearly
 labelled as such in the UI.

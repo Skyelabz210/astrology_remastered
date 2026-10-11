@@ -2934,3 +2934,36 @@ body::before {
   .rs-controls { margin-top: 16px; padding-top: 12px; gap: 10px; }
   .rs-dots { margin-left: 8px; flex-wrap: wrap; row-gap: 8px; }
 }
+
+/* Natal Persona inspector shares the app's controls and typography. */
+.persona-page { max-width: 1440px; margin: auto; padding: 2rem; color: var(--ink, #e4dfd5); }
+.persona-header { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.persona-header h1 { flex: 1; }
+.persona-layout { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 2rem; margin-top: 2rem; }
+.persona-sidebar .hdr-pill { white-space: normal; text-align: left; margin: .5rem 0; }
+.persona-saved { padding: .8rem 0; border-bottom: 1px solid #555; }
+.persona-saved label, .persona-saved input { display: block; max-width: 100%; }
+.persona-grid, .persona-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
+.persona-grid section, .persona-lanes section { border: 1px solid #555; border-radius: 12px; padding: 1rem; }
+.persona-main p { line-height: 1.6; }
+.transit-table-container { overflow-x: auto; }
+.transit-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.transit-table caption { text-align: left; padding: .75rem; }
+.transit-table th, .transit-table td { padding: .65rem; text-align: left; border-bottom: 1px solid #555; }
+.moon-phase-globe { text-align: center; width: 100%; }
+.moon-phase-globe canvas { display: block; margin: auto; }
+@media (max-width: 760px) { .persona-page { padding: 1rem; } .persona-layout { grid-template-columns: 1fr; } }
+.persona-main, .persona-sidebar { min-width: 0; }
+.persona-header h1, .persona-main h2, .persona-main p { overflow-wrap: anywhere; }
+@media (max-width: 760px) { .persona-header h1 { flex: 1 0 100%; order: -1; } }
+
+.personal-history { margin: 1rem auto; padding: 1rem; max-width: 70rem; border: 1px solid rgba(200,190,160,.25); color: #ddd5c7; }
+.personal-history summary { cursor: pointer; padding: .6rem 0; }
+.personal-history p { line-height: 1.6; overflow-wrap: anywhere; }
+.personal-history button { margin: .4rem .6rem .4rem 0; }
+.personal-history .saved-reading { white-space: pre-wrap; }
+.zc-placement { margin-top: .4rem; font-size: .7rem; line-height: 1.3; color: var(--ink-dim); }
+
+.personal-archive { margin: .5rem 0 1rem; }
+.personal-archive button { max-width: 100%; white-space: normal; }
+.personal-archive p { line-height: 1.5; overflow-wrap: anywhere; }

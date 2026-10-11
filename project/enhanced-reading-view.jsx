@@ -8,7 +8,15 @@ function EnhancedReadingPanel({chart}) {
     let cancelled = false;
     setResult(null);
     E.produceBrowserLedger(window.EPHEMERIS_MODE === "SYNTHETIC" ? null : window.Astronomy,chart.birth)
-      .then(entries=>E.buildDiagnostics(entries,chart.birth.dateISO))
+      .then(entries=>({ ...E.buildDiagnostics(entries,chart.birth.dateISO), ledger: entries }))
+      .then(data=>{
+        if (!cancelled && chart.readingContext && window.ReadingRuns) {
+          const c = chart.readingContext;
+          const ok = window.ReadingRuns.attachEvidence(null, JSON.stringify([c.at, c.input]), 'hcrm', data);
+          if (ok) window.dispatchEvent(new CustomEvent('personal-reading-evidence'));
+        }
+        return data;
+      })
       .then(data=>{if(!cancelled) setResult({chart,data});})
       .catch(error=>{if(!cancelled) setResult({chart,error:error.message});});
     return ()=>{cancelled=true;};

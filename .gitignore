@@ -1,1 +1,4 @@
-(empty)
+project/node_modules/
+project/dist/
+project/test-results/
+project/playwright-report/

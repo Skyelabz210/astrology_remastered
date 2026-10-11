@@ -154,9 +154,9 @@ export async function run() {
   t("the narrative memo never calls narrativeProgressions or progressionsDigest directly",
     !/narrativeProgressions\(|progressionsDigest\(/.test(narrativeMemo), narrativeMemo);
   t("...and passes the precomputed progressionsText through to buildChartNarrative",
-    /buildChartNarrative\(chart, \{ agentTexts, lifecycleText, progressionsText, eclipseText \}\)/.test(narrativeMemo), narrativeMemo);
+    /buildChartNarrative\(chart, \{ agentTexts, lifecycleText, progressionsText, eclipseText, personalText: context && context\.personalText \}\)/.test(narrativeMemo), narrativeMemo);
   t("...and its dependency array includes progressionsText",
-    /\[chart, order, agentOn, agent\.text, lifecycleText, progressionsText, eclipseText\]/.test(narrativeMemo), narrativeMemo);
+    /\[chart, order, agentOn, agent\.text, lifecycleText, progressionsText, eclipseText, context\]/.test(narrativeMemo), narrativeMemo);
 
   return rows;
 }

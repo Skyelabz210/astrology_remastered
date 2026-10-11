@@ -68,7 +68,7 @@ export function run() {
     `${callSites} call sites, ${guards} guards`);
 
   const hookHeads = (bare.match(/function\s+use(?:Agent\w*|Synastry)Reading\s*\(/g) || []).length;
-  const shortCircuits = (bare.match(/if\s*\(!agentAvailable\(\)\)\s*\{\s*setState\(AGENT_UNAVAILABLE\);\s*return;\s*\}/g) || []).length;
+  const shortCircuits = (bare.match(/if\s*\(!agentAvailable\(\)\)\s*\{\s*setState\((?:AGENT_UNAVAILABLE|\{\s*\.\.\.AGENT_UNAVAILABLE,\s*stateKey\s*\})\);\s*return;\s*\}/g) || []).length;
   t("every reading hook short-circuits before firing a doomed request",
     hookHeads > 0 && shortCircuits >= hookHeads,
     `${hookHeads} hooks, ${shortCircuits} short-circuits`);

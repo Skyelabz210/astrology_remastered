@@ -54,9 +54,9 @@ export function mod360(x) {
 // ──────────────────────────────────────────────────────────────────────
 export const DOMICILE = {
   Sun: [4], Moon: [3], Mercury: [2,5], Venus: [1,6], Mars: [0,7],
-  Jupiter: [8,11], Saturn: [9,10], Uranus: [10], Neptune: [11], Pluto: [7],
+  Jupiter: [8,11], Saturn: [9,10],
 };
-export const EXALT = { Sun:0, Moon:1, Mercury:5, Venus:11, Mars:9, Jupiter:3, Saturn:6, Uranus:7, Neptune:3, Pluto:0 };
+export const EXALT = { Sun:0, Moon:1, Mercury:5, Venus:11, Mars:9, Jupiter:3, Saturn:6 };
 
 export function opp(i) { return (i + 6) % 12; }
 
@@ -227,6 +227,11 @@ export const ASPECTS = [
   { name: "Sextile",     angle:  60, orb: 5, family: "classical" },
   { name: "Quincunx",    angle: 150, orb: 3, family: "minor"     },
   { name: "Semisquare",  angle:  45, orb: 2, family: "minor"     },
+  { name: "Semisextile", angle: 30, orb: 2, family: "minor" },
+  { name: "Sesquiquadrate", angle: 135, orb: 2, family: "minor" },
+  { name: "Novile", angle: 40, orb: 1.5, family: "novile" },
+  { name: "Decile", angle: 36, orb: 1.2, family: "decile" },
+  { name: "Tridecile", angle: 108, orb: 1.2, family: "decile" },
   { name: "Quintile",    angle:  72, orb: 2, family: "quintile"  },
   { name: "BiQuintile",  angle: 144, orb: 2, family: "quintile"  },
   { name: "Septile",     angle: 360/7,  orb: 1.5, family: "septile"   },
@@ -234,39 +239,27 @@ export const ASPECTS = [
   { name: "Tredecile",   angle: 360/13, orb: 1.2, family: "tredecile" },
 ];
 
-export function nearestAspect(deltaDeg) {
-  const d = Math.abs(((deltaDeg + 180) % 360) - 180);
+export function nearestAspect(deltaDeg, orbScale = 1) {
+  if (!Number.isFinite(deltaDeg) || !Number.isFinite(orbScale) || orbScale <= 0) throw new RangeError("Invalid aspect separation/orb scale");
+  const d = Math.abs(mod360(deltaDeg + 180) - 180);
   let best = null;
   for (const a of ASPECTS) {
     const sep = Math.abs(d - a.angle);
-    if (sep <= a.orb && (!best || sep < best.sep)) best = { ...a, sep, exact: a.angle };
+    if (sep <= a.orb * orbScale && (!best || sep < best.sep)) best = { ...a, orb: a.orb * orbScale, sep, exact: a.angle };
   }
   return best;
 }
 
-// Is the faster planet moving toward the exact aspect angle?
-// Returns "applying" or "separating".
-//
-// Direction is decided by comparing the current separation to the
-// separation a short time LATER, so this needs to be the instantaneous
-// direction of travel, not where the pair ends up after a full day. An
-// earlier version used a whole-day forward-Euler step (relSpeed is
-// degrees/day), which overshoots whenever the current orb is smaller than
-// the day's relative motion — very common for Moon aspects, since the
-// Moon's relative speed against slower bodies is typically 11-15°/day
-// while this app's default orbs (see ASPECTS above) are mostly 2-8°: the
-// pair would exact and re-separate WITHIN that single day-step, so the
-// coarse step lands on the wrong side of exact and reports the opposite
-// phase. A step far smaller than any realistic orb/relSpeed timescale (1
-// minute, vs. orbs measured in whole degrees and speeds in degrees/day)
-// keeps the linear approximation valid and avoids that overshoot.
-const APPLYING_PHASE_STEP_DAYS = 1 / 1440; // 1 minute
+// Signed instantaneous distance to the nearest aspect branch. A finite
+// forward step can cross exact and invert the phase for very tight orbs.
 export function applyingPhase(lonA, lonB, speedA, speedB, target) {
   const relSpeed = speedA - speedB;
-  const sep1 = mod360(lonA + relSpeed * APPLYING_PHASE_STEP_DAYS - lonB);
-  const sep0 = mod360(lonA - lonB);
-  const distTo = (s) => Math.min(Math.abs(s - target), Math.abs(s - (360 - target)), Math.abs(s - target - 360), Math.abs(s + target));
-  return distTo(sep1) < distTo(sep0) ? "applying" : "separating";
+  const errorA = mod360(lonA - lonB - target + 180) - 180;
+  const errorB = mod360(lonA - lonB + target + 180) - 180;
+  const error = Math.abs(errorA) <= Math.abs(errorB) ? errorA : errorB;
+  if (Math.abs(error) < 1e-10) return "exact";
+  if (Math.abs(relSpeed) < 1e-10) return "stationary";
+  return error * relSpeed < 0 ? "applying" : "separating";
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -368,15 +361,9 @@ export function lunarPhase(sunLon, moonLon) {
   const elong = mod360(moonLon - sunLon);
   const illumination = (1 - Math.cos(elong * Math.PI / 180)) / 2;
   const waxing = elong < 180;
-  let phase;
-  if      (elong < 45)  phase = "New";
-  else if (elong < 90)  phase = "Waxing Crescent";
-  else if (elong < 135) phase = "First Quarter";
-  else if (elong < 180) phase = "Waxing Gibbous";
-  else if (elong < 225) phase = "Full";
-  else if (elong < 270) phase = "Waning Gibbous";
-  else if (elong < 315) phase = "Last Quarter";
-  else                  phase = "Waning Crescent";
+  const names = ["New", "Waxing Crescent", "First Quarter", "Waxing Gibbous",
+    "Full", "Waning Gibbous", "Last Quarter", "Waning Crescent"];
+  const phase = names[Math.floor(mod360(elong + 22.5) / 45)];
   return { elongDeg: elong, illumination, waxing, phase };
 }
 

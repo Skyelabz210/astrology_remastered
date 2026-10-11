@@ -124,6 +124,7 @@ const TEST_GLOBALS = { ...NODE_GLOBALS, location: "readonly" };
 // gap: no-undef fails loudly, in CI, on the file that references it — fix
 // by adding the one name, not by disabling the rule.
 const JSX_GLOBALS = {
+  "PersonaPage": "readonly", "MoonPhaseGlobe": "readonly",
   "$cardUseCallback": "readonly", "$cardUseRef": "readonly", "$cardUseState": "readonly", "$ecEffect": "readonly", "$ecMemo": "readonly", "$fuUseEffect": "readonly", "$fuUseMemo": "readonly", "$fuUseState": "readonly",
   "$ecState": "readonly", "$hUseEffect": "readonly", "$hUseMemo": "readonly", "$hUseState": "readonly", "$haMemo": "readonly",
   "$haState": "readonly", "$hvEffect": "readonly", "$hvMemo": "readonly", "$hvState": "readonly", "$sUseEffect": "readonly", "$sUseMemo": "readonly",
@@ -210,6 +211,8 @@ export default [
     ],
   },
   js.configs.recommended,
+  { files: ["project/playwright.config.mjs"], languageOptions: { globals: NODE_GLOBALS } },
+  { files: ["project/browser-tests/*.mjs"], languageOptions: { globals: { ...NODE_GLOBALS, ...globals.browser } } },
   {
     files: ["project/src/**/*.js"],
     languageOptions: {
@@ -277,7 +280,7 @@ export default [
     // (`if (typeof window !== "undefined")`) publishes onto `window` for
     // the browser side of the bridge — it needs `window` declared as a
     // global for the same reason core-shim.js does.
-    files: ["project/src/present/**/*.js"],
+    files: ["project/src/astro/**/*.js", "project/src/present/**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",

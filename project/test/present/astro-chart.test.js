@@ -158,7 +158,7 @@ export function run() {
   }
   {
     const c = computeNatal(FIXTURE_BIRTH);
-    t("chart has 14 planet entries (10 + Chiron + Nodes + Lilith)", c.planets.length === 14, `got ${c.planets.length}`);
+    t("chart excludes unmodeled Chiron (10 + Nodes + mean Lilith)", c.planets.length === 13, `got ${c.planets.length}`);
   }
   {
     const c = computeNatal(FIXTURE_BIRTH);

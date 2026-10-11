@@ -40,8 +40,12 @@ function HcrmStatusBanners({ chart, birth, banners, onDismiss }) {
     notes.push({
       id: "synthetic-mode",
       kind: "info",
-      text: "Offline / synthetic ephemeris — planetary positions come from the built-in mean-motion model, not the full verified astronomical tables. Expect lower precision (typically a few arcminutes to roughly a degree).",
+      text: "Synthetic demo positions — illustrative mean motion without a validated angular error bound. Use the loaded ephemeris for astronomical readings.",
     });
+  }
+
+  if (chart && chart.positionWarnings) {
+    chart.positionWarnings.forEach((text, i) => notes.push({ id: `position-source-${i}`, kind: "info", text }));
   }
 
   if (chart && birth && typeof window !== "undefined" && window.Validate && window.HousesPolicy) {
@@ -90,7 +94,7 @@ function HCRMApp() {
     setBirth({
       dateISO: payload.dateISO, lat: payload.lat, lng: payload.lng,
       tz: payload.tz || null,
-      placeLabel: payload.placeLabel, houseSystem: birth.houseSystem, sect: birth.sect,
+      placeLabel: payload.placeLabel, placeKey: payload.placeKey || payload.placeLabel, subjectName: payload.subjectName || "You", houseSystem: birth.houseSystem, sect: birth.sect,
       timeUnknown: !!payload.timeUnknown,
       dstNote: payload.dstNote || null,
     });
@@ -104,7 +108,7 @@ function HCRMApp() {
       return computeNatal({
         dateISO: birth.dateISO, lat: birth.lat, lng: birth.lng,
         tz: birth.tz || null,
-        houseSystem: birth.houseSystem, sect: birth.sect, placeLabel: birth.placeLabel,
+        houseSystem: birth.houseSystem, sect: birth.sect, placeLabel: birth.placeLabel, placeKey: birth.placeKey, subjectName: birth.subjectName || "You",
         timeUnknown: !!birth.timeUnknown,
       });
     } catch (e) { pushError(e, "register map"); return null; }
@@ -132,6 +136,7 @@ function HCRMApp() {
   return (
     <HBoundary>
       <HcrmStatusBanners chart={chart} birth={birth} banners={banners} onDismiss={dismiss} />
+      <window.PersonalArchiveButton chart={chart} />
       <HCRMConsole chart={chart} birthLabel={label} onBack={() => setScreen("landing")} />
     </HBoundary>
   );

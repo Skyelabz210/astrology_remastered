@@ -80,9 +80,10 @@ function spokenOrb(deg) {
 }
 
 /** A date a voice can read without stumbling over an ISO string. */
-function spokenDate(dateISO) {
+function spokenDate(dateISO, tz = "UTC") {
   const d = new Date(dateISO);
   if (isNaN(d.getTime())) return null;
+  try { return new Intl.DateTimeFormat("en-US", { timeZone: tz || "UTC", year: "numeric", month: "long", day: "numeric" }).format(d); } catch { /* raw UTC fallback */ }
   const months = ["January","February","March","April","May","June","July",
     "August","September","October","November","December"];
   return `${months[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
@@ -93,7 +94,7 @@ function spokenDate(dateISO) {
 function narrativeOpening(chart) {
   const lines = [];
   const birth = chart.birth || {};
-  const when = spokenDate(birth.dateISO);
+  const when = spokenDate(birth.dateISO, birth.tz);
   const where = birth.placeLabel ? birth.placeLabel.replace(/\s*·\s*/g, ", ") : null;
 
   if (when && where) lines.push(`This is the chart for ${when}, at ${where}.`);
@@ -109,9 +110,8 @@ function narrativeOpening(chart) {
     lines.push(`${nSignName(chart.ascSignIdx)} was rising, and everything here is measured from that horizon. It is ${sect}.`);
   } else {
     // No rising sign is spoken on an unknown-time chart — see this file's
-    // header. Sect still holds: it depends on the Sun's position relative
-    // to the horizon, which astro.jsx resolves without a house system.
-    lines.push(`The birth time is unknown, so the rising sign, the houses and the angles are not spoken for on this chart. It is ${sect}.`);
+    // header. The assumed time also makes the Sun's horizon position uncertain.
+    lines.push(`The birth time is unknown, so the rising sign, houses, angles and sect are withheld. Lunar placements, phases and timings use the assumed birth time.`);
   }
 
   if (sun && moon) {
@@ -157,19 +157,20 @@ function dominantElement(chart) {
  */
 function narrativeForCard(card, chart, { first = false } = {}) {
   const p = card.principal;
+  const actualSignName = typeof ZODIAC !== "undefined" ? ZODIAC[p.sign].name : card.name;
   const timeKnown = !chart.timeUnknown;
   const parts = [];
 
   const opener = first ? "" : "";
-  const houseClause = timeKnown && card.house
-    ? `, working through the ${ORDINAL_HOUSE[card.house] || card.house} house — ${nHouseTopic(card.house)}`
+  const houseClause = timeKnown && p.house
+    ? `, working through the ${ORDINAL_HOUSE[p.house] || p.house} house — ${nHouseTopic(p.house)}`
     : "";
-  parts.push(`${opener}${p.name}${p.retrograde ? ", retrograde," : ""} in ${card.name}${houseClause}. ` +
+  parts.push(`${opener}${p.name}${p.retrograde ? ", retrograde," : ""} in ${actualSignName}${houseClause}. ` +
     `${p.name} carries ${nPlanetSignifies(p.name)}.`);
 
   const dignity = card.dignity && card.dignity.kind ? card.dignity.kind : "neutral";
   if (dignity === "neutral") {
-    parts.push(`In ${card.name} it holds no essential dignity either way: ${nDignityMeaning("neutral")}.`);
+    parts.push(`In ${actualSignName} it holds no essential dignity either way: ${nDignityMeaning("neutral")}.`);
   } else {
     parts.push(`It sits in ${dignity} here, which is to say ${nDignityMeaning(dignity)}.`);
   }
@@ -183,7 +184,7 @@ function narrativeForCard(card, chart, { first = false } = {}) {
     parts.push(`It takes ${aspectArticle(card.aspect.name)} ${String(card.aspect.name).toLowerCase()} from the Sun, ${orb}: ${nAspectMeaning(card.aspect.name)}.`);
   }
 
-  if (timeKnown && typeof chart.ascSignIdx === "number" && card.idx === chart.ascSignIdx) {
+  if (timeKnown && typeof chart.ascSignIdx === "number" && card.idx === chart.ascSignIdx && p.sign === chart.ascSignIdx) {
     parts.push(`This is the rising sign itself — the lens the rest of the chart is read through.`);
   }
 
@@ -196,7 +197,7 @@ function narrativeForCard(card, chart, { first = false } = {}) {
     ? card.principal.residues.r11
     : card.laneR11;
   const laneHolder = card.principal ? card.principal.name : null;
-  parts.push(laneHolder
+  if (timeKnown) parts.push(laneHolder
     ? `Beneath it, the eleventh lane of ${laneHolder} runs as ${nLaneName(laneOfPrincipal)}.`
     : `Beneath it, the eleventh lane runs as ${nLaneName(card.laneR11)}.`);
   return parts.join(" ");
@@ -239,7 +240,7 @@ function narrativeClosing(chart) {
   if (stelliums > 0) {
     lines.push(`${stelliums === 1 ? "One sign is" : `${stelliums} signs are`} loaded past the ordinary — that concentration is where the pressure of this chart actually sits.`);
   }
-  if (chart.voidOfCourse && chart.voidOfCourse.isVoc) {
+  if (!chart.timeUnknown && chart.voidOfCourse && chart.voidOfCourse.isVoc) {
     lines.push("The Moon was void of course at the moment of birth: whatever it was carrying had already finished being decided.");
   }
 
@@ -286,9 +287,9 @@ function narrativeClosing(chart) {
 // same moment. Requires time.jsx's lifecycleDigest to be loaded; returns
 // "" (and buildChartNarrative adds no segment) when it is not, or when no
 // jdTarget is given — this stays fully opt-in.
-function narrativeLifecycle(chart, jdTarget) {
+function narrativeLifecycle(chart, jdTarget, chapters = null) {
   if (!chart || typeof lifecycleDigest !== "function" || !Number.isFinite(jdTarget)) return "";
-  const digest = lifecycleDigest(chart, jdTarget);
+  const digest = lifecycleDigest(chart, jdTarget, chapters);
   if (!digest || !Array.isArray(digest.lines) || digest.lines.length === 0) return "";
   return digest.lines.join(" ");
 }
@@ -349,7 +350,7 @@ function narrativeProgressions(chart, jdTarget) {
  * cardIdx, title, text, start, end }` where `[start, end)` is its character
  * range inside `text` — the ranges playback syncs the deck against.
  */
-function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarget = null, lifecycleText = null, progressionsText = null, eclipseText = null } = {}) {
+function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarget = null, lifecycleText = null, progressionsText = null, eclipseText = null, personalText = null, synthesisText = null } = {}) {
   if (!chart || !Array.isArray(chart.cards)) return { text: "", segments: [] };
   const order = (typeof deckOrder === "function") ? deckOrder(chart) : chart.cards.map((_, i) => i);
 
@@ -363,12 +364,14 @@ function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarg
     raw.push({
       kind: "card",
       cardIdx: idx,
-      title: `${card.principal.name} in ${card.name}`,
+      title: `${card.principal.name} in ${typeof ZODIAC !== "undefined" ? ZODIAC[card.principal.sign].name : card.name}`,
       text: agentText || narrativeForCard(card, chart, { first: n === 0 }),
+      source: agentText ? "agent" : "local",
     });
   });
 
   raw.push({ kind: "closing", cardIdx: null, title: "The whole", text: narrativeClosing(chart) });
+  if (synthesisText) raw.push({ kind: "synthesis", cardIdx: null, title: "The chart as one", text: synthesisText, source: "agent" });
 
   const resolvedLifecycleText = lifecycleText != null
     ? lifecycleText
@@ -381,6 +384,8 @@ function buildChartNarrative(chart, { agentTexts = null, joiner = "\n\n", jdTarg
   if (resolvedProgressionsText) raw.push({ kind: "progressions", cardIdx: null, title: "By progression", text: resolvedProgressionsText });
 
   if (eclipseText) raw.push({kind:"eclipses", cardIdx:null, title:"Prenatal eclipses", text:eclipseText});
+
+  if (personalText) raw.push({ kind: "personal", cardIdx: null, title: "Your current context", text: personalText });
 
   // Character ranges are assigned against the SAME joiner the text is built
   // with, so an offset always indexes the string that is actually spoken.

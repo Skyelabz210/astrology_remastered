@@ -4,7 +4,7 @@ This file records mathematical claims that are **NOT REQUIRED** for the producti
 astrology application. These are research-level items that were part of the
 earlier framework development but are not needed for the app to function correctly.
 
-All production-critical calculations are complete, tested, and verified.
+Current calculation coverage and unresolved product gaps are recorded in [FULL_APP_AUDIT.md](FULL_APP_AUDIT.md). Research scope classification does not prove these claims.
 
 ## Research Items (Out of Scope)
 
@@ -20,11 +20,10 @@ All production-critical calculations are complete, tested, and verified.
 | Ramanujan-prime membership table | OUT OF SCOPE | Tabulated reference, not derived |
 | \u03c1-band percentages over [1, 100000] | OUT OF SCOPE | Measured framework reference |
 
-## All Production Claims are PROVEN
+## Evidence boundary
 
-All claims required for the production astrology application are:
-- **PROVEN** by exhaustive exact tests
-- **VERIFIED** against independent references (JPL Horizons, Swiss Ephemeris)
-- **COMPLETE** with no gaps or stubs
-
-The application is production-ready.
+The integer core has exhaustive checks within the tested ring and arithmetic
+contracts. Numerical ephemeris and house solvers have independent sampled
+reference checks. These results do not establish every astrological technique,
+all interpretive claims or the broader physical assertions in open issue #45.
+The earlier unqualified claim of complete production coverage is withdrawn.

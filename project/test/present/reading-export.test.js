@@ -177,7 +177,7 @@ export async function run() {
   t("the session header has an export button",
     />export</.test(sessionSrc) && /onClick=\{onExport\}/.test(sessionSrc));
   t("…wired to exportReading with the chart and its cards",
-    /onExport=\{\(\) => exportReading\(chart, cards\)\}/.test(sessionSrc));
+    /onExport=\{\(\) => exportReading\(chart, cards, narrative\)\}/.test(sessionSrc));
 
   return rows;
 }

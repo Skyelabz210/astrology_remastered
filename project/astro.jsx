@@ -243,12 +243,16 @@ function realPlanetSpeedDegPerDay(planet, jd) {
 
 function planetLongitude(planet, jd) {
   if (window.Astronomy && REAL_EPHEMERIS_BODIES.has(planet)) {
-    try {
-      return mod360(realEclipticLongitudeDeg(planet, jd));
-    } catch {
-      // Fall through to the synthetic model on any real-ephemeris failure
-      // (e.g. a corrupt/partial vendor load) rather than throwing mid-chart.
-    }
+    return mod360(realEclipticLongitudeDeg(planet, jd));
+  }
+  if (window.Astronomy && (planet === "NorthNode" || planet === "Lilith")) {
+    const time = window.Astronomy.MakeTime(new Date((jd - 2440587.5) * 86400000));
+    const t = time.tt / 36525;
+    // Meeus mean elements of date. Lilith is the mean APOGEE (+180°),
+    // not the perigee or a physical planetary body. Not a true-node model.
+    return planet === "NorthNode"
+      ? mod360(125.04452 - 1934.136261*t + 0.0020708*t*t + t*t*t/450000)
+      : mod360(83.3532465 + 4069.0137287*t - 0.01032*t*t - t*t*t/80053 + t*t*t*t/18999000 + 180);
   }
   const yearsFromJ2000 = (jd - 2451545.0) / 365.25;
   const period = PLANET_PERIODS[planet];
@@ -333,19 +337,15 @@ function planetDeclination(lon, eclLatDeg) {
     Math.sin(beta) * Math.cos(eRad) + Math.cos(beta) * Math.sin(eRad) * Math.sin(lam)
   ) * 180 / Math.PI;
 }
-// Fallback ascendant — retained ONLY for the offline case where
-// tools/ephemeris/houses.js was not loaded (e.g. a page that omits it, or a
-// module-load failure). It picks the wrong atan2 branch and lands up to
-// ~109° from the truth, i.e. the wrong rising sign; never prefer it when the
-// real solver is reachable. Kept rather than deleted so a page missing the
-// module still renders a chart, badged as APPROX, instead of throwing.
+// Closed-form fallback uses approximate GMST and fixed J2000 obliquity.
+// The eastern horizon branch is selected explicitly; precision is disclosed.
 function approxAscendantDeg(date, lat, lng) {
   const jd = dateToJD(date);
   // GMST in degrees, approximate
   const gmstDeg = mod360(280.46061837 + 360.98564736629 * (jd - 2451545.0));
   const lst = mod360(gmstDeg + lng);
   const obliquity = 23.4393;
-  const ra = lst + 90;
+  const ra = lst;
   const latRad = lat * Math.PI / 180;
   const eRad   = obliquity * Math.PI / 180;
   const raRad  = ra * Math.PI / 180;
@@ -353,7 +353,7 @@ function approxAscendantDeg(date, lat, lng) {
     -Math.cos(raRad),
     Math.sin(raRad) * Math.cos(eRad) + Math.tan(latRad) * Math.sin(eRad)
   );
-  return mod360(ascRad * 180 / Math.PI);
+  return mod360(ascRad * 180 / Math.PI + 180);
 }
 
 // Ascendant. Prefers WP-11's real solver (tools/ephemeris/houses.js ascMc(),
@@ -432,12 +432,12 @@ function residues(arcsec) { return AstroCore.residues(arcsec); }
 // from PLANET_PERIODS, unchanged from before — the documented offline
 // fallback.
 function planetSpeed(name, jd) {
+  if (window.Astronomy && ["NorthNode", "Lilith"].includes(name) && jd !== undefined) {
+    const delta = mod360(planetLongitude(name, jd + 0.005) - planetLongitude(name, jd - 0.005) + 180) - 180;
+    return delta / 0.01;
+  }
   if (window.Astronomy && REAL_EPHEMERIS_BODIES.has(name) && jd !== undefined) {
-    try {
-      return realPlanetSpeedDegPerDay(name, jd);
-    } catch {
-      // fall through to the synthetic constant rate below
-    }
+    return realPlanetSpeedDegPerDay(name, jd);
   }
   const p = PLANET_PERIODS[name];
   if (!p || p === 0) return 0;
@@ -446,7 +446,7 @@ function planetSpeed(name, jd) {
 
 // Aspect detection (ASPECTS orb table + nearest-aspect lookup) now lives in
 // AstroCore — see this file's header.
-function nearestAspect(deltaDeg) { return AstroCore.nearestAspect(deltaDeg); }
+function nearestAspect(deltaDeg, orbScale = 1) { return AstroCore.nearestAspect(deltaDeg, orbScale); }
 
 // Is the faster planet moving toward the exact aspect angle?
 // Returns "applying" or "separating".
@@ -477,6 +477,12 @@ const QUADRANT_HOUSE_SYSTEMS = new Set([
 ]);
 
 function computeNatal(birth) {
+  birth = { houseSystem: "whole", sect: "auto", ...birth };
+  if (!Number.isFinite(new Date(birth.dateISO).getTime()) || !Number.isFinite(birth.lat)
+      || Math.abs(birth.lat) > 90 || !Number.isFinite(birth.lng) || Math.abs(birth.lng) > 180)
+    throw new RangeError("A valid birth instant and latitude/longitude are required");
+  if (!["whole", "equal", "porphyry", ...QUADRANT_HOUSE_SYSTEMS].includes(birth.houseSystem))
+    throw new RangeError(`Unsupported house system: ${birth.houseSystem}`);
   const date = new Date(birth.dateISO);
   const jd = dateToJD(date);
   const asc = ascendantDeg(date, birth.lat, birth.lng);
@@ -487,7 +493,7 @@ function computeNatal(birth) {
   const mcSignIdx  = Math.floor(mc  / 30);
   // WP-21: day/night sect determination (AstroCore.sectIsDay) — see this
   // file's header. Byte-identical to the pre-WP-21 inline ternary.
-  const isDayChart = AstroCore.sectIsDay(planetLongitude("Sun", jd), asc, birth.sect);
+  const isDayChart = AstroCore.sectIsDay(planetLongitude("Sun", jd), asc, birth.sect || "auto");
 
   // Quadrant houses (Placidus, Koch, ...). houses.js's cusp functions were
   // built and Swiss-Ephemeris-verified in WP-11/WP-12 but never had a
@@ -502,6 +508,10 @@ function computeNatal(birth) {
   // a script tag should render an approximate chart, not a blank one.
   let houseSystemActual = birth.houseSystem;
   let houseCusps = null;
+  if (birth.houseSystem === "porphyry") {
+    if (window.Houses && window.Houses.porphyryCuspsFloat) houseCusps = window.Houses.porphyryCuspsFloat(asc, mc);
+    else { houseSystemActual = "whole"; }
+  }
   if (QUADRANT_HOUSE_SYSTEMS.has(birth.houseSystem)) {
     houseCusps = quadrantCuspsFor(birth.houseSystem, date, birth.lat, birth.lng);
     if (!houseCusps) houseSystemActual = "whole"; // POLAR_FALLBACK_POLICY / offline fallback
@@ -518,12 +528,16 @@ function computeNatal(birth) {
   // The Ascendant's own shadow lane — the chart-specific term inside every
   // card's resonance, returned on the chart so the reading can NAME it
   // instead of only feeling it as glow.
-  const ascR11 = Math.floor(asc * 3600) % 11;
+  const ascR11 = Math.round(asc * 3600) % 11;
 
-  const planets = PLANET_ORDER.map(p => {
+  const positionWarnings = [];
+  if (window.ANGLES_MODE === "APPROX") positionWarnings.push("Angles use the closed-form fallback with approximate sidereal time and fixed J2000 obliquity; the house solver is unavailable.");
+  if (window.Astronomy) positionWarnings.push("North/South Node use mean lunar nodes; Lilith uses mean lunar apogee. These are approximate elements, not true/osculating positions.");
+  if (birth.includeSyntheticBodies) positionWarnings.push("Chiron uses a synthetic demo position; no Chiron ephemeris is installed.");
+  const planets = PLANET_ORDER.filter(p => p !== "Chiron" || !window.Astronomy || birth.includeSyntheticBodies).map(p => {
     const lon  = planetLongitude(p, jd);
     const sign = Math.floor(lon / 30);
-    const arcsec = lon * 3600;
+    const arcsec = Math.round(lon * 3600) % 1296000;
     const degInSign = lon - sign * 30;
     return {
       name: p,
@@ -537,7 +551,12 @@ function computeNatal(birth) {
       house: houseOf(lon, sign),
       dignity: dignityFor(p, sign),
       residues: residues(arcsec),
-      declination: planetDeclination(lon, realEclipticLatitudeDeg(p, jd)),
+      declination: window.Astronomy && REAL_EPHEMERIS_BODIES.has(p)
+        ? window.Astronomy.EquatorFromVector(window.Astronomy.RotateVector(
+          window.Astronomy.Rotation_EQJ_EQD(window.Astronomy.MakeTime(date)),
+          window.Astronomy.GeoVector(window.Astronomy.Body[p], date, true))).dec
+        : planetDeclination(lon, realEclipticLatitudeDeg(p, jd)),
+      positionSource: !window.Astronomy ? "synthetic" : REAL_EPHEMERIS_BODIES.has(p) && window.Astronomy ? "ephemeris" : p === "Chiron" ? "synthetic" : "mean-element",
       criticalDegree: criticalKind(sign, degInSign),
     };
   });
@@ -553,8 +572,8 @@ function computeNatal(birth) {
       lon: snLon,
       sign: snSign,
       degInSign: snLon - snSign * 30,
-      arcsec: snLon * 3600,
-      speed: -nn.speed,
+      arcsec: Math.round(snLon * 3600) % 1296000,
+      speed: nn.speed,
       retrograde: true,
       house: houseOf(snLon, snSign),
       // dignityFor("SouthNode", snSign) is what this line calls now. It
@@ -573,7 +592,7 @@ function computeNatal(birth) {
       // already flows through the same generic, already-correct call above
       // (`dignity: dignityFor(p, sign)`).
       dignity: dignityFor("SouthNode", snSign),
-      residues: residues(snLon * 3600),
+      residues: residues(Math.round(snLon * 3600) % 1296000),
       declination: planetDeclination(snLon), // nodes lie on the ecliptic: β ≡ 0
       criticalDegree: criticalKind(snSign, snLon - snSign * 30),
     });
@@ -585,15 +604,16 @@ function computeNatal(birth) {
     const tenants = planets.filter(p => p.sign === idx);
     const ruler   = planets.find(p => p.name === sign.ruler);
     const principal = tenants[0] ?? ruler;
-    const dignity   = dignityFor(principal.name, idx);
+    const dignity   = dignityFor(principal.name, principal.sign);
     const house     = houseOf(idx * 30 + 15, idx);
 
     // Full Ptolemaic dignity table — triplicity, term, face
-    const tripLord = isDayChart ? TRIP_DAY[sign.element] : TRIP_NIGHT[sign.element];
-    const tripPart = TRIP_PART[sign.element];
-    const degInSign = principal.lon - idx * 30;
-    const term = termRuler(idx, degInSign);
-    const face = faceRuler(idx, degInSign);
+    const actualSign = ZODIAC[principal.sign];
+    const tripLord = isDayChart ? TRIP_DAY[actualSign.element] : TRIP_NIGHT[actualSign.element];
+    const tripPart = TRIP_PART[actualSign.element];
+    const degInSign = principal.degInSign;
+    const term = termRuler(principal.sign, degInSign);
+    const face = faceRuler(principal.sign, degInSign);
     const inOwnTerm = term === principal.name;
     const inOwnFace = face === principal.name;
     const ptolemaicBonus =
@@ -608,7 +628,8 @@ function computeNatal(birth) {
     // Aspect from this card's principal to the Sun, used to drive its glow
     const sun = planets.find(p => p.name === "Sun");
     const delta = mod360(principal.lon - sun.lon);
-    const aspect = nearestAspect(delta);
+    const aspect = principal.name === "Sun" ? null : nearestAspect(delta, birth.orbScale ?? 1);
+    if (aspect) aspect.phase = applyingPhase(principal.lon, sun.lon, principal.speed, sun.speed, aspect.angle);
 
     // Resonance: a 0..1 scalar that drives glow vibrance.
     // Blends Ptolemaic dignity total, tenancy count, aspect tightness, and the
@@ -661,7 +682,12 @@ function computeNatal(birth) {
   const sun  = planets.find(p => p.name === "Sun");
   const moon = planets.find(p => p.name === "Moon");
   const phase = lunarPhase(sun.lon, moon.lon);
-  const shape = chartShape(planets);
+  phase.illuminationApproximate = true;
+  if (window.Astronomy) {
+    phase.illumination = window.Astronomy.Illumination(window.Astronomy.Body.Moon, date).phase_fraction;
+    phase.illuminationApproximate = false;
+  }
+  const shape = chartShape(planets.filter(p => REAL_EPHEMERIS_BODIES.has(p.name)));
   const lots  = computeAllLots(asc, planets, isDayChart);
 
   // ───── Full aspect grid (every visible pair, applying/separating) ─────
@@ -672,7 +698,7 @@ function computeNatal(birth) {
       const A = planets[i], B = planets[j];
       if (!visibleAspectBodies.includes(A.name) || !visibleAspectBodies.includes(B.name)) continue;
       const delta = mod360(A.lon - B.lon);
-      const asp = nearestAspect(delta);
+      const asp = nearestAspect(delta, birth.orbScale ?? 1);
       if (!asp) continue;
       // Faster planet first
       const fast = Math.abs(A.speed) >= Math.abs(B.speed) ? A : B;
@@ -757,44 +783,21 @@ function computeNatal(birth) {
   const patterns = detectPatterns(aspectGrid, planets);
 
   // ───── Out-of-bounds ─────
-  const outOfBounds = planets.filter(p => Math.abs(p.declination) > 23.45).map(p => ({
+  const obliquity = window.Astronomy ? window.Astronomy.EquatorFromVector(window.Astronomy.RotateVector(
+    window.Astronomy.Rotation_ECT_EQD(window.Astronomy.MakeTime(date)),
+    new window.Astronomy.Vector(0, 1, 0, window.Astronomy.MakeTime(date)))).dec : 23.4393;
+  const outOfBounds = planets.filter(p => REAL_EPHEMERIS_BODIES.has(p.name) && Math.abs(p.declination) > obliquity).map(p => ({
     planet: p.name, declination: p.declination,
   }));
 
-  // ───── Void-of-course Moon ─────
-  // Classical VOC: the Moon makes no more major-aspect perfection before it
-  // changes sign. Days to that sign change, from the Moon's own speed:
-  const moonDegInSign = moon.lon - moon.sign * 30;
-  const moonSpeedDay = Math.abs(moon.speed); // ~13.18°/day
-  const daysToNextSignChange = (30 - moonDegInSign) / moonSpeedDay;
-  // This previously read "any aspect within orb, applying OR separating,
-  // to any planet -> not VOC," which is not what void-of-course means: a
-  // separating aspect is one the Moon has already left behind, and does
-  // not keep it "in aspect" going forward. That let a Moon read as
-  // not-VOC for hours or days after its last real aspect had perfected —
-  // see docs/COMPLETION_AUDIT.md §3 item 10. VOC now follows only
-  // APPLYING major aspects (aspectGrid's own applyingPhase() result,
-  // fixed to a 1-minute integration step by an earlier correctness pass —
-  // see astro-core.js's APPLYING_PHASE_STEP_DAYS), which is what the
-  // definition actually asks about: aspects still to come, not ones
-  // already exact and receding.
-  //
-  // Still an approximation, not the full classical test: it does not check
-  // whether each applying aspect would perfect BEFORE daysToNextSignChange
-  // above — that needs numerical root-finding per aspect (when does this
-  // pair's separation hit exactly 0/60/90/120/180?), which this
-  // single-instant aspect grid does not attempt. A chart reading "not VOC"
-  // here could still be genuinely VOC if its one remaining applying aspect
-  // would perfect only after the Moon has already changed sign. Narrowing
-  // that gap needs the same kind of forward integration
-  // tools/ephemeris/produce-ledger.mjs already does for retrograde
-  // stations, applied per-aspect — out of scope for this pass.
+  // A page missing the transit module can still display the snapshot estimate,
+  // but its uncertainty is explicit. Main chart pages load the real solver.
   const moonApplyingAspect = aspectGrid.some(a =>
-    (a.a === "Moon" || a.b === "Moon") &&
-    a.phase === "applying" &&
-    ["Conjunction","Opposition","Trine","Square","Sextile"].includes(a.aspect)
-  );
-  const voidOfCourse = { isVoc: !moonApplyingAspect, daysToNextSignChange };
+    (a.a === "Moon" || a.b === "Moon") && a.phase === "applying" &&
+    ["Conjunction","Opposition","Trine","Square","Sextile"].includes(a.aspect));
+  const voidOfCourse = window.Astronomy && window.Transits
+    ? window.Transits.calculateVoidOfCourse(jd, window.Astronomy)
+    : { isVoc: !moonApplyingAspect, daysToNextSignChange: (30 - moon.degInSign) / Math.abs(moon.speed), approximate: true };
 
   return {
     jd,
@@ -809,12 +812,14 @@ function computeNatal(birth) {
     // requested quadrant system fell back to Whole per
     // POLAR_FALLBACK_POLICY (polar latitude) or window.Houses being
     // unavailable (offline/failed module load) — see the dispatch above.
+    positionWarnings,
     houseSystemActual,
     houseCusps,
     planets,
     cards,
     lots,
     phase,
+    obliquity,
     shape,
     aspectGrid,
     antisciaContacts,

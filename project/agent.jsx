@@ -127,7 +127,7 @@ function chartIdentityKey(chart) {
     birth.lat,
     birth.lng,
     birth.tz || "no-tz",
-    birth.houseSystem || "no-house-system",
+    birth.houseSystem || "no-house-system", birth.orbScale ?? 1, birth.sect || "auto",
     birth.subjectName || "no-subject",
     chart.timeUnknown ? 1 : 0,
     Math.round(chart.asc * 3600),
@@ -522,7 +522,8 @@ function cacheKey(card, chart) {
   const a = card.aspect;
   const sig = chartIdentityKey(chart);
   return [
-    sig,
+    "model:personal-reading-v1", sig,
+    chart.readingContext ? chart.readingContext.cacheFingerprint : (typeof window.currentTransits === "function" ? `live-minute:${Math.floor(Date.now() / 60000)}` : "natal-only"),
     card.idx, p.name, p.sign, p.house, p.retrograde ? 1 : 0,
     card.dignity.kind,
     a ? `${a.name}:${a.sep.toFixed(2)}` : "noasp",
@@ -541,13 +542,13 @@ function buildCardPrompt(card, chart) {
   let liveLines = [];
   try {
     if (typeof window !== "undefined" && window.ctmState && window.currentTransits) {
-      const jdNow = window.dateToJD(new Date());
+      const jdNow = chart.readingContext ? chart.readingContext.jd : window.dateToJD(new Date());
       const ctm   = window.ctmState(jdNow, chart.jd);
-      const tx    = window.currentTransits(chart, jdNow);
+      const tx    = chart.readingContext && chart.readingContext.evidence.transits.value || window.currentTransits(chart, jdNow);
       const principalTransits = tx.hits.filter(h => h.N === p.name).slice(0, 2);
       liveLines = [
         ``,
-        `LIVE CTM STATE (today, running coordinate on ℝ × S¹):`,
+        `LIVE CTM STATE (reading instant, running coordinate on ℝ × S¹):`,
         `Age ${ctm.ageYears.toFixed(2)} yr · ${Math.floor(ctm.ageDays).toLocaleString()} days lived · phase θ = ${ctm.tco.thetaDeg.toFixed(2)}° on the ${ctm.tco.M.toLocaleString()}-day round · syndrome S = ${ctm.syndromeDeg.toFixed(2)}°.`,
         principalTransits.length
           ? `Active transits to ${p.name}: ${principalTransits.map(h => `${h.T} ${h.aspect} ${h.orb.toFixed(2)}° ${h.phase}`).join("; ")}.`
@@ -575,27 +576,27 @@ function buildCardPrompt(card, chart) {
     `- Prose only. No headers, no bullets, no asterisks, no quotation marks, no stage directions.`,
     ``,
     `SUBSTRATE`,
-    `Card: ${card.name} (${card.element}, ${card.modality}). House: ${card.house} (whole-sign).`,
+    `Card topic: ${card.name} (${card.element}, ${card.modality}). Card topic house: ${chart.timeUnknown ? "withheld" : card.house}; actual principal house: ${chart.timeUnknown ? "withheld" : p.house} (${chart.houseSystemActual}).`,
     `Principal placement in familiar language: ${placementFact(chart, p, subject)}. Exact longitude in integer arcseconds: ${Math.round(p.arcsec)}.`,
-    `Dignity (Ptolemaic full table): ${card.dignity.kind} (essential ${card.dignity.score >= 0 ? "+" : ""}${card.dignity.score}). Triplicity lord: ${card.tripLord}. Term ruler: ${card.term}${card.inOwnTerm ? " (in own term)" : ""}. Face ruler: ${card.face}${card.inOwnFace ? " (in own face)" : ""}. Total Ptolemaic bonus: ${card.ptolemaicBonus >= 0 ? "+" : ""}${card.ptolemaicBonus}.`,
-    `Dispositor: ${card.ruler}.`,
+    `Dignity (Ptolemaic full table): ${card.dignity.kind} (essential ${card.dignity.score >= 0 ? "+" : ""}${card.dignity.score}). Triplicity lord: ${chart.timeUnknown ? "withheld" : card.tripLord}. Term ruler: ${card.term}${card.inOwnTerm ? " (in own term)" : ""}. Face ruler: ${card.face}${card.inOwnFace ? " (in own face)" : ""}. Total Ptolemaic bonus: ${card.ptolemaicBonus >= 0 ? "+" : ""}${card.ptolemaicBonus}.`,
+    `Dispositor of the principal: ${ZODIAC[p.sign].ruler}.`,
     p.criticalDegree ? `Critical degree: ${p.criticalDegree}.` : null,
     `Tenancy: ${card.tenants.length} bodies — ${card.tenants.map(t => t.name + (t.retrograde ? "℞" : "")).join(", ") || "none"}.`,
     `Sun aspect: ${card.aspect ? `${card.aspect.name} ${card.aspect.sep.toFixed(2)}° (orb ${card.aspect.orb}°, family ${card.aspect.family})` : "none in orb"}.`,
     // Additional aspect context: top three tightest aspects involving the principal
     `Tight aspects to principal: ${tightAspectsFor(chart, p.name) || "none in tight orb"}.`,
     // Joy / reception
-    isJoyHit(chart, p) ? `In joy: H${card.house}.` : null,
+    isJoyHit(chart, p) ? `In joy: H${p.house}.` : null,
     receptionFor(chart, p.name) || null,
-    `Sect: ${chart.isDayChart ? "Day" : "Night"}. ${chart.timeUnknown ? "Ascendant, Midheaven, houses, and the Moon's exact degree are withheld because the birth time is unknown." : `Ascendant: ${ZODIAC[chart.ascSignIdx].name}. Midheaven: ${ZODIAC[chart.mcSignIdx].name}.`} Lunar phase: ${chart.phase.phase}.`,
+    `Sect: ${chart.timeUnknown ? "withheld; unknown birth time" : chart.isDayChart ? "Day" : "Night"}. ${chart.timeUnknown ? "Ascendant, Midheaven, houses, and the Moon's exact degree are withheld because the birth time is unknown." : `Ascendant: ${ZODIAC[chart.ascSignIdx].name}. Midheaven: ${ZODIAC[chart.mcSignIdx].name}.`} Lunar phase: ${chart.phase.phase}.`,
     ``,
     `MEANING REFERENCE (use this so the narration is accurate; do NOT quote these labels verbatim — speak them naturally):`,
-    `House ${card.house} topic: ${houseTopic(card.house)}.`,
+    `${chart.timeUnknown ? "House topic withheld" : `House ${p.house} topic: ${houseTopic(p.house)}`}.`,
     `${p.name} signifies: ${planetSignifies(p.name)}.`,
     `Dignity "${card.dignity.kind}" means in practice: ${dignityMeaning(card.dignity.kind)}.`,
     card.aspect ? `The Sun aspect (${card.aspect.name}) works as: ${aspectMeaning(card.aspect.name)}, and it is ${card.aspect.phase || "set"}.` : null,
     p.retrograde ? `Retrograde: the signification turns inward, reconsidered rather than outwardly asserted.` : null,
-    `Shadow lane "${SHADOW_LANE_NAMES[card.laneR11]}" (mod 11) is the hidden thread to fold into the final sentence — treat it as a quiet undercurrent beneath the classical reading, not a headline.`,
+    `Shadow lane "${SHADOW_LANE_NAMES[p.residues.r11]}" (mod 11) is the hidden thread to fold into the final sentence — treat it as a quiet undercurrent beneath the classical reading, not a headline.`,
     ``,
     `SUBSTRATE (exact residues — additive, not replacement; for grounding only, do NOT read these figures aloud):`,
     `CRT residues: r₂=${r.r2}, r₃=${r.r3}, r₅=${r.r5}, r₇=${r.r7}, r₁₁=${r.r11} (SHADOW), r₁₃=${r.r13} (BOUNDARY).`,
@@ -604,6 +605,7 @@ function buildCardPrompt(card, chart) {
     `Card boundary-lane: ${card.laneR13} (${BOUNDARY_LANE_NAMES[card.laneR13]}).`,
     `Resonance ρ = ${card.resonance.toFixed(4)}.`,
     ...liveLines,
+    ...(chart.readingContext ? ["PERSONAL CONTEXT", chart.readingContext.personalText, chart.readingContext.limitations.join(" ")] : []),
   ].filter(Boolean);
   return lines.join("\n");
 }
@@ -698,7 +700,7 @@ function buildChartPrompt(chart, jdTarget = null, precomputedDigest = undefined,
   const owner = ownerPossessive(subject);
   const digest = precomputedDigest !== undefined
     ? precomputedDigest
-    : (Number.isFinite(jdTarget) && typeof lifecycleDigest === "function" ? lifecycleDigest(chart, jdTarget) : null);
+    : (Number.isFinite(jdTarget) && typeof lifecycleDigest === "function" ? lifecycleDigest(chart, jdTarget, chart.readingContext && chart.readingContext.input.chapters) : null);
   const lifecycleLines = digest ? digest.lines : null;
   const progressions = precomputedProgressions !== undefined
     ? precomputedProgressions
@@ -726,9 +728,10 @@ function buildChartPrompt(chart, jdTarget = null, precomputedDigest = undefined,
     ``,
     `SOURCE OF TRUTH — CHART FOR ${subject.toUpperCase()}`,
     chartFactBlock(chart, subject),
-    `Sect: ${chart.isDayChart ? "Day" : "Night"}. Lunar phase: ${chart.phase.phase}.`,
+    `Sect: ${chart.timeUnknown ? "withheld; unknown birth time" : chart.isDayChart ? "Day" : "Night"}. Lunar phase: ${chart.phase.phase}.`,
     ...(lifecycleLines ? ["", `RIGHT NOW`, `  ${lifecycleLines.join("\n  ")}`] : []),
     ...(progressionLines ? ["", `BY PROGRESSION`, `  ${progressionLines.join("\n  ")}`] : []),
+    ...(chart.readingContext ? ["", "PERSONAL CONTEXT (same reading instant)", chart.readingContext.personalText, chart.readingContext.eclipseText, "Calculation assumptions: " + chart.readingContext.limitations.join(" ")] : []),
   ].join("\n");
 }
 
@@ -787,6 +790,7 @@ async function interpretCard(card, chart) {
     try {
       const clean = await completeVerified(prompt, (text) => validateNatalGrounding(text, chart, 1));
       remember(key, clean);
+      persistAgentRun(chart);
       __pending.delete(key);
       return clean;
     } catch (err) {
@@ -812,18 +816,16 @@ async function interpretChart(chart, jdTarget = null) {
   // would say changes, and — usefully — stays stable across calls whose
   // facts happen to be identical even at different exact instants, which
   // is MORE cache-friendly than day-bucketing, not less.
-  const digest = Number.isFinite(jdTarget) && typeof lifecycleDigest === "function"
-    ? lifecycleDigest(chart, jdTarget)
-    : null;
+  const digest = chart.readingContext ? chart.readingContext.evidence.lifecycle.value : Number.isFinite(jdTarget) && typeof lifecycleDigest === "function"
+    ? lifecycleDigest(chart, jdTarget) : null;
   // Same content-derived-key reasoning as the lifecycle digest, extended
   // to progressionsDigest — its own facts (a slower body's sign change,
   // the progressed lunar phase) are no more day-granular than lifecycle's
   // are, so the fingerprint covers both rather than trusting a time
   // bucket for either.
-  const progressions = Number.isFinite(jdTarget) && typeof progressionsDigest === "function"
-    ? progressionsDigest(chart, jdTarget)
-    : null;
-  const fingerprint = (digest ? digest.lines.join("|") : "none")
+  const progressions = chart.readingContext ? chart.readingContext.evidence.progressions.value : Number.isFinite(jdTarget) && typeof progressionsDigest === "function"
+    ? progressionsDigest(chart, jdTarget) : null;
+  const fingerprint = (chart.readingContext ? chart.readingContext.cacheFingerprint : "") + "::" + (digest ? digest.lines.join("|") : "none")
     + "::" + (progressions ? progressions.lines.join("|") : "none");
   // The chart alone, without the fingerprint — a stable pointer to
   // "whatever synthesis this chart most recently had," kept alongside
@@ -834,6 +836,8 @@ async function interpretChart(chart, jdTarget = null) {
   if (__cache.has(key)) {
     const cached = __cache.get(key);
     remember(chartIdentity + ":latest", cached);
+    if (chart.readingContext) remember(chartIdentity + ":run:" + chart.readingContext.cacheFingerprint, cached);
+    persistAgentRun(chart);
     return cached;
   }
   if (__pending.has(key)) return __pending.get(key);
@@ -843,6 +847,8 @@ async function interpretChart(chart, jdTarget = null) {
       const clean = await completeVerified(prompt, (text) => validateNatalGrounding(text, chart, 3));
       remember(key, clean);
       remember(chartIdentity + ":latest", clean);
+      if (chart.readingContext) remember(chartIdentity + ":run:" + chart.readingContext.cacheFingerprint, clean);
+      persistAgentRun(chart);
       __pending.delete(key);
       return clean;
     } catch (err) {
@@ -854,43 +860,69 @@ async function interpretChart(chart, jdTarget = null) {
   return promise;
 }
 
+// Complete the original run even if the user navigated away while an optional
+// interpretation was in flight. Never attach it to the newly selected profile.
+function persistAgentRun(chart) {
+  const c = chart.readingContext;
+  if (!c || !window.ReadingRuns || typeof window.buildChartNarrative !== "function") return;
+  const id = JSON.stringify([c.at, c.input]);
+  const previous = window.ReadingRuns.loadRuns(null, c.profileKey).find(r => r.id === id);
+  if (!previous) return;
+  const agentTexts = {};
+  (chart.cards || []).forEach(card => {
+    const text = __cache.get(cacheKey(card, chart));
+    if (text) agentTexts[card.idx] = text;
+  });
+  const synthesisText = __cache.get("chart:" + chartIdentityKey(chart) + ":run:" + c.cacheFingerprint);
+  const narrative = window.buildChartNarrative(chart, { agentTexts, synthesisText,
+    lifecycleText: c.lifecycleText, progressionsText: c.progressionsText,
+    eclipseText: c.eclipseText, personalText: c.personalText });
+  const ok = window.ReadingRuns.saveRun(null, { ...previous, reading: narrative.text,
+    evidence: { ...previous.evidence, agentCards: agentTexts, agentSynthesis: synthesisText || null,
+      narrativeSegments: narrative.segments } });
+  if (ok && window.dispatchEvent) window.dispatchEvent(new CustomEvent('personal-reading-evidence'));
+}
+
 function useAgentReading(card, chart, active) {
   const [state, setState] = React.useState({ loading: false, text: null, error: null });
+  const stateKey = card && chart ? cacheKey(card, chart) : null;
   React.useEffect(() => {
     if (!active || !card || !chart) return;
-    if (!agentAvailable()) { setState(AGENT_UNAVAILABLE); return; }
+    if (!agentAvailable()) { setState({ ...AGENT_UNAVAILABLE, stateKey }); return; }
     const key = cacheKey(card, chart);
     if (__cache.has(key)) {
-      setState({ loading: false, text: __cache.get(key), error: null });
+      setState({ stateKey, loading: false, text: __cache.get(key), error: null });
       return;
     }
-    setState({ loading: true, text: null, error: null });
+    setState({ stateKey, loading: true, text: null, error: null });
     let cancelled = false;
     interpretCard(card, chart).then(
-      (text) => { if (!cancelled) setState({ loading: false, text, error: null }); },
-      (err)  => { if (!cancelled) setState({ loading: false, text: null, error: String(err && err.message || err) }); }
+      (text) => { if (!cancelled) setState({ stateKey, loading: false, text, error: null }); },
+      (err)  => { if (!cancelled) setState({ stateKey, loading: false, text: null, error: String(err && err.message || err) }); }
     );
     return () => { cancelled = true; };
   }, [active, card && chart && cacheKey(card, chart)]);
-  return state;
+  return active && state.stateKey === stateKey ? state : { loading: false, text: null, error: null };
 }
 
 function useAgentChartReading(chart, active, jdTarget = null) {
   const [state, setState] = React.useState({ loading: false, text: null, error: null });
-  const jdBucket = Number.isFinite(jdTarget) ? Math.floor(jdTarget) : null;
+  const jdBucket = Number.isFinite(jdTarget) ? jdTarget : null;
+  const contextKey = chart && chart.readingContext && chart.readingContext.cacheFingerprint;
   const identity = chart ? chartIdentityKey(chart) : null;
+  const stateKey = chart ? chartIdentityKey(chart) + (chart.readingContext ? chart.readingContext.cacheFingerprint : "") + ":" + jdBucket : null;
   React.useEffect(() => {
     if (!active || !chart) return;
-    if (!agentAvailable()) { setState(AGENT_UNAVAILABLE); return; }
-    setState({ loading: true, text: null, error: null });
+    if (!agentAvailable()) { setState({ ...AGENT_UNAVAILABLE, stateKey }); return; }
+    setState({ stateKey, loading: true, text: null, error: null });
     let cancelled = false;
     interpretChart(chart, jdTarget).then(
-      (text) => { if (!cancelled) setState({ loading: false, text, error: null }); },
-      (err)  => { if (!cancelled) setState({ loading: false, text: null, error: String(err && err.message || err) }); }
+      (text) => { if (!cancelled) setState({ stateKey, loading: false, text, error: null }); },
+      (err)  => { if (!cancelled) setState({ stateKey, loading: false, text: null, error: String(err && err.message || err) }); }
     );
     return () => { cancelled = true; };
-  }, [active, identity, jdBucket]);
-  return state;
+  }, [active, identity, jdBucket, contextKey]);
+  return active && state.stateKey === stateKey ? state : { loading: false, text: null, error: null };
 }
 
 // ─────────────────────── synastry interpreter ───────────────────────
@@ -1048,6 +1080,7 @@ function buildNatalFollowUpPrompt(question, chart, history = []) {
     ``,
     `SOURCE OF TRUTH — CHART FOR ${subject.toUpperCase()}`,
     chartFactBlock(chart, subject),
+    ...(chart.readingContext ? ["PERSONAL CONTEXT", chart.readingContext.personalText, chart.readingContext.lifecycleText, chart.readingContext.progressionsText, chart.readingContext.eclipseText, chart.readingContext.limitations.join(" ")] : []),
   ].join("\n");
 }
 
@@ -1122,7 +1155,7 @@ function readingTextFor(card, chart) {
 }
 
 /** The whole reading, as one Markdown document. */
-function buildReadingMarkdown(chart, cards) {
+function buildReadingMarkdown(chart, cards, narrative = null) {
   const b = chart.birth || {};
   let born = b.dateISO || "";
   try {
@@ -1139,7 +1172,7 @@ function buildReadingMarkdown(chart, cards) {
     `**Born** ${born}${b.placeLabel ? ` · ${b.placeLabel}` : ""}`,
   ];
   const facts = [];
-  if (typeof chart.isDayChart === "boolean") facts.push(`**Sect** ${chart.isDayChart ? "Day" : "Night"}`);
+  if (!chart.timeUnknown && typeof chart.isDayChart === "boolean") facts.push(`**Sect** ${chart.isDayChart ? "Day" : "Night"}`);
   if (!chart.timeUnknown && typeof chart.asc === "number" && typeof ZODIAC !== "undefined" && ZODIAC[chart.ascSignIdx]) {
     facts.push(`**Ascendant** ${chart.asc.toFixed(2)}° ${ZODIAC[chart.ascSignIdx].name}`);
   }
@@ -1162,7 +1195,7 @@ function buildReadingMarkdown(chart, cards) {
     if (source === "agent") agentCount += 1;
     lines.push(
       "",
-      `## ${String(i + 1).padStart(2, "0")} · ${p.name}${p.retrograde ? " ℞" : ""} in ${card.name} — ${chart.timeUnknown ? "House —" : `House ${hnum(card.house)}`} · ${card.dignity.kind}`,
+      `## ${String(i + 1).padStart(2, "0")} · ${p.name}${p.retrograde ? " ℞" : ""} in ${typeof ZODIAC !== "undefined" && ZODIAC[p.sign] ? ZODIAC[p.sign].name : card.name} — ${chart.timeUnknown ? "House —" : `House ${hnum(p.house)}`} · ${card.dignity.kind}`,
       "",
       text || "*No reading composed for this card.*",
     );
@@ -1176,11 +1209,21 @@ function buildReadingMarkdown(chart, cards) {
   // interpretChart keeps this pointer updated to whatever it most
   // recently resolved for this exact chart, fingerprint aside.
   const chartKey = "chart:" + chartIdentityKey(chart) + ":latest";
-  const synthesis = __cache.get(chartKey);
+  const synthesis = chart.readingContext
+    ? __cache.get("chart:" + chartIdentityKey(chart) + ":run:" + chart.readingContext.cacheFingerprint)
+    : __cache.get(chartKey);
   if (synthesis) {
     lines.push("", "## The chart as one", "", synthesis);
   }
 
+  if (chart.readingContext) {
+    const c = chart.readingContext;
+    lines.push("", "## Personal reading context", "", `Calculated for ${c.at} using ${c.input.ephemeris}.`, "",
+      c.personalText, "", c.lifecycleText, "", c.progressionsText, "", c.eclipseText,
+      "", "### Calculation assumptions", "", ...c.limitations.map(line => `- ${line}`),
+      "", "### Inputs used", "", "```json", JSON.stringify(c.input, null, 2), "```");
+    if (narrative && narrative.text) lines.push("", "## Narrated reading", "", narrative.text);
+  }
   lines.push(
     "", "---", "",
     `*Exported from Resonance. ${agentCount} of ${cards.length} readings are agent-interpreted; the rest are composed locally from the classical tables.*`,
@@ -1218,8 +1261,8 @@ function downloadTextFile(filename, text, mime = "text/markdown") {
 }
 
 /** The button's one call: the reading on screen becomes a file. */
-function exportReading(chart, cards) {
-  return downloadTextFile(exportFilename(chart), buildReadingMarkdown(chart, cards));
+function exportReading(chart, cards, narrative = null) {
+  return downloadTextFile(exportFilename(chart), buildReadingMarkdown(chart, cards, narrative));
 }
 
 Object.assign(window, {

@@ -11,12 +11,15 @@
     "test:quick": "node test/run.js --quick",
     "test:accuracy": "node test/accuracy.test.js",
     "bench": "node bench/bench.mjs",
-    "lint": "cd .. && eslint --config eslint.config.mjs --no-error-on-unmatched-pattern project 'scripts/**/*.{js,mjs}'"
+    "lint": "cd .. && eslint --config eslint.config.mjs --no-error-on-unmatched-pattern project 'scripts/**/*.{js,mjs}'",
+    "build": "node tools/build-standalone.mjs \"Resonance Spread.html\" resonance-spread.html && node tools/build-standalone.mjs",
+    "test:browser": "playwright test"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",
     "@babel/preset-react": "^8.0.1",
     "@eslint/js": "10.0.1",
+    "@playwright/test": "^1.64.0",
     "esbuild": "^0.28.2",
     "eslint": "10.8.1",
     "globals": "17.9.0",
@@ -24,6 +27,7 @@
     "react-dom": "^18.3.1"
   },
   "dependencies": {
-    "astronomy-engine": "2.1.19"
+    "astronomy-engine": "2.1.19",
+    "fflate": "0.8.2"
   }
 }

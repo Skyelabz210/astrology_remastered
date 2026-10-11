@@ -14,17 +14,11 @@
 //   2. chapterAt(chapters, where, whenJd) — which chapter covers a moment.
 //      Open-ended ("still here") and missing dates are handled explicitly;
 //      overlapping ranges resolve by LATEST start, deterministically.
-//   3. relocatedChart(natal, place) — the natal chart's planets kept whole
-//      while ASC/MC/houses/angles recompute for another place. Planetary
-//      positions are NOT recast: they are already exact arcsecond values
-//      for the birth instant, and geocentric parallax between two places
-//      on Earth is sub-arcminute for everything except the Moon — below
-//      the resolution any house placement uses. Angles are recomputed via
-//      astro.jsx's own ascendantDeg/midheavenDeg/quadrantCuspsFor path, so
-//      polar fallback behaves identically to a fresh computeNatal.
-//
-// Claim boundary (the repo's honesty rule): relocated charts carry NO new
-// precision claims. When the natal chart's birth time is unknown, every
+//   3. relocatedChart(natal, place) — recast the same UTC birth instant at
+//      another location. Geocentric planetary positions remain unchanged;
+//      angles, houses, sect, Lots and resonance are recalculated. This is
+//      a relocated natal chart, not observer topocentric planetary geometry.
+// Relocation adds no independent precision. When the natal chart's birth time is unknown, every
 // angle here is as unreliable as the natal ASC/MC already flagged (WP-18),
 // so `timeUnknown` propagates through and downstream consumers suppress
 // angle-based statements exactly as they do on the natal chart itself.
@@ -278,74 +272,19 @@ function activeChapter(chapters, natal, nowJd) {
  * Returns { ...flags }: timeUnknown propagates verbatim; `relocatedPlace`
  * carries the label so headers can say "cast for Wetzlar · DE".
  *
- * This is intentionally NOT a full computeNatal re-run: lots, eclipses,
- * dignities etc. don't depend on place (dignity depends on sign, which is
- * carried), and re-running them would double the cost while adding
- * nothing. Houses DO depend on place — hence this function existing.
+ * Recast at the same birth instant. Houses, sect, Lots and card resonance
+ * depend on location, even though geocentric planetary longitudes do not.
  */
 function relocatedChart(natal, place) {
   if (!natal || !place) return null;
-  const date = new Date((natal.jd - 2440587.5) * 86400000);
-  const asc = ascendantDeg(date, place.lat, place.lng);
-  const mc = midheavenDegOf(date, place.lng); // adapter below guards astro.jsx's (date, lng) signature
-  const desc = mod360(asc + 180);
-  const ic = mod360(mc + 180);
-  const ascSignIdx = Math.floor(asc / 30);
-
-  const requested = (natal.birth && natal.birth.houseSystem) || natal.houseSystemActual || "whole";
-  let houseSystemActual = requested;
-  let houseCusps = null;
-  if (typeof QUADRANT_HOUSE_SYSTEMS !== "undefined" && QUADRANT_HOUSE_SYSTEMS.has(requested)
-      && typeof quadrantCuspsFor === "function") {
-    houseCusps = quadrantCuspsFor(requested, date, place.lat, place.lng);
-    if (!houseCusps) houseSystemActual = "whole"; // POLAR_FALLBACK_POLICY, same as computeNatal
-  }
-  const houseOf = (lon, sign) => {
-    if (houseCusps) return AstroCore.houseForCusps(lon, houseCusps);
-    return houseSystemActual === "whole"
-      ? houseForSign(sign, ascSignIdx)
-      : houseForLongEqual(lon, asc);
-  };
-
-  const planets = natal.planets.map((p) => ({
-    ...p,
-    house: houseOf(p.lon, p.sign),
-  }));
-
-  // residues().r11 IS floor-mod of the arcsecond value (astro-core's
-  // residues is a plain Math.floor + % family), so this agrees with
-  // astro.jsx computeNatal's `Math.floor(asc * 3600) % 11` ASC-lane
-  // formula to the arcsecond — verified by test/present/chapters.test.js
-  // rather than asserted here. Going through residues() keeps the whole
-  // presentation layer on one definition of "the r11 lane".
-  const ascR11 = residues(asc * 3600).r11;
-
-  return {
-    ...natal,
-    asc, mc, desc, ic,
-    ascSignIdx,
-    mcSignIdx: Math.floor(mc / 30),
-    ascR11,
-    houseSystemActual,
-    houseCusps,
-    planets,
-    cards: natal.cards, // card resonance is aspect/dignity-driven: place-independent
-    timeUnknown: !!natal.timeUnknown,
-    relocated: true,
-    relocatedPlace: {
-      placeKey: typeof place.placeKey === "string" ? place.placeKey : cityKey(place),
-      label: place.label || `${place.name} · ${place.region}`,
-      lat: place.lat,
-      lng: place.lng,
-      tz: place.tz || null,
-    },
-  };
-}
-
-// midheavenDeg's actual signature in astro.jsx is (date, lng) — guard
-// against argument-order drift with a tiny adapter rather than assuming.
-function midheavenDegOf(date, lng) {
-  return midheavenDeg(date, lng);
+  const recast = computeNatal({ ...natal.birth, lat: place.lat, lng: place.lng,
+    tz: place.tz || natal.birth.tz, placeLabel: place.label || place.name,
+    houseSystem: (natal.birth && natal.birth.houseSystem) || natal.houseSystemActual || "whole" });
+  return { ...recast, relocated: true, relocatedPlace: {
+    placeKey: typeof place.placeKey === "string" ? place.placeKey : cityKey(place),
+    label: place.label || `${place.name} · ${place.region}`,
+    lat: place.lat, lng: place.lng, tz: place.tz || null,
+  } };
 }
 
 // ─────────────────── per-chapter digest ───────────────────

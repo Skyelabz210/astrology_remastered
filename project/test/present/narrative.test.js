@@ -72,7 +72,7 @@ function makeChart({ timeUnknown = false } = {}) {
     principal: {
       name: ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","Chiron","NorthNode"][i],
       lon: i * 30 + 5,
-      sign: i,
+      sign: i, house: i + 1,
       retrograde: i === 6,
       residues: { r2: 0, r3: 0, r5: 0, r7: 0, r11: i % 11, r13: i % 13 },
     },
@@ -158,8 +158,8 @@ export function run() {
     HOUSE_WORD_RE.test(n.text));
   t("a known-time narrative DOES name the rising sign",
     /\bwas rising\b/i.test(n.text));
-  t("sect is stated on both, since it needs no birth time",
-    /day chart/i.test(n.text) && /day chart/i.test(unknown.text));
+  t("sect is stated only when birth time is known",
+    /day chart/i.test(n.text) && !/day chart|night chart/i.test(unknown.text));
 
   // The closing's two shadow-lane facts (a shared-lane pairing, a lane-zero
   // closure) are r11 residues — the same ARCSECOND-level precision the

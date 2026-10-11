@@ -228,8 +228,8 @@ export async function run() {
     const end = appSrc.indexOf("setTweak('houseSystem'", start);
     const block = appSrc.slice(start, end);
     const offered = [...block.matchAll(/value:\s*'([a-z]+)'/g)].map((m) => m[1]);
-    const expected = ["whole", "equal", ...QUADRANT_SYSTEMS];
-    t("app.jsx's house-system picker offers exactly whole+equal+8 quadrant systems",
+    const expected = ["whole", "equal", "porphyry", ...QUADRANT_SYSTEMS];
+    t("app.jsx's house-system picker offers whole+equal+Porphyry+8 quadrant systems",
       expected.every((v) => offered.includes(v)) && offered.length === expected.length,
       `offered=${JSON.stringify(offered)}`);
   }

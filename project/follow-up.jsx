@@ -16,10 +16,12 @@ function FollowUpQuestions({ mode = "natal", chart = null, syn = null, agentOn =
   const isSynastry = mode === "synastry";
   const scopeKey = $fuUseMemo(() => {
     if (isSynastry && syn) {
-      return `synastry:${chartIdentityKey(syn.chartA)}::${chartIdentityKey(syn.chartB)}`;
+      return `synastry:${chartIdentityKey(syn.chartA)}::${chartIdentityKey(syn.chartB)}::${syn.readingContext && syn.readingContext.cacheFingerprint || ''}`;
     }
-    return chart ? `natal:${chartIdentityKey(chart)}` : "no-chart";
+    return chart ? `natal:${chartIdentityKey(chart)}::${chart.readingContext && chart.readingContext.cacheFingerprint || ''}` : "no-chart";
   }, [isSynastry, chart, syn]);
+  const currentScope = React.useRef(scopeKey);
+  currentScope.current = scopeKey;
 
   $fuUseEffect(() => {
     setQuestion("");
@@ -44,12 +46,19 @@ function FollowUpQuestions({ mode = "natal", chart = null, syn = null, agentOn =
       const answer = isSynastry
         ? await answerSynastryFollowUp(nextQuestion, syn, turns)
         : await answerNatalFollowUp(nextQuestion, chart, turns);
+      const context = isSynastry ? syn.readingContext : chart.readingContext;
+      if (context && window.ReadingRuns) {
+        window.ReadingRuns.attachEvidence(null, JSON.stringify([context.at, context.input]), 'followUps',
+          [...turns, { question: nextQuestion, answer }]);
+        window.dispatchEvent(new CustomEvent('personal-reading-evidence'));
+      }
+      if (currentScope.current !== scopeKey) return;
       setTurns((prior) => [...prior, { question: nextQuestion, answer }]);
       setQuestion("");
     } catch (err) {
-      setError(String(err && err.message || err));
+      if (currentScope.current === scopeKey) setError(String(err && err.message || err));
     } finally {
-      setLoading(false);
+      if (currentScope.current === scopeKey) setLoading(false);
     }
   };
 
