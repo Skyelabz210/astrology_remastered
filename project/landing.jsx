@@ -1,3 +1,29 @@
+function BirthWheel({ label, value, options, onChange, disabled }) {
+  const ref = React.useRef(null);
+  const drag = React.useRef(null);
+  const index = options.findIndex(o => String(o.value) === String(value));
+  const indexRef = React.useRef(index); indexRef.current = index;
+  function step(delta) {
+    const next = Math.max(0, Math.min(options.length - 1, indexRef.current + delta));
+    if (next !== indexRef.current) { indexRef.current = next; onChange(options[next].value); }
+  }
+  React.useEffect(() => {
+    const node = ref.current;
+    const wheel = e => { if (!disabled) { e.preventDefault(); step(e.deltaY > 0 ? 1 : -1); } };
+    node.addEventListener('wheel', wheel, { passive: false });
+    return () => node.removeEventListener('wheel', wheel);
+  });
+  return <div ref={ref} className="birth-wheel" role="spinbutton" tabIndex={disabled ? -1 : 0}
+    aria-label={'Spin ' + label} aria-valuemin={0} aria-valuemax={options.length - 1}
+    aria-valuenow={Math.max(0, index)} aria-valuetext={String(value)} aria-disabled={!!disabled}
+    onKeyDown={e => { if (disabled) return; if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); step(e.key === 'ArrowDown' ? 1 : -1); } }}
+    onPointerDown={e => { if (!disabled) { drag.current = e.clientY; e.currentTarget.setPointerCapture(e.pointerId); } }}
+    onPointerMove={e => { if (drag.current === null || disabled) return; const delta = Math.trunc((drag.current - e.clientY) / 22); if (delta) { step(delta); drag.current = e.clientY; } }}
+    onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}>
+    {[-1, 0, 1].map(offset => { const option = options[index + offset]; return <div key={offset} className={offset === 0 ? 'wheel-current' : 'wheel-neighbor'} aria-hidden="true">{option ? option.label : '·'}</div>; })}
+  </div>;
+}
+
 // landing.jsx — Astrology Remastered landing screen.
 // Strict pickers (native selects, no free text). Default: San Antonio · TX.
 
@@ -5,6 +31,7 @@ function Picker({ label, value, options, onChange, wide, disabled }) {
   return (
     <label className={`pk ${wide ? "pk-wide" : ""}`}>
       <span className="pk-lbl">{label}</span>
+      <BirthWheel label={label} value={value} options={options} onChange={onChange} disabled={disabled} />
       <span className="pk-wrap">
         <select
           className="pk-sel"
@@ -49,7 +76,7 @@ function SearchablePicker({ label, value, options, onChange, placeholder }) {
   const qExp = expandAbbrev(q);
   const filtered = !q ? options : options.filter((o) => {
     const hay = (o.label + " " + (o.searchKey || "")).toLowerCase();
-    return hay.includes(q) || hay.includes(qExp) || expandAbbrev(hay).includes(qExp);
+    return window.PlaceSearch ? window.PlaceSearch.matchesPlace(q, hay) : hay.includes(q) || hay.includes(qExp) || expandAbbrev(hay).includes(qExp);
   });
 
   // close on outside click
@@ -165,7 +192,7 @@ function Landing({
   const [hour12,   setHour12]   = React.useState(initial?.hour12   ?? (isPartner ? 12 : 5));
   const [minute,   setMinute]   = React.useState(initial?.minute   ?? (isPartner ? 30 : 31));
   const [meridiem, setMeridiem] = React.useState(initial?.meridiem ?? "PM");
-  const [place,    setPlace]    = React.useState(initial?.place    ?? (isPartner ? "San Antonio · TX" : DEFAULT_CITY_KEY));
+  const [place,    setPlace]    = React.useState(() => { const key = initial?.place ?? (isPartner ? "San Antonio · TX" : DEFAULT_CITY_KEY); const city = findCity(key); return city ? cityKey(city) : key; });
   const [subjectName, setSubjectName] = React.useState(initial?.subjectName ?? (isPartner ? "" : "You"));
   const [timeUnknown, setTimeUnknown] = React.useState(initial?.timeUnknown ?? false);
   const [hoverKey, setHoverKey] = React.useState(null);
@@ -187,7 +214,7 @@ function Landing({
   }, [year, month, daysInMonth, day]);
 
   const years   = [];
-  for (let y = 1950; y <= currentYear; y++) years.push(y);
+  for (let y = 1800; y <= currentYear; y++) years.push(y);
   const hours   = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   const minutes = Array.from({ length: 60 }, (_, i) => i);
 
@@ -208,6 +235,7 @@ function Landing({
       return null;
     }
     const city = findCity(place);
+    if (!city) { setFormError("Choose a listed birthplace before casting. Unknown names cannot supply verified coordinates or a time zone."); return null; }
     const h24 = meridiem === "AM"
       ? (hour12 === 12 ? 0  : hour12)
       : (hour12 === 12 ? 12 : hour12 + 12);
@@ -291,11 +319,11 @@ function Landing({
     <div className="landing">
       <div className="landing-grid">
         <section className="landing-left">
-          <div className="landing-brand">
+          {isPartner && <div className="landing-brand">
             {isPartner && <button type="button" className="hdr-back landing-back" onClick={onBack} aria-label="Back to your chart">←</button>}
-            <span className="landing-mark">✦</span>
-            <span className="landing-brand-text">Resonance{isPartner ? " · Synastry" : isHcrm ? " · HCRM" : ""}</span>
-          </div>
+
+
+          </div>}
 
           <h1 className="landing-title">
             {isPartner ? <>Who are you <em>meeting?</em></>
@@ -311,6 +339,7 @@ function Landing({
           </p>
 
           <form className="landing-form" onSubmit={submit}>
+            {!isHcrm && <window.InterpreterSettings onConnected={() => onToggleAgent && onToggleAgent(false)} />}
             {!isHcrm && (
               <fieldset className="lf-set">
                 <legend className="lf-leg">{isPartner ? "Their name" : "Name for the reading"}</legend>
@@ -319,6 +348,10 @@ function Landing({
             )}
             <fieldset className="lf-set">
               <legend className="lf-leg">Date of birth</legend>
+              <label className="calendar-label">Calendar<input aria-label="Birth calendar" type="date" min="1800-01-01" max={`${currentYear}-12-31`} value={`${year}-${pad(month)}-${pad(day)}`} onChange={e => {
+                const parts = e.target.value.split('-').map(Number);
+                if (parts.length === 3 && parts.every(Number.isFinite) && parts[0] >= 1800 && parts[0] <= currentYear) { setYear(parts[0]); setMonth(parts[1]); setDay(parts[2]); }
+              }} /></label>
               <div className="lf-row">
                 <Picker
                   label="Month" value={month}
@@ -386,13 +419,13 @@ function Landing({
                 options={CITIES.map((c) => ({
                   value: cityKey(c),
                   label: `${c.name} · ${c.region}`,
-                  searchKey: `${c.name} ${c.region}`,
+                  searchKey: `${c.name} ${c.region} ${(c.aliases || []).join(" ")}`,
                   sub: `UTC${c.off >= 0 ? "+" : ""}${c.off}`,
                 }))}
                 onChange={setPlace}
                 placeholder="type a city or military base…"
               />
-              <p className="lf-hint">…or tap any pin on the globe.</p>
+              <p className="lf-hint">…or hold and drag the globe in any direction, then choose a city pin. Only a listed location is committed.</p>
             </fieldset>
 
             <button type="submit" className="lf-submit">
@@ -400,39 +433,6 @@ function Landing({
               <span className="lf-arrow">→</span>
             </button>
 
-            {/* Privacy note — wording audited against the actual code, not
-                aspirational. Verified by `grep -rn "fetch(\|XMLHttpRequest\|sendBeacon"
-                project/*.jsx`: zero hits anywhere in the jsx layer, so chart
-                math itself never makes a network call. There are now exactly
-                TWO egress paths in the whole app, and this note names both.
-                (2) is voice narration: elevenlabs.js POSTs the READING TEXT
-                and the reader's own stored API key to api.elevenlabs.io so
-                "Nerissa" can speak it. No birth data, coordinates, or
-                placements are in that request — and with no key stored there
-                is no request at all, because voice.jsx falls back to the
-                browser's offline SpeechSynthesis. Which is why the sentence
-                below is conditioned on a key actually being present rather
-                than on the voice toggle.
-                (1) is agent.jsx's `window.claude.complete(prompt)` — used
-                by the "Agent interpreter" narrative reading. Its prompt
-                (agent.jsx buildChartPrompt) includes the raw birth date,
-                latitude and longitude verbatim, and for the natal
-                chart-level reading it fires automatically the moment a
-                chart resolves, with no extra click — i.e. right after this
-                form is submitted.
-                Two things close the WP-20 finding together, and both are
-                needed. (1) The checkbox below is a real, always-reachable
-                control, offered *before* the automatic call this note
-                warns about, wired to the same `agentOn` setting and
-                threaded through so every screen that calls the agent
-                (session, full spread, synastry) honors it — replacing the
-                host-only tweaks-panel toggle that a standalone deployment
-                could never open. (2) `DEFAULT_SETTINGS.agentOn` is `false`,
-                so the feature is opt-in: nothing is sent unless the reader
-                ticks the box. Every gate reads `agentOn === true` rather
-                than `!== false`, so a settings object missing the key fails
-                closed. See project/docs/COMPLETION_AUDIT.md section 4 and
-                EXECUTION_STATUS.md's "Flagged for owner decision". */}
             {!isHcrm && (
               <label className="lf-check">
                 <input
@@ -441,8 +441,8 @@ function Landing({
                   onChange={(e) => onToggleAgent && onToggleAgent(e.target.checked)}
                 />
                 <span>
-                  Send my birth data to the AI "Agent interpreter" for a spoken-style reading
-                  (leaving this unchecked uses the local, non-AI reading — nothing leaves your browser)
+                  Send my birth data, computed chart, and reading context to the AI "Agent interpreter" for a spoken-style reading
+                  (leaving this unchecked uses the local, non-AI reading — no birth data is sent to AI providers)
                 </span>
               </label>
             )}
@@ -450,10 +450,10 @@ function Landing({
               {isHcrm
                 ? "Every register value on this console — positions, residues, houses — is computed entirely in your browser; nothing about your birth data is sent anywhere. The register map does not use the AI \"Agent interpreter\" feature at all."
                 : "Chart math — positions, houses, aspects, dignities, eclipses — is computed entirely in your browser; none of it is sent anywhere. " + (voiceEgress
-                    ? "Voice narration is set to ElevenLabs and a key is stored, so the text of each reading (and that key) is sent to ElevenLabs to be spoken aloud — no birth data or placements travel with it; switch the voice engine to \"Browser\" in the tweaks panel to keep narration offline. "
+                    ? "Voice narration is set to ElevenLabs and a key is stored, so the text of each reading (and that key) is sent to ElevenLabs to be spoken aloud. Reading text can contain your personal chart details; switch the voice engine to \"Browser\" in the tweaks panel to keep narration offline. "
                     : "") + (agentOn === true
-                    ? "Because you ticked the checkbox above, right after you submit this form this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "the name you enter above and your birth date, time, and location") + " to Claude (Anthropic) to generate the spoken-style \"Agent interpreter\" reading — untick it to keep everything local."
-                    : "The checkbox above is off by default, so nothing is sent to Claude (Anthropic) — every reading uses the local, non-AI text instead.")}
+                    ? "Because you ticked the checkbox above, right after you submit this form this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "the name you enter above and your birth date, time, and location") + " to OpenRouter and its selected model provider to generate the spoken-style \"Agent interpreter\" reading — untick it to keep everything local."
+                    : "The checkbox above is off by default, so nothing is sent to OpenRouter and its selected model provider — every reading uses the local, non-AI text instead.")}
             </p>
 
             {!isPartner && !isHcrm && typeof window !== "undefined" && window.LifeChaptersEditor && (
@@ -480,9 +480,7 @@ function Landing({
             hoverKey={hoverKey}
             onHoverKey={setHoverKey}
           />
-          <div className="landing-cred">
-            <span>{isPartner ? "Synastry · cross-aspects · phase syndrome" : isHcrm ? "HCRM · integer arcsec · basis 2·3·5·7·11·13·17·19" : "Astrology Remastered · Safe Basis 2·3·5·7·11·13 · M = 30,030"}</span>
-          </div>
+
         </section>
       </div>
     </div>

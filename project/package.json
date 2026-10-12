@@ -1,5 +1,6 @@
 {
   "name": "hcrm",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "HCRM — exact integer register core, astrological variant coverage, and shadow-spine certification.",

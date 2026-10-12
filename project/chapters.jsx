@@ -79,8 +79,8 @@ function profileChapters(raw) {
 
 // ─────────────────── city lookup (tolerant) ───────────────────
 // Places arrive either as registry keys ("Wetzlar · DE") or as free text
-// typed by a reader. findCity() falls back to CITIES[0] — WRONG for a
-// public app's relocation math — so this layer matches on name/region
+// typed by a reader. findCity() resolves unambiguous canonical names and
+// historical aliases; this layer additionally matches on name/region
 // first, accepts plain "Name, ST"-style strings, and returns null rather
 // than silently substituting San Antonio for an unknown town. Callers
 // drop unmatched chapters (with a visible hint in the UI) instead of
@@ -90,7 +90,7 @@ function chapterCity(keyOrLabel) {
   const s = keyOrLabel.trim();
   if (!s) return null;
   if (typeof findCity === "function" && typeof CITIES !== "undefined") {
-    const exact = CITIES.find((c) => cityKey(c) === s);
+    const exact = findCity(s);
     if (exact) return exact;
     // "Fort Bragg, NC" / "Wetzlar, Germany" / bare "Wetzlar"
     const parts = s.split(/[,·]/).map((p) => p.trim()).filter(Boolean);
@@ -104,7 +104,7 @@ function chapterCity(keyOrLabel) {
       const narrowed = hits.filter(
         (c) => c.region.toLowerCase() === rg || c.region.toLowerCase() === RG_TO_COUNTRY[rg]
       );
-      if (narrowed.length > 0) hits = narrowed;
+      hits = narrowed;
     }
     if (hits.length === 1) return hits[0];
     if (hits.length > 1) {

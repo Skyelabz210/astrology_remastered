@@ -10,6 +10,7 @@ async function gatherPersonalArchive(chart, context, narrative, relationships = 
     try { additional[name] = { status: 'ready', value: await fn() }; }
     catch (error) { additional[name] = { status: 'unavailable', message: String(error.message || error) }; unavailable.push(name); }
   };
+  await gather('behavioralProfile', () => window.BehavioralProfile.behavioralProfile(chart));
   const jd = c ? c.jd : window.dateToJD(new Date());
   const chapters = c && c.input.chapters || [];
   await gather('returnCharts', () => ['Sun', 'Moon'].map(body => {

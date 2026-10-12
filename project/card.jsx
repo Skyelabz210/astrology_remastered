@@ -119,13 +119,13 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
 
           {/* principal planet sigil — top right of inner field */}
           <div className="zc-planet">
-            <div className="zc-planet-glyph">{p.glyph}</div>
+            <div className="zc-planet-glyph" title={p.name}>{p.glyph}</div>
             {p.retrograde && <div className="zc-retro">℞</div>}
           </div>
 
           {/* centerpiece glyph + name */}
           <div className="zc-center">
-            <div className="zc-big-glyph">{card.glyph}</div>
+            <div className="zc-big-glyph" title={card.name}>{card.glyph}</div>
             <div className="zc-name">{card.name}</div>
             <div className="zc-latin">{card.latin}</div>
             <div className="zc-placement">{p.name} in {ZODIAC[p.sign].name}</div>

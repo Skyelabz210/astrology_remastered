@@ -124,6 +124,7 @@ const TEST_GLOBALS = { ...NODE_GLOBALS, location: "readonly" };
 // gap: no-undef fails loudly, in CI, on the file that references it — fix
 // by adding the one name, not by disabling the rule.
 const JSX_GLOBALS = {
+  "BirthWheel": "readonly", "interpreterComplete": "readonly",
   "PersonaPage": "readonly", "MoonPhaseGlobe": "readonly",
   "$cardUseCallback": "readonly", "$cardUseRef": "readonly", "$cardUseState": "readonly", "$ecEffect": "readonly", "$ecMemo": "readonly", "$fuUseEffect": "readonly", "$fuUseMemo": "readonly", "$fuUseState": "readonly",
   "$ecState": "readonly", "$hUseEffect": "readonly", "$hUseMemo": "readonly", "$hUseState": "readonly", "$haMemo": "readonly",
@@ -208,9 +209,12 @@ export default [
       "project/*.js",
       "!project/core-shim.js",
       "!project/zodiac-globe.js",
+      "!project/release-stamp.js",
     ],
   },
   js.configs.recommended,
+  { files: ["project/src/present/openrouter.js", "project/src/present/behavioral-profile.js", "project/src/present/place-search.js"], languageOptions: { globals: globals.browser } },
+  { files: ["project/release-stamp.js"], languageOptions: { globals: globals.browser } },
   { files: ["project/playwright.config.mjs"], languageOptions: { globals: NODE_GLOBALS } },
   { files: ["project/browser-tests/*.mjs"], languageOptions: { globals: { ...NODE_GLOBALS, ...globals.browser } } },
   {

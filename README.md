@@ -1,5 +1,10 @@
 # Astrology Remastered
 
+Release **2026.10 · v1.0.0** appears in the bottom-right corner of every page
+and in exported calculation/ZIP metadata. When cutting a new release, update
+`project/src/present/release.js` and the version in `project/package.json` /
+`project/package-lock.json`, then rebuild the standalone pages.
+
 A browser astrology application combining astronomical planetary positions,
 traditional interpretation, and **CRAM** (Configurable Residue Arithmetic Machines).
 
@@ -10,7 +15,7 @@ Astronomy Engine for ten planets, mean elements for lunar nodes and Lilith, and
 omits unsupported Chiron by default. See the [whole-app coverage and personal-reading audit](project/docs/FULL_APP_AUDIT.md) and [Persona repair report](project/docs/PERSONA_ACCURACY_REPAIR.md).
 
 ```
-6797/6797 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+6827/6827 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 The test banner records automated checks, not proof of every mathematical or interpretive claim in this repository.
@@ -687,3 +692,11 @@ implementation, not prototype.
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the test-first workflow, Mandate
 A1 in detail, and how to add a new core module so both no-float audits (Node
 and browser) see it.
+
+The current release includes a **Behavioral profile** page, a live Moon-phase
+icon above the draggable location globe, calendar/spinning birth controls, and
+OpenRouter interpreter settings. Enter your own OpenRouter API key in the app,
+connect a free multimodal model, then enable the AI checkbox. The key is kept
+only in memory; local readings work without it. Free providers impose quotas.
+See [the framework review](project/docs/FRAMEWORK_REVIEW.md) for verified
+calculation boundaries and remaining gaps.

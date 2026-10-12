@@ -15,7 +15,7 @@
 
 const { useState: $sUseState, useEffect: $sUseEffect, useRef: $sUseRef, useMemo: $sUseMemo } = React;
 
-function ReadingSession({ chart: natalChart, settings, setTweak, onOpenSpread, onOpenSynastry, onOpenPersona, onBack, chapters }) {
+function ReadingSession({ chart: natalChart, settings, setTweak, onOpenSpread, onOpenSynastry, onOpenPersona, onOpenBehavior, onBack, chapters }) {
   const { chart, context } = window.usePersonalReading(natalChart, chapters, settings);
   const order = $sUseMemo(() => deckOrder(chart), [chart]);
   const cards  = $sUseMemo(() => order.map(i => chart.cards[i]), [chart, order]);
@@ -251,6 +251,7 @@ function ReadingSession({ chart: natalChart, settings, setTweak, onOpenSpread, o
         onOpenSpread={onOpenSpread}
         onOpenSynastry={onOpenSynastry}
         onOpenPersona={onOpenPersona}
+        onOpenBehavior={onOpenBehavior}
         onBack={onBack}
         onExport={() => exportReading(chart, cards, narrative)}
         voiceOn={settings.voiceOn}
@@ -374,7 +375,7 @@ function CinematicStage({ card, timeUnknown, ascLane, agent, localReading, spoke
           )}
           {agent.unavailable && (
             <p className="cs-note">
-              the AI interpreter isn't available here — the reading below is composed from the classical tables
+              Connect OpenRouter in the birth-entry interpreter settings. The local reading is available below.
             </p>
           )}
           {agent.error && (
@@ -490,7 +491,7 @@ function ShuffleAnimation() {
   );
 }
 
-function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onOpenPersona, onBack, onExport,
+function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onOpenPersona, onOpenBehavior, onBack, onExport,
                          voiceOn, voiceSpeaking, voiceBlocked, onToggleVoice,
                          agentOn, onToggleAgent }) {
   // Birth-place clock, not device clock — see AstroCore.birthClockParts.
@@ -522,7 +523,7 @@ function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onOpenPersona, onB
           className={`hdr-pill ${agentOn ? "is-on" : ""}`}
           onClick={onToggleAgent}
           title={agentOn
-            ? "Agent interpreter on — sends birth data to Claude for each reading. Click to turn off."
+            ? "Agent interpreter on — sends birth data to the configured AI provider for each reading. Click to turn off."
             : "Agent interpreter off — readings stay local. Click to turn on."}
           aria-pressed={agentOn}
         >
@@ -532,6 +533,7 @@ function SessionHeader({ chart, onOpenSpread, onOpenSynastry, onOpenPersona, onB
           <button className="hdr-pill hdr-pill-syn" onClick={onOpenSynastry}>synastry</button>
         )}
         <button className="hdr-pill" onClick={onOpenSpread}>full spread</button>
+        {onOpenBehavior && <button className="hdr-pill" onClick={onOpenBehavior}>behavior</button>}
         {onOpenPersona && (
           <button className="hdr-pill" onClick={onOpenPersona}>persona</button>
         )}

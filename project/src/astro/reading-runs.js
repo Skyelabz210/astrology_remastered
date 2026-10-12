@@ -19,14 +19,22 @@ export function profileKey(birth) {
   return JSON.stringify([new Date(birth.dateISO).toISOString(), birth.lat, birth.lng, birth.tz || null,
     birth.subjectName || 'You', !!birth.timeUnknown]);
 }
+function validRun(run) {
+  try {
+    const birth = run && run.input && run.input.birth;
+    return !!(run && run.version === 1 && typeof run.id === 'string'
+      && typeof run.profileKey === 'string' && Number.isFinite(new Date(run.at).getTime())
+      && birth && Number.isFinite(birth.lat) && Math.abs(birth.lat) <= 90
+      && Number.isFinite(birth.lng) && Math.abs(birth.lng) <= 180
+      && run.profileKey === profileKey(birth) && run.evidence && typeof run.reading === 'string');
+  } catch { return false; }
+}
 export function loadRuns(storage, owner = null) {
   try {
     storage = storage || globalThis.localStorage;
     const data = JSON.parse(storage.getItem(RUNS_KEY) || '[]');
     if (!Array.isArray(data)) return [];
-    return data.filter(r => r && r.version === 1 && typeof r.id === 'string'
-      && typeof r.profileKey === 'string' && Number.isFinite(new Date(r.at).getTime())
-      && r.input && r.evidence && typeof r.reading === 'string')
+    return data.filter(validRun)
       .slice(0, RUNS_MAX).filter(r => owner === null || r.profileKey === owner);
   } catch { return []; }
 }
@@ -34,10 +42,8 @@ export function saveRun(storage, run) {
   try {
     storage = storage || globalThis.localStorage;
     const clean = JSON.parse(JSON.stringify(run));
-    if (!clean || clean.version !== 1 || typeof clean.id !== 'string'
-      || typeof clean.profileKey !== 'string' || !Number.isFinite(new Date(clean.at).getTime())
-      || !clean.input || !clean.evidence || typeof clean.reading !== 'string') return false;
-    const rows = loadRuns(storage).filter(r => r.id !== clean.id);
+    if (!validRun(clean)) return false;
+    const rows = loadRuns(storage).filter(r => r.id !== clean.id || r.profileKey !== clean.profileKey);
     storage.setItem(RUNS_KEY, JSON.stringify([clean, ...rows].slice(0, RUNS_MAX)));
     return true;
   } catch { return false; }
@@ -49,9 +55,10 @@ export function clearRuns(storage, owner) {
     return true;
   } catch { return false; }
 }
-export function attachEvidence(storage, id, section, value) {
-  const run = loadRuns(storage).find(r => r.id === id);
-  if (!run) return false;
+export function attachEvidence(storage, id, section, value, owner = null) {
+  const matches = loadRuns(storage, owner).filter(r => r.id === id);
+  if (matches.length !== 1) return false;
+  const run = matches[0];
   return saveRun(storage, { ...run, evidence: { ...run.evidence, [section]: value } });
 }
 if (typeof window !== 'undefined') window.ReadingRuns = { profileKey, loadRuns, saveRun, clearRuns, attachEvidence, evidenceFingerprint, RUNS_MAX };

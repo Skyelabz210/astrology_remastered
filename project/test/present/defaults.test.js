@@ -100,7 +100,7 @@ export async function run() {
 
   // Parse the city row itself out of cities.jsx so the coordinates the
   // globe and the chart use are asserted to be the same ones.
-  const rowRe = /\{\s*name:\s*"Fort Liberty \(Bragg\)",\s*region:\s*"NC",\s*lat:\s*([-\d.]+),\s*lng:\s*([-\d.]+),\s*off:\s*(-?[\d.]+),\s*tz:\s*"([^"]+)"\s*\}/;
+  const rowRe = /\{\s*name:\s*"Fort Liberty \(Bragg\)",\s*region:\s*"NC",\s*lat:\s*([-\d.]+),\s*lng:\s*([-\d.]+),\s*off:\s*(-?[\d.]+),\s*tz:\s*"([^"]+)"(?:,\s*aliases:\s*\[[^\]]*\])?\s*\}/;
   const row = citiesSrc.match(rowRe);
   t("the Fort Liberty row is present in the city registry", !!row);
   if (row) {

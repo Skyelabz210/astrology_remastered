@@ -10,7 +10,7 @@
 <style>
 :root{
   --bg:oklch(0.13 0.008 60);--bg-2:oklch(0.16 0.010 60);--bg-3:oklch(0.20 0.010 60);
-  --ink:oklch(0.93 0.008 80);--ink-2:oklch(0.78 0.010 80);--ink-dim:oklch(0.55 0.010 80);
+  --ink:oklch(0.93 0.008 80);--ink-2:oklch(0.78 0.010 80);--ink-dim:oklch(0.60 0.010 80);
   --line:oklch(0.93 0.008 80 / 0.16);--line-2:oklch(0.93 0.008 80 / 0.32);
   --shadow:oklch(0.80 0.10 300);--boundary:oklch(0.82 0.10 60);--gear:oklch(0.82 0.10 180);
   --emerald:oklch(0.80 0.12 150);--rose:oklch(0.72 0.14 20);--amber:oklch(0.84 0.11 75);
@@ -169,6 +169,7 @@ body{font-family:var(--sans);background:radial-gradient(120% 60% at 50% 0%,oklch
 .hl{color:var(--amber)}
 .muted{color:var(--ink-dim);font-size:12px;text-align:center;padding:14px;font-family:var(--mono)}
 </style>
+  <link rel="stylesheet" href="release-stamp.css" />
 </head>
 <body>
 <div class="app">
@@ -302,5 +303,6 @@ body{font-family:var(--sans);background:radial-gradient(120% 60% at 50% 0%,oklch
 <script type="module" src="core-shim.js"></script>
 <script src="cram-int.js"></script>
 <script src="cram-calc.js"></script>
+  <script type="module" src="release-stamp.js"></script>
 </body>
 </html>

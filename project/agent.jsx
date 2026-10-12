@@ -133,6 +133,7 @@ function chartIdentityKey(chart) {
     Math.round(chart.asc * 3600),
     Math.round(chart.mc * 3600),
     bodies,
+    ...(window.OpenRouter && window.OpenRouter.available() ? [window.OpenRouter.model()] : []),
   ].join("|");
 }
 
@@ -488,8 +489,8 @@ function validateSynastryGrounding(text, syn, minimumFacts = 1, allowDataLimit =
   return { ok: errors.length === 0, factCount: cited.length, citedFacts: cited, errors };
 }
 
-async function completeVerified(prompt, verify) {
-  const first = stripMd(String(await window.claude.complete(prompt) || "").trim());
+async function completeVerified(prompt, verify, image = null) {
+  const first = stripMd(String(await interpreterComplete(prompt, image) || "").trim());
   const firstReport = verify(first);
   if (firstReport.ok) return first;
 
@@ -502,7 +503,7 @@ async function completeVerified(prompt, verify) {
     "REJECTED DRAFT",
     first,
   ].join("\n");
-  const second = stripMd(String(await window.claude.complete(repairPrompt) || "").trim());
+  const second = stripMd(String(await interpreterComplete(repairPrompt, image) || "").trim());
   const secondReport = verify(second);
   if (!secondReport.ok) {
     const error = new Error("I couldn't verify that answer against the chart data. Try asking about a specific planet, aspect, or house.");
@@ -761,10 +762,15 @@ function buildChartPrompt(chart, jdTarget = null, precomputedDigest = undefined,
  * Does this host provide the agent interpreter?
  * @returns {boolean} true only when window.claude.complete is callable.
  */
+function interpreterComplete(prompt, image = null) {
+  if (window.OpenRouter && window.OpenRouter.available()) return window.OpenRouter.complete(prompt, image);
+  return window.claude.complete(prompt);
+}
+
 function agentAvailable() {
   return typeof window !== "undefined"
-    && !!window.claude
-    && typeof window.claude.complete === "function";
+    && ((window.OpenRouter && window.OpenRouter.available())
+      || (!!window.claude && typeof window.claude.complete === "function"));
 }
 
 /** The state the hooks report on a host with no interpreter. */
@@ -1266,7 +1272,7 @@ function exportReading(chart, cards, narrative = null) {
 }
 
 Object.assign(window, {
-  agentAvailable, remember, hydrateReadings, persistReadings,
+  agentAvailable, completeVerified, remember, hydrateReadings, persistReadings,
   readingTextFor, buildReadingMarkdown, exportFilename, downloadTextFile, exportReading,
   READINGS_STORE_KEY, READINGS_STORE_MAX,
   interpretCard, interpretChart, useAgentReading, useAgentChartReading,

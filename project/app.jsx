@@ -84,6 +84,7 @@ function App() {
     ...DEFAULT_SETTINGS,
     ...(storedProfile && storedProfile.settings ? storedProfile.settings : {}),
   });
+  React.useLayoutEffect(() => { if (window.OpenRouter) window.OpenRouter.setConsent(settings.agentOn === true); }, [settings.agentOn]);
   const t = { tweaks: settings, setTweak };
   const [screen, setScreen] = $useState("landing");
   const [landingState, setLandingState] = $useState(
@@ -187,6 +188,7 @@ function App() {
           onOpenSpread={() => setScreen("spread")}
           onOpenSynastry={() => setScreen("partner")}
           onOpenPersona={() => setScreen("persona")}
+          onOpenBehavior={() => setScreen("behavior")}
             chapters={chapters}
         />
       </Boundary>
@@ -219,6 +221,9 @@ function App() {
         />
       </Boundary>
     );
+  }
+  if (screen === "behavior") {
+    return <Boundary><window.BehavioralProfilePage setTweak={setTweak} settings={settings} chapters={chapters} onBack={() => setScreen("session")} /></Boundary>;
   }
   if (screen === "persona") {
     return (
@@ -366,7 +371,7 @@ function SynastryScreen({ chapters = [], settings, setTweak, partner, dstNote, o
   );
 }
 
-function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOpenSynastry, onOpenPersona, chapters }) {
+function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOpenSynastry, onOpenPersona, onOpenBehavior, chapters }) {
   const { banners, pushError, dismiss } = useErrorBanner();
 
   const chart = $useMemo(() => {
@@ -400,7 +405,7 @@ function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOp
   return (
     <>
       <ChartStatusBanners chart={chart} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
-      <ReadingSession chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} onOpenSpread={onOpenSpread} onOpenSynastry={onOpenSynastry} onOpenPersona={onOpenPersona} chapters={chapters} />
+      <ReadingSession chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} onOpenSpread={onOpenSpread} onOpenSynastry={onOpenSynastry} onOpenPersona={onOpenPersona} onOpenBehavior={onOpenBehavior} chapters={chapters} />
     </>
   );
 }
@@ -544,7 +549,7 @@ function Header({ chart, settings, setTweak, onBack }) {
           className={`hdr-pill ${agentOn ? 'is-on' : ''}`}
           onClick={() => setTweak('agentOn', !agentOn)}
           title={agentOn
-            ? "Agent interpreter on — sends birth data to Claude for each reading. Click to turn off."
+            ? "Agent interpreter on — sends birth data to the configured AI provider for each reading. Click to turn off."
             : "Agent interpreter off — readings stay local. Click to turn on."}
           aria-pressed={agentOn}
         >
