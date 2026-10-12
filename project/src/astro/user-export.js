@@ -1,5 +1,6 @@
 import { zipSync, strToU8 } from '../../vendor/fflate.js';
 import { profileKey } from './reading-runs.js';
+import { APP_RELEASE } from '../present/release.js';
 
 const BIRTH_FIELDS = ['dateISO', 'lat', 'lng', 'tz', 'subjectName', 'placeLabel',
   'placeKey', 'timeUnknown', 'houseSystem', 'sect', 'orbScale'];
@@ -70,7 +71,7 @@ export function collectPersonalData({ chart, context = null, narrative = null,
   try { if (profile && ownerOf(profile.settings) === owner) ownedProfile = {
     settings: select(profile.settings, BIRTH_FIELDS), birthForm: profile.birthForm,
     chapters: profile.chapters, savedAt: profile.savedAt }; } catch { /* unrelated/invalid profile */ }
-  return safeSnapshot({ schema: 'resonance-personal-export-v1', exportedAt: new Date(exportedAt).toISOString(),
+  return safeSnapshot({ schema: 'resonance-personal-export-v1', release: APP_RELEASE, exportedAt: new Date(exportedAt).toISOString(),
     owner, subject: chart.birth.subjectName || 'Your chart', chart: chartSnapshot(chart),
     context: context ? { at: context.at, jd: context.jd, input: context.input,
       evidence: context.evidence, limitations: context.limitations, modelRevision: context.input.modelRevision } : null,
@@ -100,12 +101,18 @@ export function natalChartSvg(chart) {
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500" role="img" aria-labelledby="title desc"><title id="title">Natal chart for ${escapeHtml(chart.birth.subjectName || 'your chart')}</title><desc id="desc">Geocentric tropical longitude wheel. Aries starts at the top; longitude increases clockwise. Dashed lines are computed house cusps. Label rows stagger to reduce overlap.</desc><rect width="500" height="500" fill="#faf8f2"/><circle cx="250" cy="250" r="215" fill="none" stroke="#3c4354"/>${marks.join('')}<circle cx="250" cy="250" r="70" fill="#faf8f2"/><text x="250" y="245" text-anchor="middle" font-size="16" fill="#3c4354">Natal chart</text><text x="250" y="267" text-anchor="middle" font-size="11" fill="#3c4354">${escapeHtml(chart.timeUnknown ? 'Birth time unknown' : chart.houseSystemActual)}</text></svg>`;
 }
+function behavioralArchiveText(data) {
+  const local = data.additional && data.additional.behavioralProfile && data.additional.behavioralProfile.value;
+  const saved = data.runs.find(r => typeof r.evidence?.behavioralProfile?.aiText === 'string');
+  const text = local && typeof local.text === 'string' ? local.text + '\n\n' + local.limitation : '';
+  return text + (saved ? '\n\nSaved AI expansion · ' + saved.at + '\n' + saved.evidence.behavioralProfile.aiText : '');
+}
 export function archiveReport(data) {
   const c = data.chart, subject = escapeHtml(data.subject);
   const rows = (c.planets || []).map(p => `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(SIGNS[p.sign])}</td><td>${Number(p.lon).toFixed(4)}°</td><td>${c.timeUnknown ? 'Unknown' : escapeHtml(p.house)}</td><td>${escapeHtml(p.dignity && p.dignity.kind)}</td><td>${escapeHtml(p.positionSource)}</td></tr>`).join('');
   const history = data.runs.map(run => `<details><summary>${escapeHtml(run.at)}</summary><p class="reading">${escapeHtml(run.reading)}</p></details>`).join('');
   const limitations = data.context && data.context.limitations || c.positionWarnings || [];
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'"><title>${subject} — saved astrology reading</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:960px;margin:auto;padding:24px;color:#252936;background:#faf8f2}h1,h2{line-height:1.3}.reading{white-space:pre-wrap;overflow-wrap:anywhere}svg{max-width:100%;height:auto}table{border-collapse:collapse;width:100%}th,td{padding:9px;text-align:left;border-bottom:1px solid #c9c9c0}.scroll{overflow:auto}summary{cursor:pointer;padding:12px}li{margin:6px 0}code{overflow-wrap:anywhere}</style><h1>${subject}</h1><p>Birth record: ${escapeHtml(c.birth.dateISO)} · ${escapeHtml(c.birth.placeLabel)} · ${escapeHtml(c.birth.lat)}°, ${escapeHtml(c.birth.lng)}°</p><p>Reading instant: ${escapeHtml(data.context && data.context.at || data.exportedAt)}. Saved: ${escapeHtml(data.exportedAt)}.</p>${natalChartSvg(c)}<div class="scroll"><table><caption>Natal placements and source</caption><thead><tr><th>Body</th><th>Sign</th><th>Longitude</th><th>House</th><th>Dignity</th><th>Source</th></tr></thead><tbody>${rows}</tbody></table></div><h2>Your reading</h2><p class="reading">${escapeHtml(data.readings.text || 'No narrative was composed. Computed chart data is included.')}</p><h2>Saved readings (${data.runs.length})</h2>${history}<h2>Calculation assumptions</h2><ul>${limitations.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul><p>All calculation snapshots and admitted ledgers are in the data folder. No internet connection is required to read this report.</p></html>`;
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'"><title>${subject} — saved astrology reading</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:960px;margin:auto;padding:24px;color:#252936;background:#faf8f2}h1,h2{line-height:1.3}.reading{white-space:pre-wrap;overflow-wrap:anywhere}svg{max-width:100%;height:auto}table{border-collapse:collapse;width:100%}th,td{padding:9px;text-align:left;border-bottom:1px solid #c9c9c0}.scroll{overflow:auto}summary{cursor:pointer;padding:12px}li{margin:6px 0}code{overflow-wrap:anywhere}</style><h1>${subject}</h1><p>Birth record: ${escapeHtml(c.birth.dateISO)} · ${escapeHtml(c.birth.placeLabel)} · ${escapeHtml(c.birth.lat)}°, ${escapeHtml(c.birth.lng)}°</p><p>Reading instant: ${escapeHtml(data.context && data.context.at || data.exportedAt)}. Saved: ${escapeHtml(data.exportedAt)}.</p>${natalChartSvg(c)}<div class="scroll"><table><caption>Natal placements and source</caption><thead><tr><th>Body</th><th>Sign</th><th>Longitude</th><th>House</th><th>Dignity</th><th>Source</th></tr></thead><tbody>${rows}</tbody></table></div><h2>Your reading</h2><p class="reading">${escapeHtml(data.readings.text || 'No narrative was composed. Computed chart data is included.')}</p><h2>Behavioral profile</h2><p class="reading">${escapeHtml(behavioralArchiveText(data) || "No behavioral profile was collected.")}</p><h2>Saved readings (${data.runs.length})</h2>${history}<h2>Calculation assumptions</h2><ul>${limitations.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul><p>All calculation snapshots and admitted ledgers are in the data folder. No internet connection is required to read this report.</p><footer style="text-align:right;font-size:11px">Release ${escapeHtml(data.release && data.release.release)} · v${escapeHtml(data.release && data.release.version)}</footer></html>`;
 }
 export async function buildPersonalZip(data, { crypto = globalThis.crypto } = {}) {
   if (!data || data.schema !== 'resonance-personal-export-v1' || ownerOf(data.chart.birth) !== data.owner) throw new Error('Invalid personal export snapshot');
@@ -116,6 +123,8 @@ export async function buildPersonalZip(data, { crypto = globalThis.crypto } = {}
     'readings/current.txt': strToU8(data.readings.text),
     'README.txt': strToU8('Resonance personal archive\n\nExtract this ZIP and open report.html to read it offline.\ncharts/natal.svg: vector natal chart.\ndata/personal-data.json: complete selected-user snapshot, readings, prior runs, calculated charts, provenance and availability.\nmanifest.json: format, owner and SHA-256 file checksums where available.\n\nThe archive contains personal birth information and readings. It contains no provider credentials and makes no network requests. It is a snapshot, not a cross-device account or automatic backup.\n'),
   };
+  const behaviorText = behavioralArchiveText(data);
+  if (behaviorText) files['readings/behavioral-profile.txt'] = strToU8(behaviorText);
   if (data.profile) files['data/saved-profile.json'] = strToU8(JSON.stringify(data.profile, null, 2));
   data.runs.forEach((run, index) => {
     const number = String(index + 1).padStart(2, '0');
@@ -128,7 +137,7 @@ export async function buildPersonalZip(data, { crypto = globalThis.crypto } = {}
     const hash = crypto && crypto.subtle ? await crypto.subtle.digest('SHA-256', content) : null;
     return { path, bytes: content.length, sha256: hash ? Array.from(new Uint8Array(hash), x => x.toString(16).padStart(2, '0')).join('') : null };
   }));
-  const manifest = { schema: data.schema, exportedAt: data.exportedAt, subject: data.subject,
+  const manifest = { schema: data.schema, release: data.release, exportedAt: data.exportedAt, subject: data.subject,
     profileKey: data.owner, runCount: data.runs.length, files: checksums,
     checksumStatus: checksums.every(f => f.sha256) ? 'SHA-256' : 'unavailable in this environment',
     credentialPolicy: 'Explicit profile/chart/run inputs only; credential fields omitted; no arbitrary storage or cookies.' };

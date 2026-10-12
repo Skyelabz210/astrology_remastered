@@ -27,7 +27,7 @@ const CITIES = [
   { name: "Waco",         region: "TX", lat:  31.5493, lng:  -97.1467, off: -6, tz: "America/Chicago" },
 
   // ── US military installations (frequent birthplaces) ──
-  { name: "Fort Liberty (Bragg)", region: "NC", lat: 35.1408, lng: -79.0058, off: -5, tz: "America/New_York" },
+  { name: "Fort Liberty (Bragg)", region: "NC", lat: 35.1408, lng: -79.0058, off: -5, tz: "America/New_York", aliases: ["Fort Bragg", "Ft Bragg", "Fort Liberty", "Bragg", "Liberty"] },
   { name: "Fort Cavazos (Hood)",  region: "TX", lat: 31.1349, lng: -97.7780, off: -6, tz: "America/Chicago" },
   { name: "Fort Campbell",        region: "KY", lat: 36.6726, lng: -87.4615, off: -6, tz: "America/Chicago" },
   { name: "Fort Stewart",         region: "GA", lat: 31.8693, lng: -81.6093, off: -5, tz: "America/New_York" },
@@ -253,6 +253,7 @@ const CITIES = [
   { name: "Berlin",       region: "DE", lat:  52.5200, lng:   13.4050, off:  1, tz: "Europe/Berlin" },
   { name: "Hamburg",      region: "DE", lat:  53.5511, lng:    9.9937, off:  1, tz: "Europe/Berlin" },
   { name: "Munich",       region: "DE", lat:  48.1351, lng:   11.5820, off:  1, tz: "Europe/Berlin" },
+  { name: "Wetzlar", region: "DE", lat: 50.5558, lng: 8.5046, off: 1, tz: "Europe/Berlin", aliases: ["Wezlar"] },
   { name: "Frankfurt",    region: "DE", lat:  50.1109, lng:    8.6821, off:  1, tz: "Europe/Berlin" },
   { name: "Cologne",      region: "DE", lat:  50.9375, lng:    6.9603, off:  1, tz: "Europe/Berlin" },
   { name: "Zürich",       region: "CH", lat:  47.3769, lng:    8.5417, off:  1, tz: "Europe/Zurich" },
@@ -377,7 +378,19 @@ const CITIES = [
 const DEFAULT_CITY_KEY = "Fort Liberty (Bragg) · NC";
 
 function cityKey(c) { return `${c.name} · ${c.region}`; }
-function findCity(key) { return CITIES.find(c => cityKey(c) === key) || CITIES[0]; }
+function findCity(key) {
+  if (typeof key !== 'string' || !key.trim()) return null;
+  const exact = CITIES.find(c => cityKey(c) === key); if (exact) return exact;
+  const normalize = value => String(value).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/\bft\b/g, 'fort').replace(/[^a-z0-9]+/g, ' ').trim();
+  const query = normalize(key);
+  const matches = CITIES.filter(c => {
+    const base = c.name.replace(/\s*\([^)]*\)/g, '').trim();
+    const old = c.name.match(/\(([^)]+)\)/);
+    const aliases = [c.name, base, ...(c.aliases || []), ...(old ? [base.split(' ')[0] + ' ' + old[1]] : [])];
+    return aliases.some(name => normalize(name) === query || normalize(name + ' ' + c.region) === query);
+  });
+  return matches.length === 1 ? matches[0] : null;
+}
 
 // Format the chosen local-time + city offset into an unambiguous ISO
 // string the rest of the engine can pass to new Date().

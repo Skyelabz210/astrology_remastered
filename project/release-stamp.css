@@ -1,0 +1,21 @@
+.release-stamp {
+  position: fixed;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(6px, env(safe-area-inset-bottom));
+  z-index: 4;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font: 10px/1.4 var(--mono, ui-monospace, monospace);
+  letter-spacing: 0.02em;
+  color: oklch(0.78 0.010 80);
+  background: oklch(0.13 0.008 60 / 0.95);
+  pointer-events: none;
+}
+@media print {
+  .release-stamp {
+    position: static;
+    text-align: right;
+    color: #555;
+    background: none;
+  }
+}

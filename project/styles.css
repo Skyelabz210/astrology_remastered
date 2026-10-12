@@ -2967,3 +2967,37 @@ body::before {
 .personal-archive { margin: .5rem 0 1rem; }
 .personal-archive button { max-width: 100%; white-space: normal; }
 .personal-archive p { line-height: 1.5; overflow-wrap: anywhere; }
+
+/* Birth entry controls and current phase: deliberately compact on phones. */
+.moon-phase-globe { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.moon-phase-icon { display: flex; align-items: center; gap: 12px; color: #a9f6d7; font-size: 12px; }
+.moon-phase-icon canvas { width: 64px; height: 64px; filter: drop-shadow(0 0 8px #88f4cb66); }
+.glb { touch-action: none; max-width: 100%; cursor: grab; }
+.glb:active { cursor: grabbing; }
+.glb-cities { pointer-events: none; }
+.glb-readout { pointer-events: none; }
+.glb-city { transition: opacity .16s ease; }
+.birth-wheel { text-align: center; height: 78px; padding: 3px 6px; border-radius: 8px; background: #ffffff06; touch-action: none; cursor: ns-resize; user-select: none; }
+.wheel-current { color: var(--ink); border-top: 1px solid #a9f6d74a; border-bottom: 1px solid #a9f6d74a; line-height: 26px; }
+.wheel-neighbor { font-size: 12px; line-height: 21px; color: var(--ink-dim); }
+.calendar-label { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.calendar-label input, .interpreter-settings input, .interpreter-settings select { color: var(--ink); background: #181c22; border: 1px solid #ffffff40; border-radius: 6px; padding: 9px; max-width: 100%; color-scheme: dark; }
+.interpreter-settings { margin: 12px 0; max-width: 100%; font-size: 13px; }
+.interpreter-settings summary { cursor: pointer; }
+.interpreter-settings label { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; }
+.interpreter-settings button { margin: 5px 6px 5px 0; }
+.behavioral-page { max-width: 1120px; margin: auto; }
+.behavioral-page h2 { font-size: 20px; }
+.behavior-source { color: #a9f6d7; }
+.behavior-expanded p { white-space: pre-wrap; }
+@media (max-width: 600px) { .rs-hdr-r { flex-wrap: wrap; } .birth-wheel { min-width: 48px; } .glb { overflow: visible; } .glb-readout-meta { max-width: 320px; margin: auto; } }
+
+.landing-left, .landing-right, .landing-form, .lf-set, .pk { min-width: 0; }
+.lf-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); }
+.moon-phase-globe .glb { margin-bottom: 70px; }
+@media (max-width: 1000px) { .landing-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .landing { padding: 24px 20px 60px; } .calendar-label { flex-wrap: wrap; } .lf-submit { width: 100%; } }
+
+.glb-cities { overflow: clip; border-radius: 50%; }
+
+.previous-behavior .saved-reading { white-space: pre-wrap; overflow-wrap: anywhere; }

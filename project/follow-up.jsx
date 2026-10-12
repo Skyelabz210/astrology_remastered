@@ -49,7 +49,7 @@ function FollowUpQuestions({ mode = "natal", chart = null, syn = null, agentOn =
       const context = isSynastry ? syn.readingContext : chart.readingContext;
       if (context && window.ReadingRuns) {
         window.ReadingRuns.attachEvidence(null, JSON.stringify([context.at, context.input]), 'followUps',
-          [...turns, { question: nextQuestion, answer }]);
+          [...turns, { question: nextQuestion, answer }], context.profileKey);
         window.dispatchEvent(new CustomEvent('personal-reading-evidence'));
       }
       if (currentScope.current !== scopeKey) return;

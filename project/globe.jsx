@@ -119,19 +119,31 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
   const yawRef    = React.useRef(0);
   const targetRef = React.useRef(0);
   const rafRef    = React.useRef(0);
+  const tiltRef = React.useRef(0);
+  const tiltTarget = React.useRef(0);
+  const dragRef = React.useRef(null);
+  const movedRef = React.useRef(false);
+  const reduced = React.useRef(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function moveGlobe(dx, dy) {
+    targetRef.current += dx;
+    tiltTarget.current = Math.max(-85, Math.min(85, tiltTarget.current + dy));
+    driftPauseRef.current = Infinity;
+  }
+
 
   // When the selection changes, snap the target yaw to that city's longitude
   // (and freeze drift briefly so the move reads cleanly).
   const driftPauseRef = React.useRef(0);
   React.useEffect(() => {
     const c = findCity(selectedKey);
+    if (!c) return;
     targetRef.current = -c.lng;
+    tiltTarget.current = c.lat;
     driftPauseRef.current = 120;  // ~2s no drift
   }, [selectedKey]);
 
   React.useEffect(() => {
-    const TILT = -22 * Math.PI / 180;
-    const cosT = Math.cos(TILT), sinT = Math.sin(TILT);
+    let cosT = 1, sinT = 0;
     const cx = size / 2, cy = size / 2;
     const R  = size / 2 - 14;
 
@@ -142,6 +154,7 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
     canvas.style.width  = size + "px";
     canvas.style.height = size + "px";
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     ctx.scale(dpr, dpr);
 
     let mounted = true;
@@ -150,7 +163,7 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
     //
     // zodiac-globe.js is a <script type="module">; if a page forgets to
     // load it the globe still draws, just without a sign in it.
-    const ZG = typeof window !== "undefined" ? window.ZodiacGlobe : null;
+    const ZG = null; // Location canvas: no decorative zodiac overlay.
     const masks = ZG ? buildSignMasks(ZG.SIGN_GLYPHS, ZG.MASK_SIZE) : null;
     // A reader who has asked for reduced motion gets one sign for the
     // visit instead of a fade every few seconds. The globe's own drift is
@@ -207,12 +220,15 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
 
       // ─── drift + ease ───
       if (driftPauseRef.current > 0) driftPauseRef.current--;
-      else                            targetRef.current += 0.05;
+      else if (!reduced.current && !dragRef.current) targetRef.current += 0.05;
       // wrap target into yaw frame
       let dyaw = targetRef.current - yawRef.current;
       while (dyaw >  180) dyaw -= 360;
       while (dyaw < -180) dyaw += 360;
-      yawRef.current += dyaw * 0.06;
+      yawRef.current += dyaw * (reduced.current || dragRef.current ? 1 : 0.12);
+      tiltRef.current += (tiltTarget.current - tiltRef.current) * (reduced.current || dragRef.current ? 1 : 0.12);
+      cosT = Math.cos(tiltRef.current * Math.PI / 180);
+      sinT = Math.sin(tiltRef.current * Math.PI / 180);
 
       ctx.clearRect(0, 0, size, size);
 
@@ -315,14 +331,20 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
         const node = cityRefs.current.get(cityKey(c));
         if (!node) return;
         const p = project(c.lat, c.lng);
+        node.style.transform = `translate3d(${p.x}px, ${p.y}px, 0) translate(-50%, -50%)`;
         const back = p.z < -0.02;
+        node.style.display = back ? "none" : "";
         if (back) {
           node.style.opacity = "0";
           node.style.pointerEvents = "none";
+          node.tabIndex = -1;
+          node.setAttribute("aria-hidden", "true");
           return;
         }
         const op = 0.35 + 0.65 * Math.max(0, p.z);
         node.style.opacity = String(op);
+        node.tabIndex = p.z > 0 ? 0 : -1;
+        node.setAttribute("aria-hidden", p.z > 0 ? "false" : "true");
         node.style.pointerEvents = p.z > 0.0 ? "auto" : "none";
         node.style.transform = `translate3d(${p.x}px, ${p.y}px, 0) translate(-50%, -50%)`;
       });
@@ -339,18 +361,16 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
   const labelCity = findCity(hoverKey || selectedKey);
 
   return (
-    <div className="glb" ref={wrapRef} style={{ width: size, height: size }}>
-      {/* WP-20: the canvas itself only paints decorative dots/graticule —
-          every piece of information it conveys (which city is selected,
-          its coordinates, UTC offset) is duplicated as real text in the
-          readout below and as labelled <button>s per city, so the canvas
-          is marked decorative rather than given a role="img" that would
-          just repeat "a globe" with no way to describe a live animation.
-          The zodiac sign stencilled into the sphere is decorative on the
-          same terms: it is ambience, not an input or a reading — it says
-          nothing about the chart being cast — so it stays inside the
-          aria-hidden canvas rather than being announced, which at a sign
-          every few seconds would talk over the form. */}
+    <div className="glb" ref={wrapRef} style={{ width: size, height: size }}
+      role="group" aria-label="Birthplace globe; drag to rotate and choose a city pin" tabIndex={0}
+      onKeyDown={e => { const moves = { ArrowLeft: [-10,0], ArrowRight: [10,0], ArrowUp: [0,10], ArrowDown: [0,-10] }; if (moves[e.key]) { e.preventDefault(); moveGlobe(...moves[e.key]); } }}
+      onPointerDown={e => { if (e.target.closest('.glb-readout')) return; movedRef.current = false; if (onHoverKey) onHoverKey(null); dragRef.current = { x: e.clientX, y: e.clientY, id: e.pointerId }; }}
+      onPointerMove={e => { const drag = dragRef.current; if (!drag || drag.id !== e.pointerId) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (Math.abs(dx) + Math.abs(dy) > 3) { movedRef.current = true; e.currentTarget.setPointerCapture(e.pointerId); moveGlobe(dx * 0.4, dy * 0.4); drag.x = e.clientX; drag.y = e.clientY; } }}
+      onPointerUp={() => { dragRef.current = null; if (onHoverKey) onHoverKey(null); }} onPointerCancel={() => { dragRef.current = null; if (onHoverKey) onHoverKey(null); }}
+      onPointerLeave={() => { if (onHoverKey) onHoverKey(null); }}
+      onClickCapture={e => { if (movedRef.current) { e.preventDefault(); e.stopPropagation(); movedRef.current = false; } }}>
+      {/* All geographic input is duplicated in labelled city controls. */}
       <canvas ref={canvasRef} className="glb-canvas" aria-hidden="true" role="presentation" />
       <div className="glb-cities">
         {CITIES.map((c) => {
@@ -362,9 +382,9 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
               ref={(el) => { if (el) cityRefs.current.set(k, el); else cityRefs.current.delete(k); }}
               className={`glb-city ${sel ? "is-sel" : ""}`}
               onClick={() => onSelect(k)}
-              onMouseEnter={() => onHoverKey && onHoverKey(k)}
+              onMouseEnter={() => !dragRef.current && onHoverKey && onHoverKey(k)}
               onMouseLeave={() => onHoverKey && onHoverKey(null)}
-              aria-label={`${c.name}, ${c.region}`}
+              aria-label={`${c.name}, ${c.region}`} aria-pressed={sel}
               type="button"
             >
               <span className="glb-pin" />
@@ -376,12 +396,12 @@ function DotmatrixGlobe({ size = 440, selectedKey, onSelect, hoverKey, onHoverKe
 
       {/* readout */}
       <div className="glb-readout">
-        <div className="glb-readout-name">{labelCity.name}</div>
-        <div className="glb-readout-meta">
-          {labelCity.region} · {labelCity.lat.toFixed(2)}°{labelCity.lat >= 0 ? "N" : "S"} ·
+        <div className="glb-readout-name">{labelCity ? labelCity.name : 'Choose a listed birthplace'}</div>
+        {labelCity && <div className="glb-readout-meta">
+          {labelCity.region} · {Math.abs(labelCity.lat).toFixed(2)}°{labelCity.lat >= 0 ? "N" : "S"} ·
           {" "}{Math.abs(labelCity.lng).toFixed(2)}°{labelCity.lng >= 0 ? "E" : "W"} ·
-          {" "}UTC{labelCity.off >= 0 ? "+" : ""}{labelCity.off}
-        </div>
+          {" "}{labelCity.tz} · standard UTC{labelCity.off >= 0 ? "+" : ""}{labelCity.off}
+        </div>}
       </div>
     </div>
   );

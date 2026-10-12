@@ -12,7 +12,7 @@ function EnhancedReadingPanel({chart}) {
       .then(data=>{
         if (!cancelled && chart.readingContext && window.ReadingRuns) {
           const c = chart.readingContext;
-          const ok = window.ReadingRuns.attachEvidence(null, JSON.stringify([c.at, c.input]), 'hcrm', data);
+          const ok = window.ReadingRuns.attachEvidence(null, JSON.stringify([c.at, c.input]), 'hcrm', data, c.profileKey);
           if (ok) window.dispatchEvent(new CustomEvent('personal-reading-evidence'));
         }
         return data;

@@ -115,5 +115,18 @@ export async function run() {
     profile.includes("Your natal planets stay fixed") &&
     profile.includes("save profile locally") && profile.includes("forget saved profile"));
 
+  const alpha = sb.alphaLifeChapters(settings);
+  const flow = sb.normalizeChapters(alpha, natal);
+  t("alpha journey resolves all four canonical places", flow.dropped === 0 && flow.chapters.length === 4);
+  for (const [date, key] of [["1980-10-21T21:31:00Z", "Fort Liberty (Bragg) · NC"], ["1980-10-22T00:00:00Z", "Wetzlar · DE"], ["1993-10-22T00:00:00Z", "Fort Leonard Wood · MO"], ["1996-10-22T00:00:00Z", "San Antonio · TX"]]) {
+    t(`alpha residence boundary ${date}`, sb.chapterAt(flow.chapters, sb.dateToJD(new Date(date))).placeKey === key);
+  }
+  t("approximate dates survive normalization and storage", flow.chapters.every(ch => ch.approximate) && sb.profileChapters(alpha).every(ch => ch.approximate));
+  t("another birth date cannot inherit alpha residences", sb.alphaLifeChapters({ ...settings, dateISO: "1993-06-10T14:45:00Z" }).length === 0);
+  t("another birthplace cannot inherit alpha residences", sb.alphaLifeChapters({ ...settings, lat: -33.86, lng: 151.2 }).length === 0);
+  t("alpha seed returns independent editable rows", sb.alphaLifeChapters(settings)[0] !== alpha[0]);
+  t("misspelled Wezlar resolves to Wetzlar without borrowing a city", sb.chapterCity("Wezlar").name === "Wetzlar");
+  const alphaReturn = sb.returnChart(natal, "Sun", targetJd, alpha);
+  t("current alpha returns use San Antonio while natal remains Bragg", alphaReturn.chart.birth.lat === 29.4241 && natal.birth.lat === 35.1408);
   return rows;
 }

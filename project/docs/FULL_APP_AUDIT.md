@@ -150,6 +150,21 @@ fact checker. Voice is also optional; its provider receives spoken text.
 
 ## Verification and remaining product work
 
+The release consolidation also repairs history admission: loading and saving a
+run now validate its real input birth record against the claimed profile key.
+Missing birth records and forged owners are skipped independently, without
+discarding valid history or crashing its view. Equal run IDs across profiles
+cannot replace another person's run, and evidence attachments include the owner
+or reject ambiguous IDs. The CRAM Calculator's dim text now uses
+the same corrected AA contrast level as the main stylesheet.
+
+Release 2026.10 / version 1.0.0 is shared by every page, reading input snapshot
+and ZIP manifest. The footer sits outside the React root so navigation and
+error boundaries retain it. All historical branch tips are included by ancestry
+or verified patch equivalence; the original follow-up branch and its already
+merged squash commit have identical trees, so its history can be consolidated
+without restoring obsolete code.
+
 The mandatory gates are the full native suite, 1,296,000-position ring sweep,
 21-module no-float audit, independent JPL/Swiss fixture comparisons, lint,
 ledger validation, reproducible standalone builds, browser navigation/storage/
@@ -172,3 +187,14 @@ history is required. These are explicit gaps, not silently successful outputs.
 Open issue #45's wider physics/proof assertions are not resolved by this repair.
 The tested integer core remains intact; no mathematical or interpretive claim is
 promoted solely because a test banner is green.
+
+## Birth entry, interpreter and behavioral profile
+
+Release 2026.10 adds the current lunar icon, calendar and spinning birth controls,
+canonical typo/alias suggestions, gesture-based Earth navigation, free multimodal
+OpenRouter integration, and a separate user-scoped behavioral page. See
+[FRAMEWORK_REVIEW.md](FRAMEWORK_REVIEW.md) for the supplied guide's factual
+corrections, data/privacy boundaries, and remaining product limitations.
+
+
+Alpha residence journey: Fort Bragg (birth), Wetzlar from 1980-10-22 for 13 years, Fort Leonard Wood from 1993-10-22 for three years, San Antonio from 1996-10-22 onward. Move dates were approved as approximate and remain editable; UTC-midnight boundaries do not assert an arrival time. This fixture is restricted to the alpha birth epoch and coordinates. Saved custom histories are preserved, additional chapters are available to every user, and changing the birth record discards unedited inherited chapters. Natal birthplace stays fixed; return charts select residence on the return date. Approximation flags are retained in saved profiles and reading inputs.

@@ -84,14 +84,18 @@ function App() {
     ...DEFAULT_SETTINGS,
     ...(storedProfile && storedProfile.settings ? storedProfile.settings : {}),
   });
+  React.useLayoutEffect(() => { if (window.OpenRouter) window.OpenRouter.setConsent(settings.agentOn === true); }, [settings.agentOn]);
   const t = { tweaks: settings, setTweak };
   const [screen, setScreen] = $useState("landing");
   const [landingState, setLandingState] = $useState(
     storedProfile && storedProfile.birthForm ? storedProfile.birthForm : null
   );
   const [chapters, setChapters] = $useState(
-    storedProfile && Array.isArray(storedProfile.chapters) ? storedProfile.chapters : []
+    storedProfile && Array.isArray(storedProfile.chapters) ? storedProfile.chapters : window.alphaLifeChapters(settings)
   );
+  const chaptersEdited = React.useRef(false);
+  const onChaptersChange = (rows) => { chaptersEdited.current = true; setChapters(rows); };
+  const chaptersFor = (birth) => chaptersEdited.current || window.sameBirthRecord(settings, birth) ? chapters : window.alphaLifeChapters(birth);
   const [profileState, setProfileState] = $useState({
     savedAt: storedProfile && storedProfile.savedAt ? storedProfile.savedAt : null,
     message: storedProfile ? "Your local profile is loaded." : null,
@@ -114,6 +118,8 @@ function App() {
   }, [settings.rigorous, settings.primeLayer]);
 
   const onCast = (payload) => {
+    setChapters(chaptersFor(payload));
+    chaptersEdited.current = false;
     setTweak({
       dateISO:     payload.dateISO,
       lat:         payload.lat,
@@ -141,14 +147,17 @@ function App() {
       timeUnknown: !!payload.timeUnknown,
     };
     const nextSettings = { ...settings, ...birthSettings };
+    const nextChapters = chaptersFor(payload);
     const ok = typeof window !== "undefined" && window.ProfileStore
-      ? window.ProfileStore.save(nextSettings, chapters, payload.formState)
+      ? window.ProfileStore.save(nextSettings, nextChapters, payload.formState)
       : false;
     if (!ok) {
       setProfileState({ savedAt: null, message: "This browser blocked local profile storage.", error: true });
       return;
     }
     const savedAt = new Date().toISOString();
+    setChapters(nextChapters);
+    chaptersEdited.current = false;
     setTweak(birthSettings);
     setLandingState(payload.formState);
     setProfileState({ savedAt, message: "Saved on this device. Nothing was uploaded.", error: false });
@@ -170,7 +179,7 @@ function App() {
       <Boundary>
         <Landing initial={landingState} onCast={onCast}
                  agentOn={settings.agentOn} onToggleAgent={(v) => setTweak('agentOn', v)}
-                 chapters={chapters} onChaptersChange={setChapters}
+                 chapters={chapters} onChaptersChange={onChaptersChange}
                  profileState={profileState} onSaveProfile={onSaveProfile}
                  onClearProfile={onClearProfile} />
       </Boundary>
@@ -187,6 +196,7 @@ function App() {
           onOpenSpread={() => setScreen("spread")}
           onOpenSynastry={() => setScreen("partner")}
           onOpenPersona={() => setScreen("persona")}
+          onOpenBehavior={() => setScreen("behavior")}
             chapters={chapters}
         />
       </Boundary>
@@ -219,6 +229,9 @@ function App() {
         />
       </Boundary>
     );
+  }
+  if (screen === "behavior") {
+    return <Boundary><window.BehavioralProfilePage setTweak={setTweak} settings={settings} chapters={chapters} onBack={() => setScreen("session")} /></Boundary>;
   }
   if (screen === "persona") {
     return (
@@ -366,7 +379,7 @@ function SynastryScreen({ chapters = [], settings, setTweak, partner, dstNote, o
   );
 }
 
-function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOpenSynastry, onOpenPersona, chapters }) {
+function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOpenSynastry, onOpenPersona, onOpenBehavior, chapters }) {
   const { banners, pushError, dismiss } = useErrorBanner();
 
   const chart = $useMemo(() => {
@@ -400,7 +413,7 @@ function SessionScreen({ settings, setTweak, dstNote, onBack, onOpenSpread, onOp
   return (
     <>
       <ChartStatusBanners chart={chart} settings={settings} dstNote={dstNote} banners={banners} onDismiss={dismiss} />
-      <ReadingSession chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} onOpenSpread={onOpenSpread} onOpenSynastry={onOpenSynastry} onOpenPersona={onOpenPersona} chapters={chapters} />
+      <ReadingSession chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} onOpenSpread={onOpenSpread} onOpenSynastry={onOpenSynastry} onOpenPersona={onOpenPersona} onOpenBehavior={onOpenBehavior} chapters={chapters} />
     </>
   );
 }
@@ -544,7 +557,7 @@ function Header({ chart, settings, setTweak, onBack }) {
           className={`hdr-pill ${agentOn ? 'is-on' : ''}`}
           onClick={() => setTweak('agentOn', !agentOn)}
           title={agentOn
-            ? "Agent interpreter on — sends birth data to Claude for each reading. Click to turn off."
+            ? "Agent interpreter on — sends birth data to the configured AI provider for each reading. Click to turn off."
             : "Agent interpreter off — readings stay local. Click to turn on."}
           aria-pressed={agentOn}
         >

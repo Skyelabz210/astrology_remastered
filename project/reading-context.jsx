@@ -38,12 +38,14 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
     'Lifecycle circuit counts use mean orbital periods, not integrated geocentric winding.',
     'Firdaria uses 365.2425-day years; zodiacal releasing is level 1 with 360-day Egyptian years.',
     'Fixed-star positions omit proper motion; lunar mansions use equal tropical sectors.'];
+  if ((chapters || []).some(ch => ch.approximate)) limitations.push("Residence dates marked approximate are editable estimates; location-based readings near a move date may change when dates are corrected. Date-only chapter boundaries use UTC midnight, not a known flight or arrival time.");
   if (chart.timeUnknown) limitations.push('Unknown birth time: the assumed epoch affects lunar degrees, transits and return dates; houses, sect-dependent time lords and exact natal lanes are withheld from interpretation.');
   for (const [name, item] of Object.entries(evidence)) if (item.status !== 'ready') limitations.push(`${name}: ${item.message}`);
   const input = { birth: { ...chart.birth }, chapters: JSON.parse(JSON.stringify(chapters || [])),
     houseSystemActual: chart.houseSystemActual, settings: { orbScale: settings.orbScale ?? 1, eclipseOrb,
       sect: settings.sect || 'auto' }, ephemeris: window.Astronomy ? 'Astronomy Engine 2.1.19' : 'synthetic demo',
-    modelRevision: 'personal-reading-v1' };
+    interpreter: settings.agentOn === true && window.OpenRouter && window.OpenRouter.available() ? { provider: 'OpenRouter', model: window.OpenRouter.model() } : null,
+    modelRevision: 'personal-reading-v1', release: window.APP_RELEASE || null };
   const owner = window.ReadingRuns ? window.ReadingRuns.profileKey(chart.birth) : JSON.stringify(chart.birth);
   const cacheFingerprint = window.ReadingRuns ? window.ReadingRuns.evidenceFingerprint([at, input, evidence]) : JSON.stringify([at, input, evidence]);
   return { jd, at, profileKey: owner, input, evidence, limitations, cacheFingerprint,
@@ -62,7 +64,7 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
 function usePersonalReading(natal, chapters, settings) {
   const jd = React.useMemo(() => window.dateToJD(new Date()), []);
   const context = React.useMemo(() => buildPersonalReadingContext(natal, jd, chapters, settings),
-    [natal, jd, chapters, settings.orbScale, settings.eclipseOrb, settings.sect]);
+    [natal, jd, chapters, settings.orbScale, settings.eclipseOrb, settings.sect, settings.agentOn]);
   const chart = React.useMemo(() => natal && ({ ...natal, readingContext: context }), [natal, context]);
   return { chart, context };
 }

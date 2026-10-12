@@ -115,5 +115,23 @@ export function run() {
   t('unavailable storage reports save failure', !ReadingRuns.saveRun({ getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); } }, run));
   t('malformed storage is rejected', ReadingRuns.loadRuns({ getItem: () => '{broken' }).length === 0);
   t('clearing a profile removes its stored evidence', ReadingRuns.clearRuns(storage, context.profileKey) && ReadingRuns.loadRuns(storage).length === 0);
+  const foreignBirth = { ...birth, subjectName: 'Jordan' };
+  const foreignRun = { ...run, profileKey: ReadingRuns.profileKey(foreignBirth), input: { ...run.input, birth: foreignBirth } };
+  const malformed = { ...run, input: {} };
+  const forged = { ...foreignRun, profileKey: run.profileKey };
+  storage.setItem(ReadingRuns.RUNS_KEY, JSON.stringify([malformed, forged, run]));
+  t('bad and forged records are skipped without dropping valid history', ReadingRuns.loadRuns(storage, run.profileKey).length === 1);
+  t('saving a run requires its actual birth record and matching owner', !ReadingRuns.saveRun(storage, malformed) && !ReadingRuns.saveRun(storage, forged));
+  const invalidBirth = { ...birth, lat: 100 };
+  t('out-of-range stored birth coordinates cannot enter history', !ReadingRuns.saveRun(storage, { ...run,
+    input: { birth: invalidBirth }, profileKey: ReadingRuns.profileKey(invalidBirth) }));
+  t('equal ids in different profiles do not replace another person’s run', ReadingRuns.saveRun(storage, foreignRun)
+    && ReadingRuns.loadRuns(storage, run.profileKey).length === 1 && ReadingRuns.loadRuns(storage, foreignRun.profileKey).length === 1);
+  t('ambiguous ids cannot acquire unscoped calculation evidence', !ReadingRuns.attachEvidence(storage, run.id, 'audit', { value: 1 }));
+  t('scoped evidence reaches only its actual owner', ReadingRuns.attachEvidence(storage, run.id, 'audit', { value: 1 }, run.profileKey)
+    && ReadingRuns.loadRuns(storage, run.profileKey)[0].evidence.audit.value === 1
+    && ReadingRuns.loadRuns(storage, foreignRun.profileKey)[0].evidence.audit === undefined);
+  t('clearing one profile preserves other profiles', ReadingRuns.clearRuns(storage, run.profileKey)
+    && ReadingRuns.loadRuns(storage).length === 1 && ReadingRuns.loadRuns(storage)[0].profileKey === foreignRun.profileKey);
   return rows;
 }
