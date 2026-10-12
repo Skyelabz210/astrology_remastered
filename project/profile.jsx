@@ -5,7 +5,7 @@
 // chapters.jsx before any relocation calculation uses them.
 
 function LifeChaptersEditor({
-  chapters = [], birthPlaceKey, onChange, onSave, onClear, profileState,
+  chapters = [], birthPlaceKey, onChange, onSave, onClear, profileState, onApplyAlpha,
 }) {
   const [confirmClear, setConfirmClear] = React.useState(false);
   const rows = Array.isArray(chapters) ? chapters : [];
@@ -59,7 +59,7 @@ function LifeChaptersEditor({
           return (
             <div className="profile-chapter" key={row.id || index}>
               <div className="profile-chapter-title">
-                <span>Chapter {index + 1}</span>
+                <span>Chapter {index + 1}{row.approximate ? " · approximate dates" : ""}</span>
                 <button type="button" onClick={() => remove(index)} aria-label={`Remove life chapter ${index + 1}`}>remove</button>
               </div>
               <SearchablePicker
@@ -79,10 +79,11 @@ function LifeChaptersEditor({
                   <input type="date" value={row.endISO || ""} min={row.startISO || undefined} onChange={(event) => update(index, "endISO", event.target.value)} />
                 </label>
               </div>
+              <label className="profile-row-note"><input type="checkbox" checked={row.approximate === true} onChange={(event) => update(index, "approximate", event.target.checked)} /> Dates are approximate</label>
               <p className={`profile-row-note ${invalid ? "is-error" : ""}`}>
                 {invalid
                   ? "The end date must be later than the start date."
-                  : row.endISO ? "The next chapter can begin after this date." : "Leave Until blank if this is your current place."}
+                  : row.endISO ? "This end date is exclusive; the next chapter can begin on this date." : "Leave Until blank if this is your current place."}
               </p>
             </div>
           );
@@ -90,6 +91,7 @@ function LifeChaptersEditor({
       </div>
 
       <div className="profile-actions">
+        {onApplyAlpha && <button type="button" className="profile-add" onClick={onApplyAlpha}>use alpha journey · approximate dates</button>}
         <button type="button" className="profile-add" onClick={add}>+ add a life chapter</button>
         <button type="button" className="profile-save" disabled={invalidRows.length > 0} onClick={onSave}>save profile locally</button>
         {hasSavedProfile && (

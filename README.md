@@ -15,7 +15,7 @@ Astronomy Engine for ten planets, mean elements for lunar nodes and Lilith, and
 omits unsupported Chiron by default. See the [whole-app coverage and personal-reading audit](project/docs/FULL_APP_AUDIT.md) and [Persona repair report](project/docs/PERSONA_ACCURACY_REPAIR.md).
 
 ```
-6827/6827 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+6838/6838 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 The test banner records automated checks, not proof of every mathematical or interpretive claim in this repository.

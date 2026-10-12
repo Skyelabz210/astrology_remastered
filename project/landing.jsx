@@ -461,6 +461,10 @@ function Landing({
                 chapters={chapters}
                 birthPlaceKey={place}
                 onChange={onChaptersChange}
+                onApplyAlpha={Number(year) === 1980 && Number(month) === 10 && Number(day) === 21 && Number(hour12) === 5 && Number(minute) === 31 && meridiem === "PM" && !timeUnknown && findCity(place)?.lat === 35.1408 ? () => {
+                  const payload = buildPayload();
+                  if (payload) onChaptersChange(window.alphaLifeChapters(payload));
+                } : null}
                 profileState={profileState}
                 onSave={() => {
                   const payload = buildPayload();

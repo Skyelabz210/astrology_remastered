@@ -265,3 +265,20 @@ test('an unrecognized saved birthplace cannot silently cast at a fallback city',
   await expect(page.getByRole('alert')).toContainText('Choose a listed birthplace');
   await expect(page.getByRole('button', { name: 'Cast the spread' })).toBeVisible();
 });
+
+test('alpha journey is editable, persistent and does not follow another birth record', async ({ page }) => {
+  await page.goto('/resonance-spread.html');
+  await expect(page.locator('.profile-chapter')).toHaveCount(4);
+  await expect(page.locator('.profile-chapter').nth(1).getByRole('combobox')).toHaveValue('Wetzlar · DE');
+  await page.getByRole('button', { name: '+ add a life chapter' }).click();
+  await expect(page.locator('.profile-chapter')).toHaveCount(5);
+  await page.getByRole('button', { name: 'Remove life chapter 5' }).click();
+  await page.getByRole('button', { name: 'save profile locally' }).click();
+  await page.reload();
+  await expect(page.locator('.profile-chapter')).toHaveCount(4);
+  await expect(page.locator('.profile-chapter').last().getByRole('combobox')).toHaveValue('San Antonio · TX');
+  await page.getByLabel('Birth calendar', { exact: true }).fill('1990-01-01');
+  await page.getByRole('button', { name: /Cast the spread/i }).click();
+  await page.getByRole('button', { name: 'behavior', exact: true }).click();
+  await expect(page.locator('body')).not.toContainText('Wetzlar');
+});

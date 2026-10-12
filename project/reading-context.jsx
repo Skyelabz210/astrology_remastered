@@ -38,6 +38,7 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
     'Lifecycle circuit counts use mean orbital periods, not integrated geocentric winding.',
     'Firdaria uses 365.2425-day years; zodiacal releasing is level 1 with 360-day Egyptian years.',
     'Fixed-star positions omit proper motion; lunar mansions use equal tropical sectors.'];
+  if ((chapters || []).some(ch => ch.approximate)) limitations.push("Residence dates marked approximate are editable estimates; location-based readings near a move date may change when dates are corrected. Date-only chapter boundaries use UTC midnight, not a known flight or arrival time.");
   if (chart.timeUnknown) limitations.push('Unknown birth time: the assumed epoch affects lunar degrees, transits and return dates; houses, sect-dependent time lords and exact natal lanes are withheld from interpretation.');
   for (const [name, item] of Object.entries(evidence)) if (item.status !== 'ready') limitations.push(`${name}: ${item.message}`);
   const input = { birth: { ...chart.birth }, chapters: JSON.parse(JSON.stringify(chapters || [])),

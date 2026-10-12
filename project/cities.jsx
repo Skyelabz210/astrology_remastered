@@ -253,6 +253,7 @@ const CITIES = [
   { name: "Berlin",       region: "DE", lat:  52.5200, lng:   13.4050, off:  1, tz: "Europe/Berlin" },
   { name: "Hamburg",      region: "DE", lat:  53.5511, lng:    9.9937, off:  1, tz: "Europe/Berlin" },
   { name: "Munich",       region: "DE", lat:  48.1351, lng:   11.5820, off:  1, tz: "Europe/Berlin" },
+  { name: "Wetzlar", region: "DE", lat: 50.5558, lng: 8.5046, off: 1, tz: "Europe/Berlin", aliases: ["Wezlar"] },
   { name: "Frankfurt",    region: "DE", lat:  50.1109, lng:    8.6821, off:  1, tz: "Europe/Berlin" },
   { name: "Cologne",      region: "DE", lat:  50.9375, lng:    6.9603, off:  1, tz: "Europe/Berlin" },
   { name: "Zürich",       region: "CH", lat:  47.3769, lng:    8.5417, off:  1, tz: "Europe/Zurich" },

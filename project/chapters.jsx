@@ -58,6 +58,22 @@ function profileFields(raw, keys) {
   return clean;
 }
 
+// Alpha fixture only: another birth record receives no inherited residences.
+function sameBirthRecord(a, b) {
+  return !!a && !!b && Number.isFinite(Date.parse(a.dateISO)) &&
+    Date.parse(a.dateISO) === Date.parse(b.dateISO) &&
+    Number(a.lat) === Number(b.lat) && Number(a.lng) === Number(b.lng);
+}
+function alphaLifeChapters(birth) {
+  if (!sameBirthRecord(birth, { dateISO: "1980-10-21T21:31:00Z", lat: 35.1408, lng: -79.0058 })) return [];
+  return [
+    ["Fort Liberty (Bragg) · NC", "1980-10-21", "1980-10-22"],
+    ["Wetzlar · DE", "1980-10-22", "1993-10-22"],
+    ["Fort Leonard Wood · MO", "1993-10-22", "1996-10-22"],
+    ["San Antonio · TX", "1996-10-22", ""],
+  ].map(([placeKey, startISO, endISO], i) => ({ id: `alpha-life-${i}`, placeKey, startISO, endISO, open: !endISO, approximate: true }));
+}
+
 function profileChapters(raw) {
   if (!Array.isArray(raw)) return [];
   return raw.slice(0, 50).flatMap((entry, index) => {
@@ -73,6 +89,7 @@ function profileChapters(raw) {
       startISO,
       endISO,
       open: !endISO,
+      approximate: entry.approximate === true,
     }];
   });
 }
@@ -165,6 +182,7 @@ function normalizeChapters(raw, natal) {
       lng: city.lng,
       tz: city.tz || null,
       startJd,
+      approximate: e.approximate === true,
       endJd: open ? null : endJd,
       open,
     });
@@ -414,6 +432,8 @@ Object.assign(window, {
   PROFILE_FORM_KEYS,
   profileFields,
   profileChapters,
+  sameBirthRecord,
+  alphaLifeChapters,
   chapterCity,
   normalizeChapters,
   parseChapterDate,

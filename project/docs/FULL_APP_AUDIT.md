@@ -195,3 +195,6 @@ canonical typo/alias suggestions, gesture-based Earth navigation, free multimoda
 OpenRouter integration, and a separate user-scoped behavioral page. See
 [FRAMEWORK_REVIEW.md](FRAMEWORK_REVIEW.md) for the supplied guide's factual
 corrections, data/privacy boundaries, and remaining product limitations.
+
+
+Alpha residence journey: Fort Bragg (birth), Wetzlar from 1980-10-22 for 13 years, Fort Leonard Wood from 1993-10-22 for three years, San Antonio from 1996-10-22 onward. Move dates were approved as approximate and remain editable; UTC-midnight boundaries do not assert an arrival time. This fixture is restricted to the alpha birth epoch and coordinates. Saved custom histories are preserved, additional chapters are available to every user, and changing the birth record discards unedited inherited chapters. Natal birthplace stays fixed; return charts select residence on the return date. Approximation flags are retained in saved profiles and reading inputs.
