@@ -9,13 +9,14 @@ import * as PersonaModel from '../../src/astro/persona.js';
 import * as ReadingRuns from '../../src/astro/reading-runs.js';
 import * as EnhancedReading from '../../src/present/enhanced-reading.js';
 import * as BehavioralProfile from '../../src/present/behavioral-profile.js';
+import * as VariantCalculations from '../../src/astro/variant-calculations.js';
 
 export function run() {
   const rows = [], t = (name, ok, detail = '') => rows.push({ name, ok: !!ok, detail });
   const backing = new Map(), storage = { getItem: k => backing.get(k) || null,
     setItem: (k, value) => backing.set(k, value) };
   const sb = { Astronomy, AstroCore, Houses, Transits, PersonaModel, ReadingRuns,
-    EnhancedReading, BehavioralProfile, localStorage: storage, Date, console,
+    EnhancedReading, BehavioralProfile, VariantCalculations, localStorage: storage, Date, console,
     React: { useState: () => [null, () => {}], useEffect() {}, useMemo: fn => fn() } };
   sb.window = sb;
   vm.createContext(sb);
@@ -33,8 +34,10 @@ export function run() {
   t('evidence cache fingerprint is compact and stable', context.cacheFingerprint.length === 32 && ReadingRuns.evidenceFingerprint([context.at, context.input, context.evidence]) === context.cacheFingerprint);
   const chart = { ...natal, readingContext: context };
   t('all personal context providers produce real evidence', Object.values(context.evidence).every(e => e.status === 'ready'), JSON.stringify(context.evidence));
+  t('solar arc shares the frozen reading instant and owned birth', context.evidence.solarArc.value.input.targetAt === context.at
+    && ReadingRuns.profileKey(context.evidence.solarArc.value.input.birth) === context.profileKey);
   t('bounded behavioral contacts share the reading instant and current model revision', context.evidence.behavioralTrajectories.value.at === context.at
-    && context.evidence.behavioralTrajectories.value.horizonDays === 60 && context.input.modelRevision === 'personal-reading-v2');
+    && context.evidence.behavioralTrajectories.value.horizonDays === 60 && context.input.modelRevision === 'personal-reading-v3');
   t('per-chart angle and sect conventions accompany saved calculations', context.natal.anglesMode === natal.anglesMode
     && context.natal.angleSource === natal.angleSource && context.natal.sectSource === natal.sectSource && context.natal.solarAltitude === natal.solarAltitude);
   const invalidResidence = sb.buildPersonalReadingContext(natal, jd, [{ placeKey: 'Los Angeles · CA', startISO: 'not-a-date', endISO: '' }], {});

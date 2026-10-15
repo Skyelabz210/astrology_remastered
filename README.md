@@ -1,6 +1,6 @@
 # Astrology Remastered
 
-Release **2026.10 · v1.1.0** appears in the bottom-right corner of every page
+Release **2026.10 · v1.2.0** appears in the bottom-right corner of every page
 and in exported calculation/ZIP metadata. When cutting a new release, update
 `project/src/present/release.js` and the version in `project/package.json` /
 `project/package-lock.json`, then rebuild the standalone pages.
@@ -14,8 +14,14 @@ arithmetic does not make the input observations exact. The main chart uses
 Astronomy Engine for ten planets, mean elements for lunar nodes and Lilith, and
 omits unsupported Chiron by default. See the [whole-app coverage and personal-reading audit](project/docs/FULL_APP_AUDIT.md) and [Persona repair report](project/docs/PERSONA_ACCURACY_REPAIR.md).
 
+Selected features from HCRM-Formal (Celestial Registry) and Prime Resonance are
+integrated through the same owned reading pipeline: an admitted residue inspector,
+short-arc relationship composite, solar-arc directions and refined planetary
+stations. [The variant review](project/docs/VARIANT_INTEGRATION.md) records source
+revisions, corrected formulas, conventions and remaining gaps.
+
 ```
-7548/7548 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+7767/7767 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 The test banner records automated checks, not proof of every mathematical or interpretive claim in this repository.

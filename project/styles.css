@@ -3044,3 +3044,9 @@ body::before {
 .prime-geometry-pair svg { width: min(100%,280px); }
 .prime-theatre-views label, .prime-depth { display: grid; gap: .5rem; }
 .prime-theatre-views select { max-width: 100%; }
+.variant-lab { margin-block: 1.5rem; }
+.variant-lab > details { border-top: 1px solid var(--line, #666); padding-block: 1rem; }
+.variant-lab input, .variant-lab select { width: 100%; max-width: 30rem; min-width: 0; padding: .6rem; }
+.variant-lab summary { cursor: pointer; }
+.register-equation { font-family: ui-monospace, monospace; }
+.composite-panel { margin-inline: 1rem; min-width: 0; }

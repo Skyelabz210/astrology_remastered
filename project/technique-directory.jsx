@@ -34,6 +34,10 @@ const TECHNIQUE_DESTINATIONS = Object.freeze([
   { id: 'souvenir', label: 'Celestial souvenir', screen: 'behavior', target: 'Celestial souvenir', note: 'Personal HTML, Markdown and JSON keepsake; optional source-linked AI expansion.' },
   { id: 'consultant', label: 'Chart consultant', screen: 'behavior', target: 'Chart consultant', note: 'Opt-in selected AI provider; schema-checked answers cite admitted source facts.' },
   { id: 'synastry', label: 'Synastry · two birth records', screen: 'synastry', target: null, note: 'Opens the relationship result when a partner is entered; otherwise opens the second-birth form. Data entry is required.' },
+  { id: 'composite', label: 'Composite relationship chart', screen: 'synastry', target: 'Composite relationship chart', note: 'Short-arc midpoints of both birth charts; enter a second birth record first. Antipodal points and unknown-time precision are withheld.' },
+  { id: 'register-inspector', label: 'Exact register inspector · Celestial Registry', screen: 'behavior', target: 'Exact register inspector', note: 'Admitted natal residue trays, parked and legacy windings, plus a separate signed-integer decomposition sandbox.' },
+  { id: 'solar-arc', label: 'Solar-arc directions · Prime Resonance', screen: 'behavior', target: 'Solar-arc directions', note: 'True progressed-Sun or explicitly defined Naibod key; constructed directed-to-natal contacts within 1°.' },
+  { id: 'stations', label: 'Planetary stations · Prime Resonance', screen: 'behavior', target: 'Planetary stations', note: 'Search and retain apparent motion reversals from Mercury through Pluto for up to 366 days.' },
 ]);
 
 const TECHNIQUE_UTILITIES = Object.freeze([

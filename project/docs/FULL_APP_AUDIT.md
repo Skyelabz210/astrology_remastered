@@ -1,5 +1,7 @@
 # Whole-app calculation and personal-reading audit
 
+Follow-up release **v1.2.0** integrates selected HCRM-Formal/Celestial Registry and Prime Resonance capabilities: the admitted residue inspector, symmetric short-arc composite, true/Naibod solar-arc directions and refined planetary stations. The [variant review](VARIANT_INTEGRATION.md) records the inspected source revisions, repaired formulas, personal-reading connections, tests and excluded implementations. Historical audit findings below retain their original release context.
+
 Audited starting commit: `517fc2e647c6f6d6ddf29346f770192a116f3df1`.
 Scope: every browser entry point, chart and relationship consumers, input/time
 resolution, astronomy, houses, traditional helpers, lifecycle calculations,
