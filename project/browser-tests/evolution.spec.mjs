@@ -32,7 +32,7 @@ test('Mistral opt-in is reactive, key storage is explicit, and consultant reject
     calls++;expect(route.request().headers().authorization).toBe('Bearer TEST_MISTRAL_KEY');
     const body=route.request().postDataJSON();expect(body.model).toBe('mistral-large-latest');
     expect(body.messages[0].content).not.toContain('PRIVATE_AVATAR_NOTE');
-    await route.fulfill({json:{choices:[{message:{content:JSON.stringify({title:'Reflection',sections:[{title:'Anchor',text:'Sun in Libra can be a starting point for reflection.',citations:[calls===1?'invented:fact':'placement:Sun']}]})}}]}});
+    await route.fulfill({json:{choices:[{message:{content:JSON.stringify({title:'Reflection',sections:[{title:'Anchor',text:'Your Sun in Libra can be a starting point for reflection.',citations:[calls===1?'invented:fact':'placement:Sun']}]})}}]}});
   });
   await page.goto('/resonance-spread.html');
   await page.getByRole('button',{name:'Cast the spread',exact:true}).click();
@@ -46,7 +46,7 @@ test('Mistral opt-in is reactive, key storage is explicit, and consultant reject
   await page.getByRole('checkbox',{name:/Allow sending my birth record/}).check();
   await page.getByLabel('Ask your chart consultant',{exact:true}).fill('What can I reflect on?');
   await page.getByRole('button',{name:'Ask with source traces',exact:true}).click();
-  await expect(page.locator('.evolution-generated')).toContainText('Sun in Libra can be a starting point for reflection.');
+  await expect(page.locator('.evolution-generated')).toContainText('Your Sun in Libra can be a starting point for reflection.');
   expect(calls).toBe(2);
   await page.getByRole('button',{name:'Forget Mistral key',exact:true}).click();
   await expect(page.getByRole('button',{name:'Ask with source traces',exact:true})).toBeDisabled();

@@ -348,12 +348,10 @@ function Landing({
 
           <form className="landing-form" onSubmit={submit}>
             {!isHcrm && <window.InterpreterSettings onConnected={() => onToggleAgent && onToggleAgent(false)} />}
-            {!isHcrm && (
-              <fieldset className="lf-set">
+            <fieldset className="lf-set">
                 <legend className="lf-leg">{isPartner ? "Their name" : "Name for the reading"}</legend>
                 <TweakLikeText value={subjectName} onChange={setSubjectName} placeholder={isPartner ? "a name or initial" : "your name or initial"} />
-              </fieldset>
-            )}
+            </fieldset>
             <fieldset className="lf-set">
               <legend className="lf-leg">Date of birth</legend>
               <label className="calendar-label">Calendar<input aria-label="Birth calendar" type="date" min="1800-01-01" max={`${currentYear}-12-31`} value={`${year}-${pad(month)}-${pad(day)}`} onChange={e => {

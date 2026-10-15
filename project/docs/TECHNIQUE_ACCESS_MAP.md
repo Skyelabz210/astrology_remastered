@@ -8,7 +8,7 @@ The persistent **Explore techniques** launcher opens a searchable native dialog.
 
 A browser acceptance suite is included at `browser-tests/technique-navigation.spec.mjs`. It independently names 20 techniques, exercises them from a cold launch, and tests each from eight app screen states (160 source/destination pairs). It also tests keyboard entry, Escape/focus return, search, a 390-pixel viewport, synastry prerequisites and unknown-time angle withholding. The suite writes the measured navigation matrices to ignored `test-results/technique-access-cold.json` and `test-results/technique-access-screens.json`.
 
-**At report authoring, browser measurement is pending.** The first browser invocation was blocked in a network-permission request needed for the local preview socket and then cancelled. No passing browser result is claimed here until those tests actually run. Syntax checking of the new browser spec and whitespace checks of the patch passed. The intended two-action contract remains a proposed acceptance condition until measured.
+**Measured on 2026-10-15:** all 20 cold-launch destinations and all 160 source/destination pairs passed in Chromium. Each required two navigation activations and focused its real computed section. The JSON matrices were written to `test-results/technique-access-cold.json` and `test-results/technique-access-screens.json`. The broader browser suite separately checks privacy, ownership, exports and provider behavior; its final CI result is recorded on the release PR.
 
 The eight main-app start states are birth entry, reading, full spread, Persona, behavioral profile, second-birth entry, synastry results, and Persona’s nested Add birth chart form. The directory’s separate React root keeps its launcher present across these views. A Persona route key ensures selecting a destination exits its nested birth-entry state.
 
@@ -20,28 +20,28 @@ Each listed target is present in an actual user-facing component. Several relate
 
 | Technique | Destination page and actual section | Navigation activations | Material limits |
 | --- | --- | --- | --- |
-| Natal aspects | Full spread → Aspect grid (tightest first) | 2, pending measurement | Configured orb policy; first 12 shown. |
-| Essential dignities | Full spread → Essential dignities | 2, pending measurement | Configured dignity tables; not a full almuten figuris. |
-| Four angles | Full spread → Four angles | 2, pending measurement | Withheld for unknown birth time; house fallback notices remain applicable. |
-| Natal Moon phase | Full spread → Sect · phase · void | 2, pending measurement | Computed natal phase; unknown time introduces uncertainty. |
-| Void-of-course Moon | Persona → Traditional details | 2, pending measurement | Classical aspects before sign ingress, with source/fallback notices. |
-| Hellenistic Lots | Full spread → Hellenistic lots | 2, pending measurement | Seven Hermetic Lots; selected formulas and sect convention. |
-| Antiscia and contra-antiscia | Full spread → Antiscia (solstice-axis mirrors, 1° orb) | 2, pending measurement | Longitude mirror contacts within 1°; explicit empty state. |
-| Annual profections | Persona → Annual profection | 2, pending measurement | Annual level; birth time is needed for reliable Ascendant anchoring. |
-| Firdaria | Persona → Firdaria · major period | 2, pending measurement | Bonatti major order, 75-year cycle; no subperiod UI. |
-| Lunar mansions | Persona → Lunar mansion | 2, pending measurement | 28 equal tropical mansions; not a complete stellar mansion system. |
-| Mutual receptions | Persona → Traditional details | 2, pending measurement | Domicile or exaltation; displayed with other traditional details. |
-| Prenatal New/Full Moon | Persona → Traditional details | 2, pending measurement | Last lunar syzygy before birth; depends on available ephemeris. |
-| Fixed-star conjunctions | Persona → Traditional details | 2, pending measurement | Selected catalogue, longitude-only, 1° orb; precession, no proper motion. |
-| Zodiacal releasing | Persona → Traditional details | 2, pending measurement | Level 1 from Fortune and Spirit, 360-day years; levels 2–4 and bonds absent. |
-| Solar conditions | Persona → Solar conditions | 2, pending measurement | Configured cazimi, combustion and under-beams separation criteria. |
-| Live transits | Persona → Live transits to natal | 2, pending measurement | Minute update; 12 tightest current aspects get a 60-day exact-crossing search. |
-| Solar return | Full spread → Return charts · the subject, sampled once a cycle | 2, pending measurement | Computed at natal solar degree; residence on each return date, or birthplace. |
-| Lunar return | Full spread → same Return charts section | 2, pending measurement | Computed at natal lunar degree; unknown time makes timing approximate. |
-| Secondary progressions | Full spread → Secondary progressions at the target age (one day per year of life) | 2, pending measurement | Configured progressed planets; not complete progressed-angle methods. |
-| Eclipses | Full spread → Eclipses · geophysical | 2, pending measurement | Prenatal pair, lifetime contacts, future window; full ephemeris required. |
+| Natal aspects | Full spread → Aspect grid (tightest first) | 2, measured | Configured orb policy; first 12 shown. |
+| Essential dignities | Full spread → Essential dignities | 2, measured | Configured dignity tables; not a full almuten figuris. |
+| Four angles | Full spread → Four angles | 2, measured | Withheld for unknown birth time; house fallback notices remain applicable. |
+| Natal Moon phase | Full spread → Sect · phase · void | 2, measured | Computed natal phase; unknown time introduces uncertainty. |
+| Void-of-course Moon | Persona → Traditional details | 2, measured | Classical aspects before sign ingress, with source/fallback notices. |
+| Hellenistic Lots | Full spread → Hellenistic lots | 2, measured | Seven Hermetic Lots; selected formulas and sect convention. |
+| Antiscia and contra-antiscia | Full spread → Antiscia (solstice-axis mirrors, 1° orb) | 2, measured | Longitude mirror contacts within 1°; explicit empty state. |
+| Annual profections | Persona → Annual profection | 2, measured | Annual level; birth time is needed for reliable Ascendant anchoring. |
+| Firdaria | Persona → Firdaria · major period | 2, measured | Bonatti major order, 75-year cycle; no subperiod UI. |
+| Lunar mansions | Persona → Lunar mansion | 2, measured | 28 equal tropical mansions; not a complete stellar mansion system. |
+| Mutual receptions | Persona → Traditional details | 2, measured | Domicile or exaltation; displayed with other traditional details. |
+| Prenatal New/Full Moon | Persona → Traditional details | 2, measured | Last lunar syzygy before birth; depends on available ephemeris. |
+| Fixed-star conjunctions | Persona → Traditional details | 2, measured | Selected catalogue, longitude-only, 1° orb; precession, no proper motion. |
+| Zodiacal releasing | Persona → Traditional details | 2, measured | Level 1 from Fortune and Spirit, 360-day years; levels 2–4 and bonds absent. |
+| Solar conditions | Persona → Solar conditions | 2, measured | Configured cazimi, combustion and under-beams separation criteria. |
+| Live transits | Persona → Live transits to natal | 2, measured | Minute update; 12 tightest current aspects get a 60-day exact-crossing search. |
+| Solar return | Full spread → Return charts · the subject, sampled once a cycle | 2, measured | Computed at natal solar degree; residence on each return date, or birthplace. |
+| Lunar return | Full spread → same Return charts section | 2, measured | Computed at natal lunar degree; unknown time makes timing approximate. |
+| Secondary progressions | Full spread → Secondary progressions at the target age (one day per year of life) | 2, measured | Configured progressed planets; not complete progressed-angle methods. |
+| Eclipses | Full spread → Eclipses · geophysical | 2, measured | Prenatal pair, lifetime contacts, future window; full ephemeris required. |
 
-Additional directory destinations are natal placements/houses, sect, chart shape, element and modality balance, patterns/stelliums/joys, transit perfections, behavioral profile, and synastry. They bring the current catalogue to 29 entries, without counting navigation utilities as techniques.
+Additional directory destinations are natal placements/houses, sect, chart shape, element and modality balance, patterns/stelliums/joys, transit perfections, behavioral profile, and synastry. Four new destinations—Jyotisha, Mayan calendars, Celestial souvenir and Chart consultant—open the integrated behavioral page and bring the catalogue to 33 entries. They are exercised by the evolution browser suite; the independent two-action matrix remains the 20-technique set above. Navigation utilities are not counted as techniques.
 
 Synastry has a separate prerequisite: both birth records must be entered. Its directory item opens results when a partner is already entered; otherwise it opens the second-birth form. Reaching that form in two activations is not a claim that computed synastry exists before the second birth is provided. The browser matrix prepares a real second record before using synastry results as a start screen.
 
