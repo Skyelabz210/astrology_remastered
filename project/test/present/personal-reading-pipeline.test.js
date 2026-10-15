@@ -8,13 +8,14 @@ import * as Transits from '../../src/astro/transits.js';
 import * as PersonaModel from '../../src/astro/persona.js';
 import * as ReadingRuns from '../../src/astro/reading-runs.js';
 import * as EnhancedReading from '../../src/present/enhanced-reading.js';
+import * as BehavioralProfile from '../../src/present/behavioral-profile.js';
 
 export function run() {
   const rows = [], t = (name, ok, detail = '') => rows.push({ name, ok: !!ok, detail });
   const backing = new Map(), storage = { getItem: k => backing.get(k) || null,
     setItem: (k, value) => backing.set(k, value) };
   const sb = { Astronomy, AstroCore, Houses, Transits, PersonaModel, ReadingRuns,
-    EnhancedReading, localStorage: storage, Date, console,
+    EnhancedReading, BehavioralProfile, localStorage: storage, Date, console,
     React: { useState: () => [null, () => {}], useEffect() {}, useMemo: fn => fn() } };
   sb.window = sb;
   vm.createContext(sb);
@@ -32,6 +33,12 @@ export function run() {
   t('evidence cache fingerprint is compact and stable', context.cacheFingerprint.length === 32 && ReadingRuns.evidenceFingerprint([context.at, context.input, context.evidence]) === context.cacheFingerprint);
   const chart = { ...natal, readingContext: context };
   t('all personal context providers produce real evidence', Object.values(context.evidence).every(e => e.status === 'ready'), JSON.stringify(context.evidence));
+  t('bounded behavioral contacts share the reading instant and current model revision', context.evidence.behavioralTrajectories.value.at === context.at
+    && context.evidence.behavioralTrajectories.value.horizonDays === 60 && context.input.modelRevision === 'personal-reading-v2');
+  t('per-chart angle and sect conventions accompany saved calculations', context.natal.anglesMode === natal.anglesMode
+    && context.natal.angleSource === natal.angleSource && context.natal.sectSource === natal.sectSource && context.natal.solarAltitude === natal.solarAltitude);
+  const invalidResidence = sb.buildPersonalReadingContext(natal, jd, [{ placeKey: 'Los Angeles · CA', startISO: 'not-a-date', endISO: '' }], {});
+  t('dropped residence entries are visible in narrative context and assumptions', invalidResidence.personalText.includes('excluded') && invalidResidence.limitations.some(s => s.includes('invalid residence entries')));
   t('residence is applied to narrated return charts', context.lifecycleText.includes('Los Angeles'));
   t('run has one explicit instant', context.at === '2026-10-02T12:00:00.000Z');
   const narrative = sb.buildChartNarrative(chart, { lifecycleText: context.lifecycleText,
@@ -96,6 +103,8 @@ export function run() {
   t('live path excludes unsupported Chiron', !sb.currentTransits(natal, jd).trans.some(p => p.name === 'Chiron'));
   const unknown = sb.computeNatal({ ...birth, timeUnknown: true });
   const unknownContext = sb.buildPersonalReadingContext(unknown, jd, chapters, {});
+  t('unknown birth time propagates unavailable exact behavioral contact dates', unknownContext.evidence.behavioralTrajectories.status === 'unavailable'
+    && unknownContext.limitations.some(s => s.includes('exact natal-degree contact dates are withheld')));
   t('unknown time suppresses sect-dependent traditional rulers', unknownContext.evidence.traditional.value.almuten === null && unknownContext.evidence.traditional.value.profection === null);
   t('unknown opening does not assert day or night sect', !sb.narrativeOpening(unknown).includes('It is a day chart') && !sb.narrativeOpening(unknown).includes('It is a night chart'));
   t('unknown time suppresses per-card natal lane interpretation', !sb.narrativeForCard(unknown.cards[0], unknown).includes('eleventh lane'));

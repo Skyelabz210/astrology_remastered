@@ -55,6 +55,7 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
 
   const rigorous = settings.rigorous;
   const p = card.principal;
+  const evidence = typeof window.cardReadingEvidence === "function" ? window.cardReadingEvidence(card, chart) : null;
 
   // WP-20: this div is the whole card's flip control — historically
   // mouse-only (onClick on a bare <div>, no way to reach it from the
@@ -68,7 +69,7 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
       onFlip(card.idx);
     }
   };
-  const cardLabel = `${p.name} in ${ZODIAC[p.sign].name}, ${chart && chart.timeUnknown ? "house unavailable" : `house ${p.house}`}. ${isFlipped ? "Showing reading — press to flip back." : "Press to flip for the reading."}`;
+  const cardLabel = `${card.name} sign sector. ${card.tenants.length ? "Principal tenant" : "Sign ruler"}: ${p.name} in ${ZODIAC[p.sign].name}, ${chart && chart.timeUnknown ? "house unavailable" : `house ${p.house}`}. ${isFlipped ? "Showing reading — press to flip back." : "Press to flip for the reading."}`;
 
   return (
     <div
@@ -86,7 +87,7 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
       aria-label={cardLabel}
     >
       <div className="zc-tilt" ref={inner}>
-        <div className="zc-face zc-front">
+        <div className="zc-face zc-front" aria-hidden={isFlipped}>
           {/* parchment + grain */}
           <div className="zc-paper"></div>
           <div className="zc-grain"></div>
@@ -127,8 +128,8 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
           <div className="zc-center">
             <div className="zc-big-glyph" title={card.name}>{card.glyph}</div>
             <div className="zc-name">{card.name}</div>
-            <div className="zc-latin">{card.latin}</div>
-            <div className="zc-placement">{p.name} in {ZODIAC[p.sign].name}</div>
+            <div className="zc-latin">{card.latin} · sign sector</div>
+            <div className="zc-placement">{card.tenants.length ? "Tenant" : "Ruler"}: {p.name} in {ZODIAC[p.sign].name}{evidence && evidence.anchor && evidence.anchor.degreeText ? ` · ${evidence.anchor.degreeText}` : ""}</div>
             <div className="zc-meta">
               <span>{card.element}</span>
               <i className="zc-dot"></i>
@@ -173,6 +174,7 @@ function ZodiacCard({ card, chart, settings, isFlipped, onFlip }) {
 }
 
 function CardBack({ card, chart, settings, active }) {
+  const p = card.principal;
   const reading  = readingFor(card, chart);   // synchronous fallback / skeleton
   const math     = rigorousFor(card, chart);
   // `=== true`, not `!== false`: DEFAULT_SETTINGS.agentOn is opt-in now, so a
@@ -180,7 +182,7 @@ function CardBack({ card, chart, settings, active }) {
   const agent    = useAgentReading(card, chart, active && settings.agentOn === true);
 
   return (
-    <div className="zc-back-inner">
+    <div className="zc-back-inner" aria-hidden={!active} inert={active ? undefined : ""}>
       <div className="zc-paper"></div>
       <div className="zc-grain"></div>
       <svg className="zc-frame" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true">
@@ -197,7 +199,9 @@ function CardBack({ card, chart, settings, active }) {
           </div>
         </div>
 
-        <div className="zc-back-body">
+        <div className="zc-back-body" role="region" tabIndex={0}
+          aria-label={`Full reading for ${p.name} in ${ZODIAC[p.sign].name}`}
+          onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
           {agent.loading && (
             <div className="zc-agent-loading">
               <span className="zc-agent-pulse"></span>
@@ -213,6 +217,14 @@ function CardBack({ card, chart, settings, active }) {
             <p className="zc-agent-error">the interpreter couldn't be reached — the reading below is composed from the classical tables instead.</p>
           )}
           {agent.text && <p className="zc-agent-text">{agent.text}</p>}
+          {agent.text && reading.evidence && (
+            <details onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+              <summary>Computed basis and self-observation</summary>
+              {reading.body.map((line, i) => <p key={i} className="zc-fallback-line">
+                {line.text}<span className="zc-source-tag"> — {line.sourceTag}</span>
+              </p>)}
+            </details>
+          )}
           {!agent.loading && !agent.text && reading.body.map((line, i) => (
             <p key={i} className="zc-fallback-line">
               {line.text}

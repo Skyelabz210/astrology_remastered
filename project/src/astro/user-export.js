@@ -8,7 +8,7 @@ const CHART_FIELDS = ['jd', 'asc', 'mc', 'desc', 'ic', 'ascSignIdx', 'mcSignIdx'
   'isDayChart', 'timeUnknown', 'houseSystemActual', 'houseCusps', 'planets', 'cards',
   'lots', 'phase', 'shape', 'aspectGrid', 'antisciaContacts', 'joys', 'receptions',
   'elementCount', 'modalityCount', 'hemisphereCount', 'quadrantCount', 'stelliums',
-  'patterns', 'ascR11', 'outOfBounds', 'voidOfCourse', 'obliquity', 'positionWarnings',
+  'patterns', 'ascR11', 'outOfBounds', 'voidOfCourse', 'obliquity', 'positionWarnings', 'anglesMode', 'angleSource', 'angleConvention', 'solarAltitude', 'sectSource',
   'relocated', 'relocatedPlace'];
 const PRIVATE_FIELD = /(?:api.?keys?|access.?token|refresh.?token|authorization|password|secret|cookie|credentials?|private.?key|session.?token|elevenlabs.?key|provider.?key)/i;
 const UNSAFE_FIELD = /^(?:__proto__|prototype|constructor)$/;
@@ -71,12 +71,21 @@ export function collectPersonalData({ chart, context = null, narrative = null,
   try { if (profile && ownerOf(profile.settings) === owner) ownedProfile = {
     settings: select(profile.settings, BIRTH_FIELDS), birthForm: profile.birthForm,
     chapters: profile.chapters, savedAt: profile.savedAt }; } catch { /* unrelated/invalid profile */ }
-  return safeSnapshot({ schema: 'resonance-personal-export-v1', release: APP_RELEASE, exportedAt: new Date(exportedAt).toISOString(),
+  const cleanAdditional = safeSnapshot(additional);
+  const avatar = cleanAdditional.livingAvatar?.value;
+  if (avatar?.profile || avatar?.summary) {
+    const birthOwner = JSON.stringify([new Date(chart.birth.dateISO).toISOString(), chart.birth.lat, chart.birth.lng]);
+    try {
+      const avatarBirth = avatar.profile?.birth;
+      if ((avatar.profile && (avatar.profile.ownerKey !== birthOwner || JSON.stringify([new Date(avatarBirth.dateISO).toISOString(),avatarBirth.lat,avatarBirth.lng]) !== birthOwner)) || (avatar.summary && avatar.summary.ownerKey !== birthOwner)) throw new Error('foreign avatar');
+    } catch { cleanAdditional.livingAvatar = { status: 'unavailable', message: 'Living avatar belongs to a different birth record.' }; }
+  }
+  return safeSnapshot({ schema: 'resonance-personal-export-v1' , release: APP_RELEASE, exportedAt: new Date(exportedAt).toISOString(),
     owner, subject: chart.birth.subjectName || 'Your chart', chart: chartSnapshot(chart),
     context: context ? { at: context.at, jd: context.jd, input: context.input,
       evidence: context.evidence, limitations: context.limitations, modelRevision: context.input.modelRevision } : null,
     readings: { text: narrative && narrative.text || '', segments: narrative && narrative.segments || [], cardReadings },
-    runs: ownedRuns, profile: ownedProfile, additional });
+    runs: ownedRuns, profile: ownedProfile, additional: cleanAdditional });
 }
 export function natalChartSvg(chart) {
   const radial = (longitude, radius) => {
@@ -101,6 +110,13 @@ export function natalChartSvg(chart) {
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="0 0 500 500" role="img" aria-labelledby="title desc"><title id="title">Natal chart for ${escapeHtml(chart.birth.subjectName || 'your chart')}</title><desc id="desc">Geocentric tropical longitude wheel. Aries starts at the top; longitude increases clockwise. Dashed lines are computed house cusps. Label rows stagger to reduce overlap.</desc><rect width="500" height="500" fill="#faf8f2"/><circle cx="250" cy="250" r="215" fill="none" stroke="#3c4354"/>${marks.join('')}<circle cx="250" cy="250" r="70" fill="#faf8f2"/><text x="250" y="245" text-anchor="middle" font-size="16" fill="#3c4354">Natal chart</text><text x="250" y="267" text-anchor="middle" font-size="11" fill="#3c4354">${escapeHtml(chart.timeUnknown ? 'Birth time unknown' : chart.houseSystemActual)}</text></svg>`;
 }
+function livingArchiveText(data) {
+  const summary = data.additional?.livingAvatar?.value?.summary;
+  if (!summary) return '';
+  return [`Level ${summary.engagement.level} · ${summary.engagement.xp} participation XP · ${summary.observationCount} retained observations.`,
+    ...Object.entries(summary.preferences || {}).filter(([,value]) => value).map(([key,value]) => `${key}: ${value}`),
+    ...(summary.history || []).slice(-10).map(entry => `${entry.at} · ${entry.domain}: ${entry.note || entry.agreement || ''}${entry.rating === null ? '' : ` · self-rating ${entry.rating}/4`}`), summary.limitation].join('\n');
+}
 function behavioralArchiveText(data) {
   const local = data.additional && data.additional.behavioralProfile && data.additional.behavioralProfile.value;
   const saved = data.runs.find(r => typeof r.evidence?.behavioralProfile?.aiText === 'string');
@@ -112,7 +128,7 @@ export function archiveReport(data) {
   const rows = (c.planets || []).map(p => `<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(SIGNS[p.sign])}</td><td>${Number(p.lon).toFixed(4)}°</td><td>${c.timeUnknown ? 'Unknown' : escapeHtml(p.house)}</td><td>${escapeHtml(p.dignity && p.dignity.kind)}</td><td>${escapeHtml(p.positionSource)}</td></tr>`).join('');
   const history = data.runs.map(run => `<details><summary>${escapeHtml(run.at)}</summary><p class="reading">${escapeHtml(run.reading)}</p></details>`).join('');
   const limitations = data.context && data.context.limitations || c.positionWarnings || [];
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'"><title>${subject} — saved astrology reading</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:960px;margin:auto;padding:24px;color:#252936;background:#faf8f2}h1,h2{line-height:1.3}.reading{white-space:pre-wrap;overflow-wrap:anywhere}svg{max-width:100%;height:auto}table{border-collapse:collapse;width:100%}th,td{padding:9px;text-align:left;border-bottom:1px solid #c9c9c0}.scroll{overflow:auto}summary{cursor:pointer;padding:12px}li{margin:6px 0}code{overflow-wrap:anywhere}</style><h1>${subject}</h1><p>Birth record: ${escapeHtml(c.birth.dateISO)} · ${escapeHtml(c.birth.placeLabel)} · ${escapeHtml(c.birth.lat)}°, ${escapeHtml(c.birth.lng)}°</p><p>Reading instant: ${escapeHtml(data.context && data.context.at || data.exportedAt)}. Saved: ${escapeHtml(data.exportedAt)}.</p>${natalChartSvg(c)}<div class="scroll"><table><caption>Natal placements and source</caption><thead><tr><th>Body</th><th>Sign</th><th>Longitude</th><th>House</th><th>Dignity</th><th>Source</th></tr></thead><tbody>${rows}</tbody></table></div><h2>Your reading</h2><p class="reading">${escapeHtml(data.readings.text || 'No narrative was composed. Computed chart data is included.')}</p><h2>Behavioral profile</h2><p class="reading">${escapeHtml(behavioralArchiveText(data) || "No behavioral profile was collected.")}</p><h2>Saved readings (${data.runs.length})</h2>${history}<h2>Calculation assumptions</h2><ul>${limitations.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul><p>All calculation snapshots and admitted ledgers are in the data folder. No internet connection is required to read this report.</p><footer style="text-align:right;font-size:11px">Release ${escapeHtml(data.release && data.release.release)} · v${escapeHtml(data.release && data.release.version)}</footer></html>`;
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'"><title>${subject} — saved astrology reading</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:960px;margin:auto;padding:24px;color:#252936;background:#faf8f2}h1,h2{line-height:1.3}.reading{white-space:pre-wrap;overflow-wrap:anywhere}svg{max-width:100%;height:auto}table{border-collapse:collapse;width:100%}th,td{padding:9px;text-align:left;border-bottom:1px solid #c9c9c0}.scroll{overflow:auto}summary{cursor:pointer;padding:12px}li{margin:6px 0}code{overflow-wrap:anywhere}</style><h1>${subject}</h1><p>Birth record: ${escapeHtml(c.birth.dateISO)} · ${escapeHtml(c.birth.placeLabel)} · ${escapeHtml(c.birth.lat)}°, ${escapeHtml(c.birth.lng)}°</p><p>Reading instant: ${escapeHtml(data.context && data.context.at || data.exportedAt)}. Saved: ${escapeHtml(data.exportedAt)}.</p>${natalChartSvg(c)}<div class="scroll"><table><caption>Natal placements and source</caption><thead><tr><th>Body</th><th>Sign</th><th>Longitude</th><th>House</th><th>Dignity</th><th>Source</th></tr></thead><tbody>${rows}</tbody></table></div><h2>Your reading</h2><p class="reading">${escapeHtml(data.readings.text || 'No narrative was composed. Computed chart data is included.')}</p><h2>Behavioral profile</h2><p class="reading">${escapeHtml(behavioralArchiveText(data) || "No behavioral profile was collected.")}</p><h2>Your living avatar</h2><p class="reading">${escapeHtml(livingArchiveText(data) || "No living avatar was collected.")}</p><h2>Saved readings (${data.runs.length})</h2>${history}<h2>Calculation assumptions</h2><ul>${limitations.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul><p>All calculation snapshots and admitted ledgers are in the data folder. No internet connection is required to read this report.</p><footer style="text-align:right;font-size:11px">Release ${escapeHtml(data.release && data.release.release)} · v${escapeHtml(data.release && data.release.version)}</footer></html>`;
 }
 export async function buildPersonalZip(data, { crypto = globalThis.crypto } = {}) {
   if (!data || data.schema !== 'resonance-personal-export-v1' || ownerOf(data.chart.birth) !== data.owner) throw new Error('Invalid personal export snapshot');
@@ -125,6 +141,9 @@ export async function buildPersonalZip(data, { crypto = globalThis.crypto } = {}
   };
   const behaviorText = behavioralArchiveText(data);
   if (behaviorText) files['readings/behavioral-profile.txt'] = strToU8(behaviorText);
+  const avatar = data.additional?.livingAvatar?.value;
+  if (avatar?.profile) files['profile/living-avatar.json'] = strToU8(JSON.stringify(avatar.profile,null,2));
+  if (avatar?.summary) files['profile/avatar-summary.json'] = strToU8(JSON.stringify(avatar.summary,null,2));
   if (data.profile) files['data/saved-profile.json'] = strToU8(JSON.stringify(data.profile, null, 2));
   data.runs.forEach((run, index) => {
     const number = String(index + 1).padStart(2, '0');

@@ -39,7 +39,7 @@ const PROFILE_STORAGE_KEY = "resonance.profile.v1";
 const PROFILE_SETTING_KEYS = [
   "dateISO", "lat", "lng", "tz", "placeLabel", "placeKey", "subjectName", "timeUnknown",
   "houseSystem", "sect", "tilt", "iridescence", "noise", "glow", "specular",
-  "rigorous", "agentOn", "spread", "primeLayer", "orbScale", "harmonic",
+  "rigorous", "agentOn", "shareBehavioralDataWithAI", "spread", "primeLayer", "orbScale", "harmonic",
   "showAspects", "voiceOn", "voiceStyle", "voiceProvider", "voiceName",
   "elevenVoiceId", "elevenModel", "eclipseOrb", "eclipseWindow",
 ];
@@ -63,6 +63,19 @@ function sameBirthRecord(a, b) {
   return !!a && !!b && Number.isFinite(Date.parse(a.dateISO)) &&
     Date.parse(a.dateISO) === Date.parse(b.dateISO) &&
     Number(a.lat) === Number(b.lat) && Number(a.lng) === Number(b.lng);
+}
+// Chapter drafts belong to a birth record, independently of editable names
+// and calculation settings. Changing a form's birth never copies its history.
+function chapterBirthKey(birth) {
+  if (!birth || !Number.isFinite(Date.parse(birth.dateISO)) ||
+      !Number.isFinite(Number(birth.lat)) || Math.abs(Number(birth.lat)) > 90 ||
+      !Number.isFinite(Number(birth.lng)) || Math.abs(Number(birth.lng)) > 180) return null;
+  return JSON.stringify([new Date(birth.dateISO).toISOString(), Number(birth.lat), Number(birth.lng)]);
+}
+function chapterRowsFor(drafts, birth) {
+  const key = chapterBirthKey(birth);
+  if (!key) return [];
+  return Object.prototype.hasOwnProperty.call(drafts || {}, key) ? drafts[key] : alphaLifeChapters(birth);
 }
 function alphaLifeChapters(birth) {
   if (!sameBirthRecord(birth, { dateISO: "1980-10-21T21:31:00Z", lat: 35.1408, lng: -79.0058 })) return [];
@@ -167,8 +180,11 @@ function normalizeChapters(raw, natal) {
     const city = chapterCity(e.placeKey || e.place || e.label);
     if (!city) { dropped++; continue; }
 
-    const startJd = parseChapterDate(e.startISO || e.from, birthJd);
-    const endJd = parseChapterDate(e.endISO || e.to, null);
+    const startJd = parseChapterDate(e.startISO ?? e.from, birthJd);
+    const endJd = parseChapterDate(e.endISO ?? e.to, null);
+    // Omitted boundaries have documented defaults; present invalid dates
+    // must never turn into a birth-date start or an ongoing residence.
+    if (Number.isNaN(startJd) || Number.isNaN(endJd)) { dropped++; continue; }
     const open = !(e.open === false) && endJd === null; // default: ongoing
 
     // An END before the START is junk input, not a negative chapter.
@@ -206,14 +222,22 @@ function parseChapterDate(v, fallbackJd) {
   if (v === null || v === undefined || v === "") {
     return fallbackJd !== undefined ? fallbackJd : null;
   }
-  if (typeof v === "number" && Number.isFinite(v)) return v; // already JD
-  if (typeof v !== "string") return fallbackJd !== undefined ? fallbackJd : null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : NaN; // already JD
+  if (typeof v !== "string") return NaN;
   const s = v.trim();
-  const iso = /^\d{4}$/.test(s) ? `${s}-01-01T12:00:00Z`
-            : /^\d{4}-\d{2}$/.test(s) ? `${s}-01T12:00:00Z`
-            : s;
+  const parts = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|[+-]\d{2}:\d{2}))?$/.exec(s);
+  if (!parts || (parts[4] && !parts[3])) return NaN;
+  const year = Number(parts[1]), month = Number(parts[2] || 1), day = Number(parts[3] || 1);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > days[month - 1]) return NaN;
+  if (parts[4] && (Number(parts[4]) > 23 || Number(parts[5]) > 59 || Number(parts[6] || 0) > 59)) return NaN;
+  if (parts[8] && parts[8] !== "Z" && (Number(parts[8].slice(1, 3)) > 23 || Number(parts[8].slice(4)) > 59)) return NaN;
+  const iso = !parts[2] ? `${s}-01-01T12:00:00Z`
+            : !parts[3] ? `${s}-01T12:00:00Z`
+            : !parts[4] ? `${s}T00:00:00Z` : s;
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return fallbackJd !== undefined ? fallbackJd : null;
+  if (isNaN(d.getTime())) return NaN;
   return typeof dateToJD === "function" ? dateToJD(d) : d.getTime() / 86400000 + 2440587.5;
 }
 
@@ -356,11 +380,9 @@ function chapterDigest(natal, chapters) {
  * half-working:
  *   - chapters.jsx's dependencies not loaded on this page (a host that
  *     omits the <script> tags — every caller keeps pre-chapters behavior),
- *   - NO usable chapters after normalization — including the case where
- *     the ONLY rows dropped were "the same city as the natal place":
- *     a relocated chart identical to the natal one is noise, not a
- *     feature, so a reader who grew up at home and never moved sees the
- *     app exactly as they did before chapters existed,
+ *   - NO entered history. Invalid entered rows retain their dropped count
+ *     for feedback. Natal-city rows remain in the chronology: moving home
+ *     must replace the previous residence for current and return charts.
  *   - an unknown birth TIME: relocation is angle math, and angles are
  *     already flagged unreliable (WP-18) — casting them for another city
  *     would multiply an admitted guess instead of informing anyone.
@@ -370,11 +392,9 @@ function chapterDigest(natal, chapters) {
 function chapterAware(natal, chaptersRaw, nowJd) {
   if (!natal || typeof chapterCity !== "function" || typeof CITIES === "undefined") return null;
   const { chapters, dropped } = normalizeChapters(chaptersRaw, natal);
-  const natalKey = natal.placeKey || (natal.birth && natal.birth.placeKey) || null;
-  const distinct = chapters.filter((ch) => !natalKey || ch.placeKey !== natalKey);
-  if (distinct.length === 0) return null;
-  if (natal.timeUnknown) return { chapters: distinct, dropped, active: null, timeUnknown: true };
-  return { chapters: distinct, dropped, active: activeChapter(distinct, natal, nowJd), timeUnknown: false };
+  if (chapters.length === 0 && dropped === 0) return null;
+  if (natal.timeUnknown) return { chapters, dropped, active: null, timeUnknown: true };
+  return { chapters, dropped, active: activeChapter(chapters, natal, nowJd), timeUnknown: false };
 }
 
 // ─────────────────── local profile storage ───────────────────
@@ -433,6 +453,8 @@ Object.assign(window, {
   profileFields,
   profileChapters,
   sameBirthRecord,
+  chapterBirthKey,
+  chapterRowsFor,
   alphaLifeChapters,
   chapterCity,
   normalizeChapters,

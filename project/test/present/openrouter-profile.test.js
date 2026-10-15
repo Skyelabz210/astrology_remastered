@@ -9,10 +9,16 @@ export async function run() {
   const client = createOpenRouter(async (url, options) => { calls.push({ url, options }); return { ok: true, json: async () => url.endsWith('/models') ? { data: [vision] } : { choices: [{ message: { content: 'Sun in Libra' } }] } }; });
   test('no credential means unavailable', !client.available());
   await client.models();
+  const stateBefore = client.getState(), changes = [];
+  const unsubscribe = client.subscribe(() => changes.push(client.getState()));
   let rejected = false; try { client.configure('key', 'unverified/model:free'); } catch { rejected = true; }
   test('unverified model rejected', rejected);
   client.configure('key', vision.id);
   test('verified configuration becomes available', client.available());
+  test('configuration publishes stable secret-free provider state', client.getState() !== stateBefore && client.getState() === client.getState()
+    && changes.length === 1 && !JSON.stringify(client.getState()).includes('key'));
+  let emptyRejected = false; try { client.configure('', vision.id); } catch { emptyRejected = true; }
+  test('an empty replacement key preserves the existing configuration', emptyRejected && client.available() && changes.length === 1);
   test('completion returned', await client.complete('verified facts', 'data:image/png;base64,AA==') === 'Sun in Libra');
   const request = JSON.parse(calls[1].options.body);
   test('sends image and text to multimodal endpoint', request.messages[0].content[1].type === 'image_url' && request.messages[0].content[0].text === 'verified facts');
@@ -24,12 +30,31 @@ export async function run() {
   test('withdrawing permission cancels queued birth-data requests', cancelled && calls.length === 2);
   client.setConsent(true);
   client.disconnect(); test('disconnect makes interpreter unavailable', !client.available());
+  unsubscribe(); const observed = changes.length;
+  client.setConsent(false);
+  test('provider subscribers observe permission and disconnect and can unsubscribe', observed === 4 && changes.length === observed && !changes.at(-1).available);
+  client.setConsent(true);
   let errorText = ''; try { await client.complete('facts'); } catch (error) { errorText = error.message; }
   test('disconnected requests fail before transport', errorText.includes('Connect OpenRouter') && calls.length === 2);
   const limited = createOpenRouter(async url => url.endsWith('/models') ? { ok: true, json: async () => ({ data: [vision] }) } : { ok: false, status: 429 });
   await limited.models(); limited.configure('key', vision.id);
   try { await limited.complete('facts'); } catch (error) { errorText = error.message; }
   test('rate limit exposes useful fallback message', errorText.includes('limit reached') && errorText.includes('local reading'));
+  const secondVision = { ...vision, id: 'qwen/second-vl:free' };
+  let activeSignal;
+  const cancellable = createOpenRouter(async (url, options) => {
+    if (url.endsWith('/models')) return { ok: true, json: async () => ({ data: [vision, secondVision] }) };
+    activeSignal = options.signal;
+    return new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true }));
+  });
+  await cancellable.models(); cancellable.configure('first-account', vision.id);
+  const activeJob = cancellable.complete('computed birth data'); await Promise.resolve();
+  cancellable.chooseModel(secondVision.id);
+  try { await activeJob; } catch (error) { errorText = error.message; }
+  test('changing models aborts an active request and reports cancellation', activeSignal.aborted && errorText.includes('settings changed') && !errorText.includes('timed out'));
+  const afterModel = cancellable.getState();
+  cancellable.configure('second-account', secondVision.id);
+  test('changing account advances the provider generation without exposing the key', cancellable.getState().generation > afterModel.generation && !JSON.stringify(cancellable.getState()).includes('second-account'));
   test('typos match canonical place suggestions', matchesPlace('san antonoi', 'San Antonio TX'));
   test('old base names match canonical aliases', matchesPlace('ft bragg', 'Fort Liberty Bragg NC Fort Bragg'));
   test('accent differences match', matchesPlace('sao paulo', 'São Paulo BR'));

@@ -732,10 +732,9 @@ body::before {
   line-height: 1.42;
   color: var(--card-ink);
   flex-shrink: 1;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  -webkit-box-orient: vertical;
+  min-height: 0;
+  overflow: auto;
+  display: block;
 }
 .zc-back-body p { margin: 0 0 3px 0; }
 .zc-agent-loading {
@@ -3001,3 +3000,30 @@ body::before {
 .glb-cities { overflow: clip; border-radius: 50%; }
 
 .previous-behavior .saved-reading { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Each behavioral domain keeps its computed facts and hypotheses visible. */
+.behavior-card { min-width: 0; scroll-margin-top: 24px; }
+.behavior-card h3 { margin: 22px 0 8px; font-size: 15px; }
+.behavior-card details { margin: 16px 0; }
+.behavior-card li, .behavior-card p { overflow-wrap: anywhere; }
+.behavior-card small, .behavior-uncertainty { color: #c3c9b9; line-height: 1.5; }
+.behavior-card a { color: #c6dfb4; text-underline-offset: 3px; }
+.behavior-card a:focus-visible { outline: 2px solid #c6dfb4; outline-offset: 4px; }
+
+.living-avatar { border: 1px solid #596954; border-radius: 18px; padding: 24px; margin: 24px 0; background: #1b241e; color: #e8ecdf; }
+.living-avatar-head { display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+.living-kicker { font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+.living-xp { display:grid; gap:8px; }.living-xp strong {font-size:26px;color:#d0eab0;}
+.avatar-orbit {max-width:360px;margin:auto;color:#d0eab0;} .avatar-orbit svg {width:100%;height:auto;}
+.avatar-quests {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+.avatar-quests article {border:1px solid #596954;border-radius:12px;padding:16px;min-width:0;}
+.avatar-quests a {color:#d0eab0;display:block;margin-bottom:12px;}
+.avatar-check-in,.avatar-preferences {margin-top:24px;display:grid;gap:14px;}
+.avatar-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.living-avatar label {display:grid;gap:8px;line-height:1.5;}
+.living-avatar select,.living-avatar textarea {box-sizing:border-box;width:100%;min-width:0;color:#e8ecdf;background:#101a14;border:1px solid #849976;border-radius:8px;padding:12px;font:inherit;}
+.living-avatar textarea {min-height:90px;resize:vertical;}.living-avatar details {margin:22px 0;}
+.living-avatar button {justify-self:start;}.living-avatar p,.living-avatar li {overflow-wrap:anywhere;}
+.living-avatar :focus-visible {outline:3px solid #d0eab0;outline-offset:3px;}
+.living-summary {position:relative;z-index:2;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;color:#d0eab0;background:#1b241e;border-bottom:1px solid #596954;}
+@media(max-width:600px){.living-avatar {padding:16px;}.avatar-quests,.avatar-fields {grid-template-columns:minmax(0,1fr);}}

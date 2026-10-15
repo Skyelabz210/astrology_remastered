@@ -1,0 +1,33 @@
+import { test, expect } from '@playwright/test';
+test.beforeEach(async ({ page }) => { await page.route('https://**/*', route => route.abort()); });
+test('behavioral profile exposes computed anchors, dated contacts, counterexamples and owned evidence', async ({ page }) => {
+  await page.goto('/resonance-spread.html');
+  await page.getByRole('button',{name:'Explore techniques',exact:true}).click();
+  await page.locator('[data-technique-id="behavioral-profile"]').click();
+  await expect(page.getByRole('heading',{name:'Behavioral profile',exact:true})).toBeVisible();
+  await expect(page.locator('.behavior-card')).toHaveCount(5);
+  const sun = page.locator('#behavior-Sun');
+  await expect(sun.locator('.behavior-source')).toContainText(/Sun at \d+°\d+′\d+″/);
+  await expect(sun).toContainText('Interpretive tension');
+  await expect(sun).toContainText('set this interpretation aside');
+  await expect(sun).toContainText('Transiting');
+  const run = await page.evaluate(() => JSON.parse(localStorage.getItem('resonance.reading-runs.v1')).find(r => r.evidence?.behavioralProfile?.version === 2));
+  expect(run.evidence.behavioralProfile.sections).toHaveLength(5);
+  expect(run.evidence.behavioralProfile.sections[0].anchor.house).toBeGreaterThan(0);
+  expect(run.evidence.behavioralProfile.sections[0].trajectory.hits.length).toBeGreaterThan(0);
+  expect(run.input.chapters.at(-1).placeKey).toBe('San Antonio · TX');
+  expect(run.evidence.behavioralProfile.ownerBirth.lat).toBe(run.input.birth.lat);
+  expect(run.evidence.behavioralTrajectories.value.at).toBe(run.at);
+  await page.screenshot({path:'test-results/behavioral-evidence.png',fullPage:true});
+});
+test('unknown birth time visibly withholds precise house and transit claims', async ({ page }) => {
+  await page.goto('/resonance-spread.html');
+  await page.getByLabel(/Time unknown — compute/).check();
+  await page.getByRole('button',{name:/Cast the spread/i}).click();
+  await page.getByRole('button',{name:'behavior',exact:true}).click();
+  await expect(page.locator('.behavior-card')).toHaveCount(5);
+  await expect(page.locator('#behavior-Sun .behavior-source')).toContainText('house withheld');
+  await expect(page.locator('#behavior-Sun')).toContainText('Exact natal-degree transit dates are withheld');
+  const profile = await page.evaluate(() => JSON.parse(localStorage.getItem('resonance.reading-runs.v1')).find(r => r.evidence?.behavioralProfile?.version === 2).evidence.behavioralProfile);
+  expect(profile.sections.every(s => s.anchor.house === null && s.trajectory.hits.length === 0 && s.conditions.sect === null)).toBe(true);
+});

@@ -144,14 +144,8 @@ export async function run() {
     }).asc));
 
   // ── Polar latitudes ────────────────────────────────────────────────────
-  // houses.js ascMc() throws PolarLatitudeError above |lat| = 66.56° (a
-  // correctness fix: it used to return the Descendant, a 180° error). WP-19
-  // deliberately removed the ±66° entry clamp, so those latitudes ARE
-  // reachable from the form — letting the throw escape would take down the
-  // whole chart, including planetary positions that are perfectly valid
-  // there. astro.jsx catches it and falls back; these assertions pin that a
-  // polar chart still builds, that the MC stays exact anyway (it is
-  // latitude-independent), and that the fallback is honestly reported.
+  // Eastern-horizon branch selection supports inhabited polar latitudes.
+  // Independent geometry coverage lives in calculation-regressions.test.js.
   const POLAR = [
     ["Tromsø 69.6°N", 69.6492, 18.9553],
     ["Longyearbyen 78.2°N", 78.2232, 15.6267],
@@ -173,8 +167,8 @@ export async function run() {
       threw ? `${threw.name}: ${threw.message}` : "");
     if (!chart) continue;
 
-    t(`${label} · Ascendant is reported as NOT exact`,
-      sandbox.ascendantIsExactAt(polarDate, lat, lng) === false);
+    t(`${label} · Ascendant is supplied by the horizon solver`,
+      sandbox.ascendantIsExactAt(polarDate, lat, lng) === true);
     t(`${label} · Ascendant is still a finite number`, Number.isFinite(chart.asc));
 
     // The MC does not depend on latitude, so it must remain exact even where

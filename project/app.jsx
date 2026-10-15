@@ -17,7 +17,7 @@ const { useMemo: $useMemo, useState: $useState, useEffect: $useEffect } = React;
 // `voiceOn` ships true so a reading narrates in that voice by default;
 // that costs nothing and sends nothing until an ElevenLabs API key is
 // stored, because with no key voice.jsx falls back to the browser's own
-// offline SpeechSynthesis. The key itself is deliberately NOT a setting —
+// selected browser SpeechSynthesis voice. The key itself is deliberately NOT a setting —
 // it lives in localStorage only, so useTweaks()'s __edit_mode_set_keys
 // postMessage can never write it back into this file.
 const DEFAULT_SETTINGS = /*EDITMODE-BEGIN*/{
@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS = /*EDITMODE-BEGIN*/{
   "specular":      0.8,
   "rigorous":      false,
   "agentOn":       false,
+  "shareBehavioralDataWithAI": false,
   "spread":        "grid",
   "primeLayer":    false,
   "orbScale":      1.0,
@@ -90,12 +91,19 @@ function App() {
   const [landingState, setLandingState] = $useState(
     storedProfile && storedProfile.birthForm ? storedProfile.birthForm : null
   );
-  const [chapters, setChapters] = $useState(
-    storedProfile && Array.isArray(storedProfile.chapters) ? storedProfile.chapters : window.alphaLifeChapters(settings)
-  );
-  const chaptersEdited = React.useRef(false);
-  const onChaptersChange = (rows) => { chaptersEdited.current = true; setChapters(rows); };
-  const chaptersFor = (birth) => chaptersEdited.current || window.sameBirthRecord(settings, birth) ? chapters : window.alphaLifeChapters(birth);
+  // Keep editable drafts bound to their birth record. The landing form can
+  // switch people before casting; an edit must not authorize copying the
+  // previous person's residence history into the newly entered chart.
+  const [chapterDrafts, setChapterDrafts] = $useState(() => ({
+    [window.chapterBirthKey(settings)]: storedProfile && Array.isArray(storedProfile.chapters)
+      ? storedProfile.chapters : window.alphaLifeChapters(settings),
+  }));
+  const chaptersFor = (birth) => window.chapterRowsFor(chapterDrafts, birth);
+  const chapters = chaptersFor(settings);
+  const onChaptersChange = (rows, birth = settings) => {
+    const owner = window.chapterBirthKey(birth);
+    if (owner) setChapterDrafts(prior => ({ ...prior, [owner]: rows }));
+  };
   const [profileState, setProfileState] = $useState({
     savedAt: storedProfile && storedProfile.savedAt ? storedProfile.savedAt : null,
     message: storedProfile ? "Your local profile is loaded." : null,
@@ -103,6 +111,11 @@ function App() {
   });
   const [partner, setPartner] = $useState(null);       // partner birth payload
   const [partnerState, setPartnerState] = $useState(null);
+  const [navigationEpoch, setNavigationEpoch] = React.useState(0);
+  window.useTechniqueNavigation((next) => {
+    setNavigationEpoch(n => n + 1);
+    setScreen(next === "synastry" && !partner ? "partner" : next);
+  });
   // WP-19: the DST ambiguous/nonexistent note landing.jsx computes at
   // submit time (tzresolve.js's resolveUtcInstant kind !== "ok"). Kept as
   // plain component state rather than a tweak — it's a one-shot notice
@@ -118,9 +131,22 @@ function App() {
   }, [settings.rigorous, settings.primeLayer]);
 
   const onCast = (payload) => {
-    setChapters(chaptersFor(payload));
-    chaptersEdited.current = false;
+    const rows = chaptersFor(payload);
+    const shareBehavioralDataWithAI = window.sameBirthRecord(settings,payload) && settings.shareBehavioralDataWithAI === true;
+    if (window.LivingProfile) {
+      try {
+        const firstChart = computeNatal({ ...settings, ...payload });
+        const firstContext = window.buildPersonalReadingContext(firstChart, window.dateToJD(new Date()), rows, { ...settings, shareBehavioralDataWithAI });
+        if (!window.LivingProfile.ensureProfile(firstChart, firstContext)) setProfileState({ savedAt: null, message: "Your chart is ready, but this browser could not save the living avatar. Export your reading to keep it.", error: true });
+        else if (window.ProfileStore) {
+          const saved = window.ProfileStore.save({ ...settings, ...payload, shareBehavioralDataWithAI }, rows, payload.formState);
+          setProfileState(saved ? { savedAt: new Date().toISOString(), message: "Your birth profile and living avatar are saved on this device.", error: false } : { savedAt: null, message: "Your avatar is saved, but the birth form could not be stored. Export your data to keep a copy.", error: true });
+        }
+      } catch (error) { setProfileState({ savedAt: null, message: `The living avatar could not be created: ${error.message}`, error: true }); }
+    }
+    onChaptersChange(rows, payload);
     setTweak({
+      shareBehavioralDataWithAI,
       dateISO:     payload.dateISO,
       lat:         payload.lat,
       lng:         payload.lng,
@@ -137,6 +163,7 @@ function App() {
 
   const onSaveProfile = (payload) => {
     const birthSettings = {
+      shareBehavioralDataWithAI: window.sameBirthRecord(settings,payload) && settings.shareBehavioralDataWithAI === true,
       dateISO: payload.dateISO,
       lat: payload.lat,
       lng: payload.lng,
@@ -156,8 +183,7 @@ function App() {
       return;
     }
     const savedAt = new Date().toISOString();
-    setChapters(nextChapters);
-    chaptersEdited.current = false;
+    onChaptersChange(nextChapters, payload);
     setTweak(birthSettings);
     setLandingState(payload.formState);
     setProfileState({ savedAt, message: "Saved on this device. Nothing was uploaded.", error: false });
@@ -179,7 +205,7 @@ function App() {
       <Boundary>
         <Landing initial={landingState} onCast={onCast}
                  agentOn={settings.agentOn} onToggleAgent={(v) => setTweak('agentOn', v)}
-                 chapters={chapters} onChaptersChange={onChaptersChange}
+                 chapters={chapters} chaptersForBirth={chaptersFor} onChaptersChange={onChaptersChange}
                  profileState={profileState} onSaveProfile={onSaveProfile}
                  onClearProfile={onClearProfile} />
       </Boundary>
@@ -231,12 +257,12 @@ function App() {
     );
   }
   if (screen === "behavior") {
-    return <Boundary><window.BehavioralProfilePage setTweak={setTweak} settings={settings} chapters={chapters} onBack={() => setScreen("session")} /></Boundary>;
+    return <Boundary><window.BehavioralProfilePage key={navigationEpoch} setTweak={setTweak} settings={settings} chapters={chapters} onBack={() => setScreen("session")} /></Boundary>;
   }
   if (screen === "persona") {
     return (
       <Boundary>
-        <PersonaPage
+        <PersonaPage key={navigationEpoch}
           onBack={() => setScreen("session")}
           settings={settings}
           chapters={chapters}
@@ -839,8 +865,8 @@ function ElevenLabsTweaks({ t }) {
       <TweakRow label="Egress" value={key ? "on when narrating" : "none"}>
         <span style={{ color: "var(--ink-dim)" }}>
           {key
-            ? "With a key stored, the reading text is sent to api.elevenlabs.io to be spoken. No birth data, chart, or placements go with it."
-            : "No key stored — narration uses the browser's offline voice and nothing leaves this page."}
+            ? "With a key stored, narrated text is sent to api.elevenlabs.io. That text can include your birth details, placements and personal reading."
+            : "No key stored — narration uses your selected browser voice. Local voices can work offline; remote voices may send narrated text to the browser’s voice service."}
         </span>
       </TweakRow>
     </>
@@ -867,7 +893,7 @@ function SubstrateTweaks({ t }) {
       {t.tweaks.voiceOn && (
         <TweakRadio label="Voice engine" value={provider} options={[
           { value: 'elevenlabs', label: 'ElevenLabs · Nerissa' },
-          { value: 'browser',    label: 'Browser · offline' },
+          { value: 'browser',    label: 'Browser voice' },
         ]} onChange={v => t.setTweak('voiceProvider', v)} />
       )}
       {t.tweaks.voiceOn && provider === 'elevenlabs' && <ElevenLabsTweaks t={t} />}
@@ -1082,10 +1108,10 @@ function TraditionalPanel({ chart }) {
         </div>
       </div>
 
-      {chart.antisciaContacts.length > 0 && (
-        <div className="tp-card" style={{ marginTop: 16 }}>
+      <div className="tp-card" style={{ marginTop: 16 }}>
           <h4>Antiscia (solstice-axis mirrors, 1° orb)</h4>
-          <table className="tp-table">
+          {!chart.antisciaContacts.length && <p>No antiscion or contra-antiscion contacts within 1°.</p>}
+          {chart.antisciaContacts.length > 0 && <table className="tp-table">
             <thead><tr><th>pair</th><th>kind</th><th className="num">orb</th></tr></thead>
             <tbody>
               {chart.antisciaContacts.map((c, i) => (
@@ -1096,9 +1122,8 @@ function TraditionalPanel({ chart }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table>}
         </div>
-      )}
     </section>
   );
 }

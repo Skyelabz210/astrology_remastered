@@ -17,14 +17,15 @@
 // EGRESS, stated plainly because the app's privacy note has to match the
 // code: when this provider is active, the text of the reading and the
 // user's own ElevenLabs API key are sent to api.elevenlabs.io over HTTPS.
-// Nothing else goes with it — no birth data, no chart, no placements. The
+// The reading can itself contain birth dates, places and chart placements;
+// those details travel as part of its text. No separate chart object is sent. The
 // key is read from browser localStorage (or an injected `storage`), is
 // never written into the settings object, and therefore never reaches the
 // tweaks-panel's `__edit_mode_set_keys` postMessage that persists settings
 // back into the page source. Narration is ON by default, but this provider
 // is not reachable until a key has been entered by hand — until then
-// voice.jsx narrates through the browser's own offline engine and no
-// request is made at all.
+// voice.jsx narrates through SpeechSynthesis. Some system voices are remote;
+// that engine's network behavior depends on the selected voice and browser.
 //
 // DEPENDENCY INJECTION: `fetchImpl` and `storage` are parameters, not
 // globals, so the test suite drives the real code with a stub transport
@@ -57,6 +58,9 @@ export const DEFAULT_OUTPUT_FORMAT = "mp3_44100_128";
 /** localStorage keys. Namespaced so they can't collide with the tweaks JSON. */
 export const KEY_STORAGE_KEY = "resonance:elevenlabs-key";
 export const VOICE_CACHE_PREFIX = "resonance:elevenlabs-voice:";
+const VOICE_CACHE_NAMES_KEY = "resonance:elevenlabs-voice-names";
+export const REQUEST_TIMEOUT_MS = 30000;
+const storageGenerations = new WeakMap();
 
 /** ElevenLabs clamps playback speed to this range; requests outside it are refused. */
 export const SPEED_RANGE = [0.7, 1.2];
@@ -132,6 +136,15 @@ export function writeKey(storage, key) {
   if (!s) return false;
   try {
     const v = (key || "").trim();
+    if (v !== readKey(s)) {
+      storageGenerations.set(s, (storageGenerations.get(s) || 0) + 1);
+      let names = [];
+      try { names = JSON.parse(s.getItem(VOICE_CACHE_NAMES_KEY) || "[]"); } catch { /* old cache */ }
+      for (const name of new Set([DEFAULT_VOICE_NAME, ...(Array.isArray(names) ? names : [])])) {
+        s.removeItem(cacheKeyFor(name));
+      }
+      s.removeItem(VOICE_CACHE_NAMES_KEY);
+    }
     if (v) s.setItem(KEY_STORAGE_KEY, v);
     else s.removeItem(KEY_STORAGE_KEY);
     return true;
@@ -153,19 +166,34 @@ export function maskKey(key) {
   return `${k.slice(0, 4)}${"•".repeat(Math.max(4, k.length - 8))}${k.slice(-4)}`;
 }
 
-function cacheKeyFor(name) { return VOICE_CACHE_PREFIX + String(name || "").toLowerCase(); }
+function cacheKeyFor(name) { return VOICE_CACHE_PREFIX + String(name || "").trim().toLowerCase(); }
 
-export function readCachedVoiceId(storage, name) {
+export function readCachedVoiceId(storage, name, accountScope = "") {
   const s = safeStorage(storage);
   if (!s) return "";
-  try { return (s.getItem(cacheKeyFor(name)) || "").trim(); } catch { return ""; }
+  try {
+    const raw = (s.getItem(cacheKeyFor(name)) || "").trim();
+    if (!raw) return "";
+    let record;
+    try { record = JSON.parse(raw); } catch { return accountScope ? "" : raw; }
+    if (!record || typeof record.voiceId !== "string") return "";
+    if (accountScope && record.accountScope !== accountScope) return "";
+    return record.voiceId.trim();
+  } catch { return ""; }
 }
 
-export function writeCachedVoiceId(storage, name, voiceId) {
+export function writeCachedVoiceId(storage, name, voiceId, accountScope = "") {
   const s = safeStorage(storage);
   if (!s) return false;
   try {
-    if (voiceId) s.setItem(cacheKeyFor(name), voiceId);
+    if (voiceId) {
+      s.setItem(cacheKeyFor(name), JSON.stringify({ voiceId, accountScope }));
+      let names = [];
+      try { names = JSON.parse(s.getItem(VOICE_CACHE_NAMES_KEY) || "[]"); } catch { /* old cache */ }
+      s.setItem(VOICE_CACHE_NAMES_KEY, JSON.stringify([...new Set([
+        ...(Array.isArray(names) ? names : []), String(name || "").trim().toLowerCase(),
+      ])]));
+    }
     else s.removeItem(cacheKeyFor(name));
     return true;
   } catch { return false; }
@@ -179,6 +207,47 @@ function pickFetch(fetchImpl) {
   if (fetchImpl) return fetchImpl;
   if (typeof fetch === "function") return fetch;
   throw new ElevenLabsError("no fetch implementation available", { code: "no_transport" });
+}
+
+function abortError() {
+  const error = new Error("ElevenLabs request cancelled.");
+  error.name = "AbortError";
+  return error;
+}
+
+/** Bound both transport and response-body reads, including transports that ignore abort. */
+async function withDeadline(operation, { signal, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
+  if (signal && signal.aborted) throw abortError();
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  let rejectCancelled;
+  const cancelled = new Promise((_, reject) => { rejectCancelled = reject; });
+  const cancel = (error) => {
+    if (controller) controller.abort();
+    rejectCancelled(error);
+  };
+  const onAbort = () => cancel(abortError());
+  if (signal) signal.addEventListener("abort", onAbort, { once: true });
+  const duration = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : REQUEST_TIMEOUT_MS;
+  const timer = setTimeout(() => cancel(new ElevenLabsError(
+    "ElevenLabs did not respond in time — narration will fall back to the browser voice.",
+    { code: "timeout", retryable: true },
+  )), duration);
+  try {
+    return await Promise.race([Promise.resolve().then(() => operation(controller ? controller.signal : signal)), cancelled]);
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener("abort", onAbort);
+  }
+}
+
+/** A one-way account identifier; a missing crypto implementation disables persisted reuse. */
+async function accountScopeFor(apiKey) {
+  try {
+    if (!globalThis.crypto || !globalThis.crypto.subtle || typeof TextEncoder !== "function") return "";
+    const bytes = new TextEncoder().encode(apiKey);
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  } catch { return ""; }
 }
 
 /**
@@ -209,16 +278,18 @@ async function failureFrom(res) {
 }
 
 /** GET /v1/voices — the voices this key can use, including added library voices. */
-export async function listVoices({ apiKey, fetchImpl, signal } = {}) {
+export async function listVoices({ apiKey, fetchImpl, signal, timeoutMs } = {}) {
   const doFetch = pickFetch(fetchImpl);
-  const res = await doFetch(`${ELEVEN_API_BASE}/voices`, {
-    method: "GET",
-    headers: apiKey ? { "xi-api-key": apiKey } : {},
-    signal,
-  });
-  if (!res.ok) throw await failureFrom(res);
-  const body = await res.json();
-  return Array.isArray(body && body.voices) ? body.voices : [];
+  return withDeadline(async requestSignal => {
+    const res = await doFetch(`${ELEVEN_API_BASE}/voices`, {
+      method: "GET",
+      headers: apiKey ? { "xi-api-key": apiKey } : {},
+      signal: requestSignal,
+    });
+    if (!res.ok) throw await failureFrom(res);
+    const body = await res.json();
+    return Array.isArray(body && body.voices) ? body.voices : [];
+  }, { signal, timeoutMs });
 }
 
 /**
@@ -254,17 +325,19 @@ export function matchVoiceByName(voices, name) {
  * looks: a voice already added to the caller's own library is both cheaper
  * to find and guaranteed usable.
  */
-export async function searchSharedVoices({ apiKey, name, fetchImpl, signal, pageSize = 10 } = {}) {
+export async function searchSharedVoices({ apiKey, name, fetchImpl, signal, timeoutMs, pageSize = 10 } = {}) {
   const doFetch = pickFetch(fetchImpl);
   const url = `${ELEVEN_API_BASE}/shared-voices?search=${encodeURIComponent(name)}&page_size=${pageSize}`;
-  const res = await doFetch(url, {
-    method: "GET",
-    headers: apiKey ? { "xi-api-key": apiKey } : {},
-    signal,
-  });
-  if (!res.ok) throw await failureFrom(res);
-  const body = await res.json();
-  return Array.isArray(body && body.voices) ? body.voices : [];
+  return withDeadline(async requestSignal => {
+    const res = await doFetch(url, {
+      method: "GET",
+      headers: apiKey ? { "xi-api-key": apiKey } : {},
+      signal: requestSignal,
+    });
+    if (!res.ok) throw await failureFrom(res);
+    const body = await res.json();
+    return Array.isArray(body && body.voices) ? body.voices : [];
+  }, { signal, timeoutMs });
 }
 
 /**
@@ -283,24 +356,42 @@ export async function searchSharedVoices({ apiKey, name, fetchImpl, signal, page
  * letting the reader watch an unexplained 403 later.
  */
 export async function resolveVoiceId(options = {}) {
-  const { name = DEFAULT_VOICE_NAME, voiceId = "", storage, force = false } = options;
+  const { name = DEFAULT_VOICE_NAME, voiceId = "", force = false, signal } = options;
+  const storage = safeStorage(options.storage);
+  const apiKey = String(options.apiKey || "").trim();
+  if (signal && signal.aborted) throw abortError();
   if (voiceId && voiceId.trim()) {
     return { voiceId: voiceId.trim(), name, source: "override", needsAdd: false };
   }
-  if (!force) {
-    const cached = readCachedVoiceId(storage, name);
+  if (!apiKey) throw new ElevenLabsError(
+    "No ElevenLabs API key configured — add one to use the ElevenLabs voice.", { code: "no_key" },
+  );
+  const generation = storage ? (storageGenerations.get(storage) || 0) : 0;
+  const configuredKey = readKey(storage);
+  const accountScope = await accountScopeFor(apiKey);
+  if (signal && signal.aborted) throw abortError();
+  if (!force && accountScope) {
+    const cached = readCachedVoiceId(storage, name, accountScope);
     if (cached) return { voiceId: cached, name, source: "cache", needsAdd: false };
   }
   // Two callers can want the same voice at the same instant — on the first
   // reading, the click handler that primes the engine and the auto-speak
   // effect it unblocks both reach for it, and with no cache written yet
   // that is two identical round trips (observed in a real browser run).
-  // Share the in-flight lookup instead; the entry is dropped as soon as it
-  // settles, so a later call resolves normally.
-  const inFlightKey = `${name}\u0000${force ? "force" : ""}`;
+  // Share only when the account, storage, transport, cancellation and
+  // deadline match. API keys here remain in memory, never in cache names.
+  const inFlightKey = JSON.stringify([
+    apiKey, String(name).trim().toLowerCase(), force, objectId(storage),
+    objectId(options.fetchImpl || globalThis.fetch), objectId(signal), options.timeoutMs || REQUEST_TIMEOUT_MS, generation,
+  ]);
   const pending = __resolveInFlight.get(inFlightKey);
   if (pending) return pending;
-  const run = resolveVoiceIdUncached(options).finally(() => {
+  const cacheResolved = voiceId => {
+    if (!accountScope || !storage || (signal && signal.aborted)) return;
+    if ((storageGenerations.get(storage) || 0) !== generation || readKey(storage) !== configuredKey) return;
+    writeCachedVoiceId(storage, name, voiceId, accountScope);
+  };
+  const run = resolveVoiceIdUncached({ ...options, apiKey, cacheResolved }).finally(() => {
     __resolveInFlight.delete(inFlightKey);
   });
   __resolveInFlight.set(inFlightKey, run);
@@ -308,13 +399,21 @@ export async function resolveVoiceId(options = {}) {
 }
 
 const __resolveInFlight = new Map();
+const objectIds = new WeakMap();
+let nextObjectId = 0;
+function objectId(object) {
+  if (!object || (typeof object !== "object" && typeof object !== "function")) return 0;
+  if (!objectIds.has(object)) objectIds.set(object, ++nextObjectId);
+  return objectIds.get(object);
+}
 
 async function resolveVoiceIdUncached({
   apiKey,
   name = DEFAULT_VOICE_NAME,
-  storage,
   fetchImpl,
   signal,
+  timeoutMs,
+  cacheResolved,
 } = {}) {
   if (!apiKey) {
     throw new ElevenLabsError(
@@ -323,24 +422,24 @@ async function resolveVoiceIdUncached({
     );
   }
 
-  const own = await listVoices({ apiKey, fetchImpl, signal });
+  const own = await listVoices({ apiKey, fetchImpl, signal, timeoutMs });
   const mine = matchVoiceByName(own, name);
   if (mine) {
-    writeCachedVoiceId(storage, name, mine.voice_id);
+    cacheResolved(mine.voice_id);
     return { voiceId: mine.voice_id, name: mine.name, source: "account", needsAdd: false };
   }
 
   let shared = [];
   try {
-    shared = await searchSharedVoices({ apiKey, name, fetchImpl, signal });
+    shared = await searchSharedVoices({ apiKey, name, fetchImpl, signal, timeoutMs });
   } catch (e) {
     // The library search is the fallback path, not the answer — a failure
     // here should report "voice not found", not the search's own error.
-    if (!(e instanceof ElevenLabsError)) throw e;
+    if (!(e instanceof ElevenLabsError) || e.code === "timeout") throw e;
   }
   const found = matchVoiceByName(shared, name);
   if (found) {
-    writeCachedVoiceId(storage, name, found.voice_id);
+    cacheResolved(found.voice_id);
     return {
       voiceId: found.voice_id,
       name: found.name,
@@ -371,6 +470,7 @@ export async function synthesize({
   voiceSettings,
   fetchImpl,
   signal,
+  timeoutMs,
 } = {}) {
   if (!apiKey) throw new ElevenLabsError("No ElevenLabs API key configured.", { code: "no_key" });
   if (!voiceId) throw new ElevenLabsError("No ElevenLabs voice ID resolved.", { code: "no_voice" });
@@ -379,22 +479,24 @@ export async function synthesize({
 
   const doFetch = pickFetch(fetchImpl);
   const url = `${ELEVEN_API_BASE}/text-to-speech/${encodeURIComponent(voiceId)}?output_format=${encodeURIComponent(outputFormat)}`;
-  const res = await doFetch(url, {
-    method: "POST",
-    headers: {
-      "xi-api-key": apiKey,
-      "Content-Type": "application/json",
-      "Accept": "audio/mpeg",
-    },
-    body: JSON.stringify({
-      text: body,
-      model_id: modelId,
-      voice_settings: voiceSettings || voiceSettingsFor("jedi"),
-    }),
-    signal,
-  });
-  if (!res.ok) throw await failureFrom(res);
-  return await res.arrayBuffer();
+  return withDeadline(async requestSignal => {
+    const res = await doFetch(url, {
+      method: "POST",
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+      },
+      body: JSON.stringify({
+        text: body,
+        model_id: modelId,
+        voice_settings: voiceSettings || voiceSettingsFor("jedi"),
+      }),
+      signal: requestSignal,
+    });
+    if (!res.ok) throw await failureFrom(res);
+    return await res.arrayBuffer();
+  }, { signal, timeoutMs });
 }
 
 /**
@@ -441,6 +543,7 @@ export async function synthesizeWithTimestamps({
   voiceSettings,
   fetchImpl,
   signal,
+  timeoutMs,
 } = {}) {
   if (!apiKey) throw new ElevenLabsError("No ElevenLabs API key configured.", { code: "no_key" });
   if (!voiceId) throw new ElevenLabsError("No ElevenLabs voice ID resolved.", { code: "no_voice" });
@@ -450,29 +553,31 @@ export async function synthesizeWithTimestamps({
   const doFetch = pickFetch(fetchImpl);
   const url = `${ELEVEN_API_BASE}/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps`
     + `?output_format=${encodeURIComponent(outputFormat)}`;
-  const res = await doFetch(url, {
-    method: "POST",
-    headers: {
-      "xi-api-key": apiKey,
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-    },
-    body: JSON.stringify({
-      text: body,
-      model_id: modelId,
-      voice_settings: voiceSettings || voiceSettingsFor("jedi"),
-    }),
-    signal,
-  });
-  if (!res.ok) throw await failureFrom(res);
-  const payload = await res.json();
-  const b64 = payload && (payload.audio_base64 || payload.audioBase64);
-  if (!b64) throw new ElevenLabsError("ElevenLabs returned no audio.", { code: "no_audio" });
-  return {
-    audio: base64ToArrayBuffer(b64),
-    alignment: (payload && payload.alignment) || null,
-    normalizedAlignment: (payload && payload.normalized_alignment) || null,
-  };
+  return withDeadline(async requestSignal => {
+    const res = await doFetch(url, {
+      method: "POST",
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify({
+        text: body,
+        model_id: modelId,
+        voice_settings: voiceSettings || voiceSettingsFor("jedi"),
+      }),
+      signal: requestSignal,
+    });
+    if (!res.ok) throw await failureFrom(res);
+    const payload = await res.json();
+    const b64 = payload && (payload.audio_base64 || payload.audioBase64);
+    if (!b64) throw new ElevenLabsError("ElevenLabs returned no audio.", { code: "no_audio" });
+    return {
+      audio: base64ToArrayBuffer(b64),
+      alignment: (payload && payload.alignment) || null,
+      normalizedAlignment: (payload && payload.normalized_alignment) || null,
+    };
+  }, { signal, timeoutMs });
 }
 
 // Browser publication — see this file's header for the load-order contract.
@@ -484,6 +589,7 @@ if (typeof window !== "undefined") {
     DEFAULT_OUTPUT_FORMAT,
     KEY_STORAGE_KEY,
     SPEED_RANGE,
+    REQUEST_TIMEOUT_MS,
     ElevenLabsError,
     voiceSettingsFor,
     readKey,

@@ -17,6 +17,55 @@ function useNow(intervalMs = 60000) {
   return now;
 }
 
+// Snapshot the selected calculation separately from the frozen narrated
+// reading. A scan belongs to its natal inputs and its actual scan window;
+// a result left in state while the target changes is never called complete.
+function lifecycleScanKey(chart, jd) {
+  return window.ReadingRuns.evidenceFingerprint([
+    window.ReadingRuns.profileKey(chart.birth), chart.timeUnknown,
+    chart.planets.map(p => [p.name, p.lon]),
+    chart.timeUnknown ? null : [chart.asc, chart.mc], Math.round(jd / 30),
+  ]);
+}
+
+function buildLifecycleRun(chart, chapters, calculation, scan, selection, createdAt = new Date()) {
+  const settings = chart.readingContext && chart.readingContext.input.settings || chart.birth || {};
+  const context = window.buildPersonalReadingContext(chart, calculation.jdT, chapters,
+    { ...settings, agentOn: false });
+  if (!context || !window.UserExport) throw new Error('Personal calculation snapshots are unavailable');
+  const scanKey = lifecycleScanKey(chart, calculation.jdT);
+  const completed = !!scan && scan.key === scanKey;
+  const centre = Math.round(calculation.jdT / 30) * 30;
+  const scanInput = { key: scanKey, centreJd: centre, spanDays: 366,
+    startJd: centre - 183, endJd: centre + 183,
+    bodies: [...window.PERFECTION_TRANSITERS], aspects: window.PERFECTION_ASPECTS.map(a => ({ name: a.name, angle: a.angle })),
+    gridStepDays: 2, bisectionIterations: 40,
+    method: 'Ephemeris longitude crossings; numerical refinement does not establish an equal physical timing accuracy.' };
+  const input = { ...context.input,
+    target: { dateISO: context.at, jd: calculation.jdT, selection,
+      dateOnlyConvention: selection === 'date' ? '12:00 UTC on the selected calendar date' : null },
+    calculation: { kind: 'lifecycle', modelRevision: 'lifecycle-snapshot-v1',
+      secondaryProgressionYearDays: 365.25, transitOrbDegrees: 2, perfectionScan: scanInput } };
+  const scanEvidence = completed
+    ? { status: 'ready', value: { ...scanInput, hits: scan.hits.map(h => ({ ...h, daysFromTarget: h.jd - calculation.jdT })) } }
+    : { status: 'pending', message: 'The perfection scan for these natal inputs and this window has not completed.', value: scanInput };
+  const lines = [`Lifecycle calculation at ${context.at}.`, context.personalText,
+    calculation.digest.lines.join(' '), context.progressionsText,
+    completed ? `${scan.hits.length} computed perfection events are retained for the recorded scan window.`
+      : 'Perfection events are pending and are not included as completed results.'];
+  const evidence = { ...context.evidence, natal: context.natal, limitations: context.limitations,
+    lifecycleCalculation: { status: 'ready', value: { jd: calculation.jdT,
+      ctm: calculation.ctm, lift: calculation.lift } },
+    returnCharts: { status: 'ready', value: calculation.returns.map(r => ({ ...r,
+      chart: window.UserExport.chartSnapshot(r.chart) })) },
+    secondaryProgressions: { status: 'ready', value: calculation.prog },
+    perfectionScan: scanEvidence };
+  return window.UserExport.safeSnapshot({ version: 1,
+    id: `lifecycle:${window.ReadingRuns.evidenceFingerprint([context.profileKey, context.at, input])}`,
+    profileKey: context.profileKey, at: context.at, createdAt: new Date(createdAt).toISOString(),
+    input, evidence, reading: lines.filter(Boolean).join(' ') });
+}
+
 function LiveStatePanel({ chart, chapters = [] }) {
   const now = useNow(60000);
   // Target instant: "now" keeps ticking; picking a date freezes the panel
@@ -39,7 +88,7 @@ function LiveStatePanel({ chart, chapters = [] }) {
       lift:     windingLift(chart, jdT),
       digest:   lifecycleDigest(chart, jdT, chapters),
     };
-  }, [target.getTime() - (target.getTime() % 60000), chart, chapters]);
+  }, [target.getTime(), chart, chapters]);
 
   const chapterContext = React.useMemo(
     () => (typeof window.chapterAware === "function" ? window.chapterAware(chart, chapters, data.jdT) : null),
@@ -51,19 +100,20 @@ function LiveStatePanel({ chart, chapters = [] }) {
   // Keyed to a 30-day block of the target so scrubbing nearby dates reuses
   // the same window instead of rescanning; the day offsets shown are
   // re-derived from the live target at render time.
-  const perfKey = `${chart.birth.dateISO}:${chart.birth.lat}:${chart.birth.lng}:${chart.timeUnknown}:${Math.round(data.jdT / 30)}`;
+  const perfKey = lifecycleScanKey(chart, data.jdT);
   const [perf, setPerf] = React.useState(null);
   React.useEffect(() => {
     let alive = true;
     setPerf(null);
-    const centre = data.jdT;
+    // A deterministic centre makes reuse inside the same block explicit.
+    const centre = Math.round(data.jdT / 30) * 30;
     const bodies = ["Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
     const acc = [];
     const runBody = (i) => {
       if (!alive) return;
       if (i >= bodies.length) {
         acc.sort((a, b) => a.jd - b.jd);
-        setPerf({ hits: acc });
+        setPerf({ key: perfKey, centreJd: centre, hits: acc });
         return;
       }
       acc.push(...transitPerfections(chart, centre, 366, [bodies[i]]).hits);
@@ -75,13 +125,13 @@ function LiveStatePanel({ chart, chapters = [] }) {
 
   // The sixteen perfections nearest the live target, in calendar order.
   const perfRows = React.useMemo(() => {
-    if (!perf) return null;
+    if (!perf || perf.key !== perfKey) return null;
     return perf.hits
       .map((h) => ({ ...h, dDays: h.jd - data.jdT }))
       .sort((a, b) => Math.abs(a.dDays) - Math.abs(b.dDays))
       .slice(0, 16)
       .sort((a, b) => a.jd - b.jd);
-  }, [perf, data.jdT]);
+  }, [perf, perfKey, data.jdT]);
 
   // Secondary progressions at current age
   const prog = React.useMemo(
@@ -106,6 +156,19 @@ function LiveStatePanel({ chart, chapters = [] }) {
     () => RETURN_BODIES.map((b) => returnChart(chart, b, data.jdT, chapters)).filter(Boolean),
     [chart, chapters, data.jdT]
   );
+  const [saveStatus, setSaveStatus] = React.useState('');
+  React.useEffect(() => { setSaveStatus(''); }, [perfKey, data.jdT, chapters]);
+  const saveCalculation = () => {
+    try {
+      const run = buildLifecycleRun(chart, chapters, { ...data, prog, returns }, perf,
+        targetDate === 'birth' ? 'birth' : targetDate ? 'date' : 'now');
+      const ok = window.ReadingRuns.saveRun(null, run);
+      setSaveStatus(ok
+        ? `Saved calculation for ${run.at}${run.evidence.perfectionScan.status === 'pending' ? ' — perfection scan pending; save again after it completes to include its events' : ' with the completed perfection scan'}.`
+        : 'This browser blocked saving the calculation.');
+      if (ok) window.dispatchEvent(new Event('personal-reading-evidence'));
+    } catch (error) { setSaveStatus(`Calculation could not be saved: ${error.message || error}`); }
+  };
 
   return (
     <section className="cl">
@@ -141,6 +204,11 @@ function LiveStatePanel({ chart, chapters = [] }) {
             : now.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</span>
         </div>
       </header>
+      <div className="cl-place">
+        <button type="button" className="cl-target-btn" onClick={saveCalculation}>Save reading for this date</button>
+        <span>Retains this target, residence, returns, progressions and completed scan in your history and ZIP.</span>
+      </div>
+      <p role="status" aria-live="polite">{saveStatus}</p>
 
       {/* The same facts the tables below carry, read as a paragraph
           first. Nothing here is computed specially for this sentence —
@@ -211,8 +279,8 @@ function LiveStatePanel({ chart, chapters = [] }) {
               <div className="cl-rows">
                 <div className="cl-row"><span className="l">exact instant</span><span className="v">{r.dateISO.slice(0, 16).replace("T", " ")} UTC</span></div>
                 <div className="cl-row"><span className="l">cast for</span><span className="v">{r.placeLabel}</span></div>
-                <div className="cl-row"><span className="l">Ascendant</span><span className="v">{ZODIAC[r.chart.ascSignIdx].glyph} {ZODIAC[r.chart.ascSignIdx].name} {(r.chart.asc % 30).toFixed(1)}°</span></div>
-                <div className="cl-row"><span className="l">Midheaven</span><span className="v">{ZODIAC[r.chart.mcSignIdx].glyph} {ZODIAC[r.chart.mcSignIdx].name} {(r.chart.mc % 30).toFixed(1)}°</span></div>
+                <div className="cl-row"><span className="l">Ascendant</span><span className="v">{chart.timeUnknown ? 'withheld — birth time unknown' : `${ZODIAC[r.chart.ascSignIdx].glyph} ${ZODIAC[r.chart.ascSignIdx].name} ${(r.chart.asc % 30).toFixed(1)}°`}</span></div>
+                <div className="cl-row"><span className="l">Midheaven</span><span className="v">{chart.timeUnknown ? 'withheld — birth time unknown' : `${ZODIAC[r.chart.mcSignIdx].glyph} ${ZODIAC[r.chart.mcSignIdx].name} ${(r.chart.mc % 30).toFixed(1)}°`}</span></div>
                 <div className="cl-row"><span className="l">next {r.body === "Sun" ? "solar" : "lunar"} return</span><span className="v">{r.nextDateISO.slice(0, 10)}</span></div>
               </div>
               <table className="tp-table cl-return-planets">
@@ -221,7 +289,7 @@ function LiveStatePanel({ chart, chapters = [] }) {
                     <tr key={p.name}>
                       <td><span className="pl-gl">{p.glyph}</span> {p.name}{p.retrograde ? " ℞" : ""}</td>
                       <td>{ZODIAC[p.sign].glyph} {ZODIAC[p.sign].name} {(p.lon % 30).toFixed(1)}°</td>
-                      <td className="num">H{p.house}</td>
+                      <td className="num">{chart.timeUnknown ? '—' : `H${p.house}`}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -287,7 +355,7 @@ function LiveStatePanel({ chart, chapters = [] }) {
             </tbody>
           </table>
         )}
-        {perf && perf.hits.length > 16 && (
+        {perf && perf.key === perfKey && perf.hits.length > 16 && (
           <div className="cl-row"><span className="l">{perf.hits.length} perfections in the full year — the sixteen nearest the target are shown</span></div>
         )}
       </div>
@@ -393,4 +461,4 @@ function HelixViz({ syndrome }) {
   );
 }
 
-Object.assign(window, { LiveStatePanel, useNow });
+Object.assign(window, { LiveStatePanel, useNow, lifecycleScanKey, buildLifecycleRun });

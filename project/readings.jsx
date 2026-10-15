@@ -1,8 +1,8 @@
 // readings.jsx — declarative readings + rigorous math for each card.
-// No metaphor, no poetry. Each line states the structural fact and what
-// the placement does, in operational language. The Mayan CRT substrate
-// (Safe Basis primes, M_SAFE = 30030, mod-11 shadow, mod-13 boundary)
-// is the source of every number cited here.
+// Computed placements and relationships are separate from symbolic
+// interpretation. Numerical chart facts come from the ephemeris and
+// selected astrology tables; integer lanes describe rounded coordinates,
+// and do not establish behavioral traits or causal effects.
 //
 // WP-29: every statement in the generated reading is grounded in an
 // actually-computed value (dignity, sect, triplicity, term/face, aspect —
@@ -120,6 +120,24 @@ const ASPECT_FAMILY_SOURCE_TAG = {
   tredecile:  "Substrate harmonic (mod-13, non-classical)",
 };
 
+// The same evidence object feeds the behavioral page, local cards, spoken
+// narration and exported reading. Loading a legacy standalone page without
+// the evidence module keeps its original classical reading available.
+function cardReadingEvidence(card, chart) {
+  if (!card || !chart || !Array.isArray(chart.planets) ||
+      !chart.planets.some(p => p.name === card.principal.name)) return null;
+  const api = typeof window !== "undefined" && window.BehavioralProfile;
+  if (!api || typeof api.chartEvidenceForBody !== "function") return null;
+  try { return api.chartEvidenceForBody(chart, card.principal.name); }
+  catch { return null; }
+}
+
+function readingAngle(degrees) {
+  if (!Number.isFinite(degrees)) return "unavailable";
+  const seconds = Math.round(Math.abs(degrees) * 3600);
+  return `${Math.floor(seconds / 3600)}°${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}′${String(seconds % 60).padStart(2, "0")}″`;
+}
+
 function readingFor(card, chart) {
   chart = chart || {};
   const p = card.principal;
@@ -131,8 +149,20 @@ function readingFor(card, chart) {
   const elemFn    = ELEMENT_FN[actualSign.element];
   const modeFn    = MODALITY_FN[actualSign.modality];
   const timeKnown = !chart.timeUnknown;
+  const evidence = cardReadingEvidence(card, chart);
 
   const body = [];
+
+  if (evidence && evidence.anchor) body.push({
+    text: evidence.anchor.text,
+    sourceTag: "Natal ephemeris placement (rounded to an arcsecond)",
+    field: "anchor",
+  });
+  if (evidence && chart.timeUnknown) body.push({
+    text: "Degrees and natal relationships use the assumed birth time. The Moon's sign and degree can change across the birth day; the displayed arcseconds do not establish birth-time or astronomical accuracy.",
+    sourceTag: "Birth-time uncertainty",
+    field: "uncertainty",
+  });
 
   // ── Dignity (Ptolemaic) — always available; grounded in card.dignity,
   // which astro.jsx computed via AstroCore.dignityFor against this card's
@@ -159,7 +189,8 @@ function readingFor(card, chart) {
   // line to flag that uncertainty rather than asserting it outright. ─────
   if (timeKnown && typeof chart.isDayChart === "boolean") {
     const sectWord = chart.isDayChart ? "day" : "night";
-    const uncertainty = timeKnown ? "" : " (birth time unknown — this determination may be unreliable)";
+    const uncertainty = chart.sectSource === "explicit override" || chart.birth && ["day", "night"].includes(chart.birth.sect)
+      ? " (selected override)" : "";
     body.push({
       text: `Sect: this reads as a ${sectWord} chart${uncertainty}. Sect membership can favor how a planet's signification tends to express.`,
       sourceTag: "Hellenistic sect",
@@ -195,10 +226,10 @@ function readingFor(card, chart) {
   // house-based, so this is safe to show regardless of chart.timeUnknown. ─
   const tenancy = card.tenants.length;
   const tenancyText = tenancy === 0
-    ? `Untenanted. Reading delegates to dispositor ${card.ruler}.`
+    ? `${card.name} is an untenanted sign sector. Its reading delegates to sign ruler ${card.ruler}; the placement described here belongs to that ruler.`
     : tenancy === 1
-    ? `Sole tenant: ${p.name}. Single-signature sector.`
-    : `${tenancy} tenants: ${card.tenants.map(t => t.name).join(", ")}. Weighted sector.`;
+    ? `${card.name} sign sector: sole tenant ${p.name}.`
+    : `${card.name} sign sector has ${tenancy} tenants: ${card.tenants.map(t => t.name).join(", ")}. The principal placement shown here is ${p.name}.`;
   body.push({ text: tenancyText, sourceTag: "Sign tenancy (occupancy census)" });
 
   if (p.retrograde) {
@@ -207,19 +238,40 @@ function readingFor(card, chart) {
       sourceTag: "Ephemeris (retrograde motion)",
     });
   }
+  if (evidence && Array.isArray(evidence.facts)) {
+    for (const fact of evidence.facts.filter(line => /^(Solar condition:|(?:Retrograde|Direct) motion,)/.test(line))) body.push({
+      text: fact,
+      sourceTag: fact.startsWith("Solar condition:") ? "Traditional solar-distance thresholds" : "Signed natal ephemeris velocity",
+      field: "condition",
+    });
+  }
 
   // ── Aspect to the Sun — grounded in card.aspect, which astro.jsx
   // computed via AstroCore.nearestAspect against the real Sun-principal
   // separation for this chart. ───────────────────────────────────────────
-  if (card.aspect) {
+  if (evidence && Array.isArray(evidence.aspects)) {
+    for (const aspect of evidence.aspects) {
+      body.push({
+        text: `${p.name}-${aspect.other} ${aspect.aspect}: orb ${aspect.orbText}, ${aspect.phase || "phase unavailable"}. ${ASPECT_FN[aspect.aspect] || ""}`.trim(),
+        sourceTag: ASPECT_FAMILY_SOURCE_TAG[(chart.aspectGrid || []).find(a =>
+          (a.a === p.name && a.b === aspect.other || a.b === p.name && a.a === aspect.other) && a.aspect === aspect.aspect)?.family] || "Computed natal aspect grid",
+        field: "aspect",
+      });
+    }
+    if (!evidence.aspects.length) body.push({
+      text: `No admitted natal aspect connects ${p.name} to another body under this chart's aspect and orb settings.`,
+      sourceTag: "Computed natal aspect grid",
+      field: "aspect",
+    });
+  } else if (card.aspect) {
     const fn = ASPECT_FN[card.aspect.name] || "";
     body.push({
-      text: `Sun-${p.name} ${card.aspect.name} ${card.aspect.sep.toFixed(2)}° (orb ${card.aspect.orb}°, ${card.aspect.family}). ${fn}`,
+      text: `Sun-${p.name} ${card.aspect.name}: orb ${readingAngle(card.aspect.sep)} (allowed orb ${readingAngle(card.aspect.orb)}, ${card.aspect.family})${card.aspect.phase ? `, ${card.aspect.phase}` : ""}. ${fn}`,
       sourceTag: ASPECT_FAMILY_SOURCE_TAG[card.aspect.family] || "Aspect (classical orb table)",
     });
   } else {
     body.push({
-      text: "No Sun-aspect within orb. This sector reads from intrinsic dignity alone.",
+      text: p.name === "Sun" ? "A body does not form a natal aspect with itself." : "No Sun-aspect within orb; the remaining natal relationships are not included in this legacy Sun-relative scan.",
       sourceTag: "Aspect scan (Sun-relative, classical orbs)",
     });
   }
@@ -236,7 +288,7 @@ function readingFor(card, chart) {
   if (timeKnown) {
     body.push({
       text: `House ${roman(p.house)}: ${houseFn}`,
-      sourceTag: "Whole-sign / equal house placement",
+      sourceTag: `House placement (${chart.houseSystemActual || chart.birth && chart.birth.houseSystem || "selected system"})`,
     });
   }
 
@@ -251,10 +303,35 @@ function readingFor(card, chart) {
     });
   }
 
+  if (evidence) {
+    if (evidence.feedback && evidence.feedback.text) body.push({ text: evidence.feedback.text, sourceTag: "Your reported experience; not calculated astrology", field: "feedback" });
+    if (evidence.tension && evidence.tension.interpretation) body.push({
+      text: `Symbolic interpretation: ${evidence.tension.interpretation}`,
+      sourceTag: "Astrological synthesis; not a measured behavioral trait",
+      field: "tension",
+    });
+    if (evidence.trajectory && evidence.trajectory.text) body.push({
+      text: evidence.trajectory.text,
+      sourceTag: "Computed transit search and its stated limits",
+      field: "trajectory",
+    });
+    if (evidence.falsifier && evidence.falsifier.text) body.push({
+      text: evidence.falsifier.text,
+      sourceTag: "Self-observation exercise; observations can disagree",
+      field: "falsifier",
+    });
+    if (Array.isArray(evidence.resonance) && evidence.resonance.length) body.push({
+      text: `Read alongside ${evidence.resonance.map(r => r.separationArcsec !== null ? `${r.body} (geometric separation ${r.separationArcsec} arcseconds)` : r.body).join("; ")}. These cross-references connect computed placements; they do not establish a psychological correlation.`,
+      sourceTag: "Chart cross-references; integer separations",
+      field: "resonance",
+    });
+  }
+
   return {
     title: `${p.name} in ${sign}`,
     subtitle,
     body,
+    evidence,
   };
 }
 
@@ -294,7 +371,7 @@ function rigorousFor(card, chart) {
     { label: "card lane-13",     value: card.laneR13, note: BOUNDARY_LANE_NAMES[card.laneR13] },
     { label: "resonance ρ",      value: card.resonance.toFixed(4) },
     { label: "Δ to Sun",         value: card.aspect
-      ? `${card.aspect.angle}° ± ${card.aspect.sep.toFixed(3)}° (${card.aspect.family})`
+      ? `target ${card.aspect.angle}°; deviation ${readingAngle(card.aspect.sep)}; allowed orb ${readingAngle(card.aspect.orb)} (${card.aspect.family})`
       : "—" },
   ];
 }
@@ -309,7 +386,7 @@ const BOUNDARY_LANE_NAMES = [
 ];
 
 Object.assign(window, {
-  readingFor, rigorousFor, roman,
+  readingFor, rigorousFor, roman, cardReadingEvidence, readingAngle,
   SHADOW_LANE_NAMES, BOUNDARY_LANE_NAMES,
   DIGNITY_STATEMENT, ASPECT_FN, PLANET_FN,
 });

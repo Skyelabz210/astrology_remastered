@@ -234,7 +234,7 @@ test('OpenRouter free vision integration generates and saves a grounded behavior
   await page.getByText('Interpreter settings · OpenRouter', { exact: true }).click();
   await page.getByLabel('OpenRouter API key', { exact: true }).fill('test-key');
   await page.getByRole('button', { name: 'Connect OpenRouter', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: /Connected/ })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: /Configured/ })).toBeVisible();
   await expect(page.getByLabel('OpenRouter API key', { exact: true })).toHaveValue('');
   await page.getByLabel(/Send my birth data/).check();
   await page.getByRole('button', { name: 'Cast the spread' }).click();

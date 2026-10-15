@@ -1,0 +1,36 @@
+import { test, expect } from '@playwright/test';
+
+test('local chart evidence, linked readings, exported text and scrollable card backs agree', async ({ page }) => {
+  await page.route('https://**/*', route => route.abort());
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/resonance-spread.html');
+  await page.getByRole('button', { name: /Cast the spread/i }).click();
+  await expect(page.locator('.cs-local-line').first()).toContainText(/\d+°\d+′\d+″/);
+  await expect(page.locator('.cs-local-reading')).toContainText('counterexample');
+  await expect(page.locator('.cs-local-reading')).toContainText('set this interpretation aside');
+  const linked = page.getByRole('navigation', { name: 'Related placement readings' }).getByRole('button').first();
+  await expect(linked).toBeVisible();
+  const target = (await linked.innerText()).replace(/^Read /,'').split(' · ')[0];
+  await linked.click();
+  await expect(page.locator('.cs-title')).toContainText(target);
+  const anchor = (await page.locator('.cs-local-line').first().innerText()).split(' — ')[0];
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'export', exact: true }).click();
+  const file = await download;
+  const { readFile } = await import('node:fs/promises');
+  const text = await readFile(await file.path(),'utf8');
+  expect(text).toContain(anchor);
+  expect(text).toContain('counterexample');
+  await page.getByRole('button', { name: 'full spread', exact: true }).click();
+  const card = page.locator('.zc').first();
+  await card.click();
+  await expect(card).toHaveAttribute('aria-pressed','true');
+  const reading = card.getByRole('region', { name: /^Full reading for/ });
+  await reading.focus();
+  await reading.press('End');
+  expect(await reading.evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
+  expect(await reading.evaluate(el => el.scrollHeight > el.clientHeight && el.scrollTop > 0)).toBe(true);
+  await expect(card).toHaveAttribute('aria-pressed','true');
+  expect(errors).toEqual([]);
+});

@@ -30,10 +30,13 @@ function LifeChaptersEditor({
     }]);
   };
   const remove = (index) => onChange(rows.filter((_, i) => i !== index));
-  const invalidRows = rows.reduce((out, row, index) => {
-    if (row.startISO && row.endISO && row.endISO <= row.startISO) out.push(index);
+  const rowErrors = rows.reduce((out, row, index) => {
+    if (!window.chapterCity(row.placeKey)) out[index] = "Choose a listed place before saving this chapter.";
+    else if (Number.isNaN(window.parseChapterDate(row.startISO, null))) out[index] = "The start date must be a real calendar date.";
+    else if (Number.isNaN(window.parseChapterDate(row.endISO, null))) out[index] = "The end date must be a real calendar date.";
+    else if (row.startISO && row.endISO && row.endISO <= row.startISO) out[index] = "The end date must be later than the start date.";
     return out;
-  }, []);
+  }, {});
   const hasSavedProfile = !!(profileState && profileState.savedAt);
 
   return (
@@ -55,7 +58,7 @@ function LifeChaptersEditor({
           <p className="profile-empty">No life chapters yet. Your birthplace remains the location for every chart.</p>
         )}
         {rows.map((row, index) => {
-          const invalid = invalidRows.includes(index);
+          const invalid = !!rowErrors[index];
           return (
             <div className="profile-chapter" key={row.id || index}>
               <div className="profile-chapter-title">
@@ -82,7 +85,7 @@ function LifeChaptersEditor({
               <label className="profile-row-note"><input type="checkbox" checked={row.approximate === true} onChange={(event) => update(index, "approximate", event.target.checked)} /> Dates are approximate</label>
               <p className={`profile-row-note ${invalid ? "is-error" : ""}`}>
                 {invalid
-                  ? "The end date must be later than the start date."
+                  ? rowErrors[index]
                   : row.endISO ? "This end date is exclusive; the next chapter can begin on this date." : "Leave Until blank if this is your current place."}
               </p>
             </div>
@@ -93,7 +96,7 @@ function LifeChaptersEditor({
       <div className="profile-actions">
         {onApplyAlpha && <button type="button" className="profile-add" onClick={onApplyAlpha}>use alpha journey · approximate dates</button>}
         <button type="button" className="profile-add" onClick={add}>+ add a life chapter</button>
-        <button type="button" className="profile-save" disabled={invalidRows.length > 0} onClick={onSave}>save profile locally</button>
+        <button type="button" className="profile-save" disabled={Object.keys(rowErrors).length > 0} onClick={onSave}>save profile locally</button>
         {hasSavedProfile && (
           <button
             type="button"
@@ -120,7 +123,7 @@ function LifeChapterSummary({ chart, chapters = [] }) {
   const data = React.useMemo(() => {
     if (!chart || typeof window.normalizeChapters !== "function") return null;
     const normalized = window.normalizeChapters(chapters, chart);
-    if (!normalized.chapters.length) return null;
+    if (!normalized.chapters.length && normalized.dropped === 0) return null;
     const nowJd = typeof dateToJD === "function" ? dateToJD(new Date()) : null;
     const active = !chart.timeUnknown && Number.isFinite(nowJd)
       ? window.activeChapter(normalized.chapters, chart, nowJd)
@@ -138,7 +141,7 @@ function LifeChapterSummary({ chart, chapters = [] }) {
       <div>
         <div className="profile-kicker">life chapters · relocated chart</div>
         <h2 id="chapter-summary-title">
-          {data.active ? `Current place: ${data.active.place.label}` : "Residence history saved"}
+          {data.active ? `Current place: ${data.active.place.label}` : data.chapters.length ? "Residence history saved" : "No usable residence history"}
         </h2>
       </div>
       <div className="chapter-summary-lines">

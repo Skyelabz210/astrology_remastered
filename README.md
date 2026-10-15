@@ -1,6 +1,6 @@
 # Astrology Remastered
 
-Release **2026.10 · v1.0.0** appears in the bottom-right corner of every page
+Release **2026.10 · v1.1.0** appears in the bottom-right corner of every page
 and in exported calculation/ZIP metadata. When cutting a new release, update
 `project/src/present/release.js` and the version in `project/package.json` /
 `project/package-lock.json`, then rebuild the standalone pages.
@@ -15,13 +15,17 @@ Astronomy Engine for ten planets, mean elements for lunar nodes and Lilith, and
 omits unsupported Chiron by default. See the [whole-app coverage and personal-reading audit](project/docs/FULL_APP_AUDIT.md) and [Persona repair report](project/docs/PERSONA_ACCURACY_REPAIR.md).
 
 ```
-6838/6838 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+7319/7319 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 The test banner records automated checks, not proof of every mathematical or interpretive claim in this repository.
 See [`project/STATUS.md`](project/STATUS.md) for current layer classification and
 [`project/REMEDIATION_LEDGER.md`](project/REMEDIATION_LEDGER.md) for the
 corrective-pass history (P1–P28).
+
+The first chart run now creates a [living behavioral avatar](project/docs/LIVING_AVATAR.md), with user goals, cognitive preferences, reflection quests, check-ins, feedback and participation XP. It evolves through authored observations and retains inspectable sources; private notes require a separate opt-in before AI sharing.
+
+The version-2 reading evidence schema connects exact displayed placements, all natal contacts, traditional condition, bounded transit trajectories, counterexample prompts and linked placements. See the [system reading audit and improvement steps](project/docs/SYSTEM_READING_AUDIT.md) and [measured technique access map](project/docs/TECHNIQUE_ACCESS_MAP.md).
 
 ### Documentation map
 
@@ -140,7 +144,8 @@ selected synthetic demonstration is labelled with `window.EPHEMERIS_MODE =
 switching to invented positions.
 
 `agent.jsx`'s optional LLM chart-interpretation feature defaults to off and
-sends the chart data to `window.claude.complete()` only after the reader opts in. It was originally
+sends chart data to the configured OpenRouter model only after the reader opts in.
+A legacy host interpreter remains available where the host supplies it. It was originally
 shipped as a disclosed, unresolved finding — no reachable off-switch existed
 in a standalone deployment, and (found while fixing it) some screens ignored
 the in-repo toggle entirely. Both gaps are now fixed: a real checkbox on the

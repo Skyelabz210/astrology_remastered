@@ -106,7 +106,10 @@ export const DIVISIONS = [
   { id: "degree", n: 360n, label: "Degrees", traditions: ["all"] },
   { id: "minute", n: 21600n, label: "Arcminutes", traditions: ["all"] },
   { id: "arcsec", n: RING, label: "Arcseconds (register unit)", traditions: ["all"] },
-  { id: "monomoiria", n: 4320n, label: "Monomoiriai (12 per degree)", traditions: ["hellenistic"] },
+  // Preserve the legacy divisor API; this proxy is not the traditional
+  // single-degree ruler assignment called monomoiria.
+  { id: "monomoiria", n: 4320n, label: "Legacy equal 12-per-degree proxy", traditions: ["hellenistic"],
+    convention: "Uniform proxy only; traditional monomoiria assign rulers to single degrees and are not implemented" },
 
   // Vedic / Jyotiṣa — the ṣoḍaśavarga
   { id: "hora", n: 24n, label: "Horā D-2", traditions: ["vedic"] },
@@ -126,7 +129,10 @@ export const DIVISIONS = [
   { id: "nakshatra", n: 27n, label: "Nakṣatras", traditions: ["vedic"] },
 
   // Krishnamurti Paddhati
-  { id: "kp_sub", n: 249n, label: "KP subs (Vimśottarī-proportioned)", traditions: ["kp"] },
+  // Actual sublord widths are unequal: nakshatra arc times period/120.
+  // Non-closure of this legacy uniform proxy says nothing about those widths.
+  { id: "kp_sub", n: 249n, label: "Legacy uniform 249-cut KP proxy", traditions: ["kp"],
+    convention: "Uniform proxy only; actual unequal Vimshottari-proportioned sublord boundaries are not implemented" },
 
   // Mesoamerican
   { id: "tzolkin", n: 260n, label: "Tzolk'in sacred round (13 × 20)", traditions: ["maya"] },
@@ -423,7 +429,7 @@ export const VARIANTS = [
     frame: "krishnamurti", houses: ["placidus"],
     aspects: ["ptolemaic"],
     divisions: ["sign", "nakshatra", "navamsa", "kp_sub"],
-    note: "Sidereal with the KP ayanamsa; 249 subs proportioned to the Viṁśottarī years.",
+    note: "Registry only: J2000 KP frame and a legacy uniform 249-cut proxy; actual unequal Vimshottari sublord assignments and date-dependent ayanamsa are not implemented.",
   },
   {
     id: "maya", name: "Maya / Mesoamerican", tradition: "maya",
@@ -509,7 +515,7 @@ export function variantReport(id) {
   const f = frame(v.frame);
   const divisions = v.divisions.map((d) => {
     const dv = division(d);
-    return { id: dv.id, label: dv.label, ...divisionReport(dv.n) };
+    return { id: dv.id, label: dv.label, ...(dv.convention ? { convention: dv.convention } : {}), ...divisionReport(dv.n) };
   });
   const houses = v.houses.map((h) => HOUSE_SYSTEMS.find((s) => s.id === h)).filter(Boolean);
   const aspects = v.aspects.map((a) => {

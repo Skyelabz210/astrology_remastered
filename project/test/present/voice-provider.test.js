@@ -28,9 +28,10 @@ const voiceSrc = readFileSync(join(ROOT, "voice.jsx"), "utf8");
  * voice list.
  */
 function makeSandbox({ eleven = null, voices = [], audioFails = false } = {}) {
-  const calls = { speak: [], cancel: 0, audioPlay: 0, audioSrc: [], pause: 0, synthesize: [] };
+  const calls = { speak: [], cancel: 0, audioPlay: 0, audioSrc: [], pause: 0, synthesize: [], revoked: [] };
   const sandbox = {};
   sandbox.window = sandbox;
+  sandbox.AbortController = AbortController;
   sandbox.React = {
     useState: (init) => [typeof init === "function" ? init() : init, () => {}],
     useRef: (init) => ({ current: init }),
@@ -61,7 +62,7 @@ function makeSandbox({ eleven = null, voices = [], audioFails = false } = {}) {
   sandbox.Blob = function (parts, opts) { this.parts = parts; this.type = opts && opts.type; };
   sandbox.URL = {
     createObjectURL: () => `blob:stub-${calls.synthesize.length}`,
-    revokeObjectURL: () => {},
+    revokeObjectURL: url => { calls.revoked.push(url); },
   };
   if (eleven) sandbox.ElevenLabs = eleven(calls);
   vm.createContext(sandbox);
@@ -154,6 +155,53 @@ export async function run() {
     await sandbox.speakEleven("Same words.", { style: "jedi" });
     await sandbox.speakEleven("Same words.", { style: "sith" });
     t("a different style is a different cache entry", calls.synthesize.length === 2);
+  }
+  {
+    let account = "account_A";
+    const { sandbox, calls } = makeSandbox({ eleven: recorded => ({ ...workingEleven(recorded), readKey: () => account }) });
+    await sandbox.speakEleven("Same words and voice ID.");
+    account = "account_B";
+    await sandbox.speakEleven("Same words and voice ID.");
+    t("changing account evicts synthesized audio even when the voice ID is unchanged",
+      calls.synthesize.length === 2 && calls.revoked.length === 1);
+  }
+  {
+    let finish, signal;
+    let started;
+    const began = new Promise(resolve => { started = resolve; });
+    const { sandbox, calls } = makeSandbox({ eleven: recorded => ({ ...workingEleven(recorded),
+      synthesize: async args => {
+        signal = args.signal;
+        started();
+        return new Promise(resolve => { finish = resolve; });
+      },
+    }) });
+    const speaking = sandbox.speakEleven("Cancelled before audio exists.");
+    await began;
+    sandbox.stopSpeech();
+    finish(new ArrayBuffer(8));
+    const result = await speaking;
+    t("stopping voice aborts synthesis and prevents late playback or fallback",
+      signal.aborted && result === null && calls.audioPlay === 0 && calls.speak.length === 0);
+  }
+  {
+    let account = "account_A", finish;
+    let started;
+    const began = new Promise(resolve => { started = resolve; });
+    const { sandbox, calls } = makeSandbox({ eleven: recorded => ({ ...workingEleven(recorded),
+      readKey: () => account,
+      resolveVoiceId: async () => {
+        started();
+        return new Promise(resolve => { finish = resolve; });
+      },
+    }) });
+    const speaking = sandbox.speakEleven("Account changed while resolving.");
+    await began;
+    account = "account_B";
+    finish({ voiceId: "old_voice", name: "Nerissa" });
+    const result = await speaking;
+    t("key replacement during resolution prevents synthesis with the old account",
+      result === null && calls.synthesize.length === 0 && calls.audioPlay === 0 && calls.speak.length === 0);
   }
 
   // ── every failure mode falls back, none goes silent ──────────────────
@@ -256,6 +304,7 @@ export async function run() {
     // with no SpeechSynthesis at all.
     const sandbox = {};
     sandbox.window = sandbox;
+    sandbox.AbortController = AbortController;
     sandbox.React = {
       useState: (init) => [typeof init === "function" ? init() : init, () => {}],
       useRef: (init) => ({ current: init }),
@@ -445,6 +494,7 @@ export async function run() {
     const emit = (ev) => (listeners[ev] || []).slice().forEach(fn => fn());
     const sandbox = {};
     sandbox.window = sandbox;
+    sandbox.AbortController = AbortController;
     sandbox.React = {
       useState: (init) => [typeof init === "function" ? init() : init, () => {}],
       useRef: (init) => ({ current: init }),
@@ -481,6 +531,72 @@ export async function run() {
       };
     },
   });
+
+  {
+    const { sandbox, calls } = narrationSandbox({ eleven: narrationEleven });
+    const prefix = "Identical introduction and chart narrative. ".repeat(5);
+    const first = { text: prefix + "Mercury in Aries.", offsets: [] };
+    const second = { text: prefix + "Mercury in Virgo.", offsets: [] };
+    const ctx = { EL: sandbox.ElevenLabs, apiKey: "k", voiceId: "v", modelId: "m", settings: {} };
+    await sandbox.renderNarrationChunk(first, ctx);
+    await sandbox.renderNarrationChunk(second, ctx);
+    t("same-length narratives with an identical opening synthesize their distinct endings",
+      first.text.length === second.text.length && calls.timestamped.length === 2
+      && calls.timestamped[0].text.endsWith("Aries.") && calls.timestamped[1].text.endsWith("Virgo."));
+  }
+  {
+    const { sandbox, calls } = narrationSandbox({ eleven: narrationEleven });
+    const first = { text: "Same narrated words.", offsets: [{ index: 0, cardIdx: 0, start: 0, end: 19 }] };
+    const second = { text: first.text, offsets: [{ index: 7, cardIdx: 4, start: 5, end: 19 }] };
+    const ctx = { EL: sandbox.ElevenLabs, apiKey: "k", voiceId: "v", modelId: "m", settings: {} };
+    const a = await sandbox.renderNarrationChunk(first, ctx);
+    const b = await sandbox.renderNarrationChunk(second, ctx);
+    t("cached audio recomputes cues for the current segment and card layout",
+      calls.timestamped.length === 1 && a.timings[0].index === 0 && b.timings[0].index === 7
+      && b.timings[0].cardIdx === 4 && b.timings[0].startSec > a.timings[0].startSec);
+  }
+  {
+    const { sandbox } = narrationSandbox({ eleven: recorded => ({ ...narrationEleven(recorded, true),
+      synthesizeWithTimestamps: async () => ({ audio: new ArrayBuffer(8),
+        alignment: { character_start_times_seconds: [0, 1, 2, 3] },
+        normalizedAlignment: { character_start_times_seconds: [0, 8, 9, 10] },
+      }),
+    }) });
+    const chunk = { text: "text", offsets: [{ index: 0, cardIdx: 0, start: 1, end: 4 }] };
+    const ctx = { EL: sandbox.ElevenLabs, apiKey: "k", voiceId: "v", modelId: "m", settings: {} };
+    const entry = await sandbox.renderNarrationChunk(chunk, ctx);
+    t("narrative cues prefer submitted-text alignment over normalized character indices", entry.timings[0].startSec === 1);
+  }
+  {
+    let signal, rejectAudio, started;
+    const began = new Promise(resolve => { started = resolve; });
+    const { sandbox, calls } = narrationSandbox({ eleven: recorded => ({ ...narrationEleven(recorded, true),
+      synthesizeWithTimestamps: args => {
+        signal = args.signal;
+        started();
+        return new Promise((_resolve, reject) => { rejectAudio = reject; });
+      },
+    }) });
+    const handle = sandbox.speakNarrative(narrativeFixture(3), { provider: "elevenlabs" });
+    await began;
+    handle.stop();
+    const cancelled = new Error("aborted"); cancelled.name = "AbortError";
+    rejectAudio(cancelled);
+    await tick();
+    t("stopping a narrative aborts transport and prevents duplicate synthesis or browser fallback",
+      signal.aborted && calls.synth.length === 0 && calls.speak.length === 0);
+  }
+  {
+    const { sandbox, calls } = narrationSandbox({ eleven: recorded => ({ ...narrationEleven(recorded, true),
+      synthesizeWithTimestamps: async () => {
+        const error = new Error("Quota exceeded."); error.status = 429; throw error;
+      },
+    }) });
+    sandbox.speakNarrative(narrativeFixture(2), { provider: "elevenlabs" });
+    await tick(); await tick();
+    t("a timestamps quota failure falls back once instead of retrying paid plain synthesis",
+      calls.synth.length === 0 && calls.speak.length === 2);
+  }
 
   {
     const { sandbox, calls, audio, emit } = narrationSandbox({ eleven: narrationEleven });

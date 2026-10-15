@@ -216,6 +216,13 @@ export async function run() {
   const md = buildReadingMarkdown(chart, chart.cards);
   t("the export includes the whole-chart synthesis via the chart's :latest pointer",
     md.includes("The chart as one") && md.includes(r7), md.slice(0, 250));
+  delete sb.window.claude;
+  t('a verified cached synthesis remains available when the interpreter host is absent',
+    await interpretChart(chart,chart.jd) === r7 && calls === 4);
+  const cachedCard = chart.cards[0];
+  sb.remember(sb.cacheKey(cachedCard,chart),'A previously verified card reading.');
+  t('a verified cached card remains available without a live interpreter',
+    await sb.interpretCard(cachedCard,chart) === 'A previously verified card reading.');
 
   return rows;
 }

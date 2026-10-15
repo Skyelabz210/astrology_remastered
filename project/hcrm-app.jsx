@@ -84,22 +84,74 @@ function HcrmStatusBanners({ chart, birth, banners, onDismiss }) {
   );
 }
 
+// The register console is another view of the same local profile. When
+// older profiles have no picker draft, reconstruct it in the birth zone
+// instead of opening the repository's alpha birth on the next Back action.
+function hcrmBirthForm(birth) {
+  const date = new Date(birth.dateISO);
+  if (!Number.isFinite(date.getTime())) return null;
+  let parts;
+  try {
+    parts = new Intl.DateTimeFormat('en-GB', { timeZone: birth.tz || 'UTC',
+      year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+      hourCycle: 'h23' }).formatToParts(date);
+  } catch { return null; }
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const hour = Number(values.hour);
+  return { year: Number(values.year), month: Number(values.month), day: Number(values.day),
+    hour12: hour % 12 || 12, minute: Number(values.minute), meridiem: hour < 12 ? 'AM' : 'PM',
+    place: birth.placeKey || birth.placeLabel, subjectName: birth.subjectName || 'You',
+    timeUnknown: !!birth.timeUnknown };
+}
+
 function HCRMApp() {
-  const [screen, setScreen] = $haState("console");   // preloaded chart on open
-  const [birth, setBirth] = $haState(HCRM_DEFAULTS);
-  const [formState, setFormState] = $haState(null);
+  const [storedProfile] = $haState(() => window.ProfileStore ? window.ProfileStore.load() : null);
+  const [screen, setScreen] = $haState("console");
+  const [birth, setBirth] = $haState(() => ({ ...HCRM_DEFAULTS,
+    ...(storedProfile && storedProfile.settings || {}) }));
+  const [formState, setFormState] = $haState(() => storedProfile && storedProfile.birthForm || hcrmBirthForm(birth));
+  const [chapterDrafts, setChapterDrafts] = $haState(() => ({
+    [window.chapterBirthKey(birth)]: storedProfile && Array.isArray(storedProfile.chapters)
+      ? storedProfile.chapters : window.alphaLifeChapters(birth),
+  }));
+  const chaptersFor = person => window.chapterRowsFor(chapterDrafts, person);
+  const chapters = chaptersFor(birth);
+  const onChaptersChange = (rows, person = birth) => {
+    const owner = window.chapterBirthKey(person);
+    if (owner) setChapterDrafts(prior => ({ ...prior, [owner]: rows }));
+  };
+  const [profileState, setProfileState] = $haState({
+    savedAt: storedProfile && storedProfile.savedAt || null,
+    message: storedProfile ? 'Your local profile is loaded.' : 'Alpha chart example; enter your own birth details to use another profile.',
+    error: false,
+  });
   const { banners, pushError, dismiss } = useErrorBanner();
 
-  const onCast = (payload) => {
-    setBirth({
+  const birthForPayload = payload => ({ ...birth,
       dateISO: payload.dateISO, lat: payload.lat, lng: payload.lng,
       tz: payload.tz || null,
       placeLabel: payload.placeLabel, placeKey: payload.placeKey || payload.placeLabel, subjectName: payload.subjectName || "You", houseSystem: birth.houseSystem, sect: birth.sect,
       timeUnknown: !!payload.timeUnknown,
       dstNote: payload.dstNote || null,
-    });
+  });
+  const onCast = (payload) => {
+    onChaptersChange(chaptersFor(payload), payload);
+    setBirth(birthForPayload(payload));
     setFormState(payload.formState);
     setScreen("console");
+  };
+  const onSaveProfile = payload => {
+    const nextBirth = birthForPayload(payload), rows = chaptersFor(payload);
+    if (!window.ProfileStore || !window.ProfileStore.save(nextBirth, rows, payload.formState)) {
+      setProfileState({ savedAt: null, message: 'This browser blocked local profile storage.', error: true });
+      return;
+    }
+    onChaptersChange(rows, payload); setBirth(nextBirth); setFormState(payload.formState);
+    setProfileState({ savedAt: new Date().toISOString(), message: 'Saved on this device. Nothing was uploaded.', error: false });
+  };
+  const onClearProfile = () => {
+    if (window.ProfileStore) window.ProfileStore.clear();
+    setProfileState({ savedAt: null, message: 'Saved copy removed. The current form is unchanged.', error: false });
   };
 
   const chart = $haMemo(() => {
@@ -109,15 +161,18 @@ function HCRMApp() {
         dateISO: birth.dateISO, lat: birth.lat, lng: birth.lng,
         tz: birth.tz || null,
         houseSystem: birth.houseSystem, sect: birth.sect, placeLabel: birth.placeLabel, placeKey: birth.placeKey, subjectName: birth.subjectName || "You",
-        timeUnknown: !!birth.timeUnknown,
+        timeUnknown: !!birth.timeUnknown, orbScale: birth.orbScale || 1,
       });
     } catch (e) { pushError(e, "register map"); return null; }
   }, [screen, birth, pushError]);
+  const personal = window.usePersonalReading(chart, chapters, { ...birth, agentOn: false });
 
   if (screen === "landing") {
     return (
       <HBoundary>
-        <Landing initial={formState} onCast={onCast} mode="hcrm" />
+        <Landing initial={formState} onCast={onCast} mode="hcrm"
+          chapters={chapters} chaptersForBirth={chaptersFor} onChaptersChange={onChaptersChange}
+          profileState={profileState} onSaveProfile={onSaveProfile} onClearProfile={onClearProfile} />
       </HBoundary>
     );
   }
@@ -136,10 +191,12 @@ function HCRMApp() {
   return (
     <HBoundary>
       <HcrmStatusBanners chart={chart} birth={birth} banners={banners} onDismiss={dismiss} />
-      <window.PersonalArchiveButton chart={chart} />
+      <p role="note">{storedProfile ? 'Register view of your saved local birth profile.' : 'Alpha chart example — use Back to enter your own birth profile.'}</p>
+      <window.PersonalArchiveButton chart={personal.chart || chart} context={personal.context} />
       <HCRMConsole chart={chart} birthLabel={label} onBack={() => setScreen("landing")} />
     </HBoundary>
   );
 }
 
+Object.assign(window, { hcrmBirthForm });
 ReactDOM.createRoot(document.getElementById('root')).render(<HCRMApp />);

@@ -243,9 +243,14 @@ export function run() {
     "Ketu 7 · Mercury 17 · Saturn 19");
 
   // ── Krishnamurti Paddhati ─────────────────────────────────────────
-  t("KP 249 subs do NOT close — 249 = 3 · 83, alien factor 83",
+  t("legacy uniform 249-cut proxy does NOT close — not actual unequal KP subs",
     !closes(div("kp_sub")) && divisionClosure(249n).alien_factor === "83",
     "defect " + defect(249n) + "″");
+  const actualKpWidths = VIMSHOTTARI_YEARS.map(({ years }) => 48000n * years / 120n);
+  t("actual unequal KP widths sum to a nakshatra", actualKpWidths.reduce((a, b) => a + b, 0n) === 48000n);
+  for (let i = 0; i < actualKpWidths.length; i++)
+    t(`KP ${VIMSHOTTARI_YEARS[i].lord} sublord width lies on the arcsecond lattice`,
+      48000n * VIMSHOTTARI_YEARS[i].years % 120n === 0n);
 
   // ── Medieval / Perso-Arabic ───────────────────────────────────────
   t("Firdāria total = 75 years",

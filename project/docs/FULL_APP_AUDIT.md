@@ -198,3 +198,17 @@ corrections, data/privacy boundaries, and remaining product limitations.
 
 
 Alpha residence journey: Fort Bragg (birth), Wetzlar from 1980-10-22 for 13 years, Fort Leonard Wood from 1993-10-22 for three years, San Antonio from 1996-10-22 onward. Move dates were approved as approximate and remain editable; UTC-midnight boundaries do not assert an arrival time. This fixture is restricted to the alpha birth epoch and coordinates. Saved custom histories are preserved, additional chapters are available to every user, and changing the birth record discards unedited inherited chapters. Natal birthplace stays fixed; return charts select residence on the return date. Approximation flags are retained in saved profiles and reading inputs.
+
+
+## Corrective release 1.1.0
+
+The deeper reading audit is [SYSTEM_READING_AUDIT.md](SYSTEM_READING_AUDIT.md).
+It supersedes the sign-only behavioral baseline and records independent
+reproductions missed by the preceding green suite: homeward residence selection,
+chapter ownership while editing, impossible dates, polar horizon branch/status,
+Grand Cross ordering, mean-apogee motion and Ascendant rounding. Shared chart
+evidence now supplies local cards, speech, behavioral profiles and exports.
+See [CALCULATION_CONVENTIONS.md](CALCULATION_CONVENTIONS.md) for exact conventions
+and [TECHNIQUE_ACCESS_MAP.md](TECHNIQUE_ACCESS_MAP.md) for measured navigation
+rather than an implementation inventory. Historical target calculations can be
+saved with their actual scan evidence; the standalone HCRM profile is hydrated.

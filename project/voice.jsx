@@ -14,6 +14,8 @@
 //     Used whenever ElevenLabs cannot serve: no key, no network, a refused
 //     request, or the reader picking a system voice explicitly. Narration
 //     never goes silent just because a network call failed.
+//     A browser voice with localService !== true may send the reading to
+//     its own speech service; browser fallback is not an offline guarantee.
 //
 // GESTURE / AUTOPLAY, which is why the odd-looking prime()/retrigger() pair
 // exists and why both providers need it:
@@ -136,6 +138,8 @@ const __eleven = {
   url: null,          // object URL currently loaded into it
   cache: new Map(),   // request key -> object URL
   seq: 0,             // request generation, so a stale synth can't play late
+  controller: null,
+  accountKey: null,    // memory only; account changes evict synthesized audio
 };
 
 const ELEVEN_CACHE_MAX = 24;
@@ -162,7 +166,24 @@ function primeElevenAudio() {
 }
 
 function cacheKeyFor(text, voiceId, modelId, settings) {
-  return [voiceId, modelId, settings.speed, settings.stability, settings.style, text].join("|");
+  return JSON.stringify([voiceId, modelId, settings, text]);
+}
+
+function speechAbortController() {
+  return typeof window !== "undefined" && typeof window.AbortController === "function" ? new window.AbortController() : null;
+}
+
+function syncElevenAccount(apiKey) {
+  if (__eleven.accountKey === apiKey) return;
+  for (const url of __eleven.cache.values()) {
+    try { window.URL.revokeObjectURL(url); } catch { /* already revoked */ }
+  }
+  __eleven.cache.clear();
+  for (const entry of __narration.cache.values()) {
+    try { window.URL.revokeObjectURL(entry.url); } catch { /* already revoked */ }
+  }
+  __narration.cache.clear();
+  __eleven.accountKey = apiKey;
 }
 
 function putCached(key, url) {
@@ -178,6 +199,8 @@ function putCached(key, url) {
 /** Stop ElevenLabs playback (leaves the element unlocked and reusable). */
 function stopEleven() {
   __eleven.seq += 1;
+  if (__eleven.controller) __eleven.controller.abort();
+  __eleven.controller = null;
   const a = __eleven.audio;
   if (!a) return;
   try { a.pause(); a.currentTime = 0; } catch { /* not yet playable */ }
@@ -203,12 +226,21 @@ async function speakEleven(text, opts = {}) {
   const effText = preset.power ? applyPower(text) : text;
   const say = (state, message) => { if (typeof onStatus === "function") onStatus({ state, message }); };
 
+  stopNarration();
+  if (__eleven.controller) __eleven.controller.abort();
+  const controller = speechAbortController();
+  __eleven.controller = controller;
   const generation = ++__eleven.seq;
-  const isStale = () => generation !== __eleven.seq;
+  let apiKey = null;
+  const isStale = () => {
+    if (generation !== __eleven.seq || (controller && controller.signal.aborted)) return true;
+    try { return apiKey !== null && EL.readKey() !== apiKey; } catch { return true; }
+  };
 
   try {
     if (!EL) throw new Error("ElevenLabs module not loaded");
-    const apiKey = EL.readKey();
+    apiKey = EL.readKey();
+    syncElevenAccount(apiKey);
     const settings = EL.voiceSettingsFor(style, rate ?? preset.rate);
     const modelId = elevenModel || EL.DEFAULT_MODEL_ID;
 
@@ -217,6 +249,7 @@ async function speakEleven(text, opts = {}) {
       apiKey,
       name: voiceName || EL.DEFAULT_VOICE_NAME,
       voiceId: elevenVoiceId,
+      signal: controller && controller.signal,
     });
     if (isStale()) return null;
 
@@ -230,6 +263,7 @@ async function speakEleven(text, opts = {}) {
         text: effText,
         modelId,
         voiceSettings: settings,
+        signal: controller && controller.signal,
       });
       if (isStale()) return null;
       url = window.URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
@@ -257,6 +291,8 @@ async function speakEleven(text, opts = {}) {
     say("fallback", `${message} Using the browser voice.`);
     speakBrowser(text, opts);
     return VOICE_PROVIDER_BROWSER;
+  } finally {
+    if (__eleven.controller === controller) __eleven.controller = null;
   }
 }
 
@@ -372,6 +408,7 @@ function speakBrowser(text, { style = "jedi", voiceName, rate, pitch } = {}) {
  */
 function speakNow(text, opts = {}) {
   if (!text) return;
+  stopNarration();
   const provider = resolveProvider(opts.provider);
   if (provider === VOICE_PROVIDER_ELEVEN) {
     stopBrowserSpeech();
@@ -392,6 +429,7 @@ function stopBrowserSpeech() {
 
 /** Stop narration on both providers. */
 function stopSpeech() {
+  stopNarration();
   stopBrowserSpeech();
   stopEleven();
 }
@@ -421,37 +459,54 @@ function stopSpeech() {
 // chunk is synthesized while the current one plays, so the seam between
 // them is the length of a network round trip that already happened.
 
-const __narration = { seq: 0, cache: new Map() };
+const __narration = { seq: 0, cache: new Map(), active: null };
 const NARRATION_CACHE_MAX = 8;
 
 function narrationCacheKey(text, voiceId, modelId, settings) {
-  return [voiceId, modelId, settings.speed, settings.stability, settings.style, text.length, text.slice(0, 120)].join("|");
+  return JSON.stringify([voiceId, modelId, settings, text]);
+}
+
+function stopNarration() {
+  __narration.seq += 1;
+  if (__narration.active) {
+    __narration.active.cancelled = true;
+    if (__narration.active.controller) __narration.active.controller.abort();
+  }
+  __narration.active = null;
 }
 
 /** Synthesize one chunk and work out when each of its segments is spoken. */
 async function renderNarrationChunk(chunk, ctx) {
+  if (ctx.isCancelled && ctx.isCancelled()) throw new Error("Narration cancelled.");
   const key = narrationCacheKey(chunk.text, ctx.voiceId, ctx.modelId, ctx.settings);
   const cached = __narration.cache.get(key);
-  if (cached) return { ...cached, timings: cached.timings || segmentTimingsFromAlignmentSafe(chunk, cached.alignment) };
+  if (cached) return { ...cached, timings: segmentTimingsFromAlignmentSafe(chunk, cached.alignment) };
 
   let audio, alignment = null;
   try {
     const out = await ctx.EL.synthesizeWithTimestamps({
       apiKey: ctx.apiKey, voiceId: ctx.voiceId, text: chunk.text,
       modelId: ctx.modelId, voiceSettings: ctx.settings,
+      signal: ctx.signal,
     });
     audio = out.audio;
-    alignment = out.normalizedAlignment || out.alignment;
+    // Chunk offsets refer to submitted text; prefer its raw alignment over
+    // normalized speech characters, whose indices can differ.
+    alignment = out.alignment || out.normalizedAlignment;
   } catch (err) {
     // A model or plan without the timestamps endpoint must not cost the
     // whole narration — fall back to plain synthesis and time the segments
     // against the clip's duration instead.
-    if (err && (err.code === "no_key" || err.code === "no_voice")) throw err;
+    if (err && (err.code === "no_key" || err.code === "no_voice" || err.code === "timeout"
+      || err.name === "AbortError" || err.name === "TypeError" || [401, 403, 429].includes(err.status) || err.status >= 500)) throw err;
+    if (ctx.isCancelled && ctx.isCancelled()) throw err;
     audio = await ctx.EL.synthesize({
       apiKey: ctx.apiKey, voiceId: ctx.voiceId, text: chunk.text,
       modelId: ctx.modelId, voiceSettings: ctx.settings,
+      signal: ctx.signal,
     });
   }
+  if (ctx.isCancelled && ctx.isCancelled()) throw new Error("Narration cancelled.");
   const url = window.URL.createObjectURL(new Blob([audio], { type: "audio/mpeg" }));
   const entry = { url, alignment, timings: segmentTimingsFromAlignmentSafe(chunk, alignment) };
   __narration.cache.set(key, entry);
@@ -478,6 +533,7 @@ function playNarrationChunk(chunk, entry, ctx) {
     let announced = -1;
 
     const announce = () => {
+      if (ctx.isCancelled && ctx.isCancelled()) return;
       if (!timings || !timings.length) return;
       const now = a.currentTime + 0.06;   // a beat of lead so the card is up as the words land
       let hit = -1;
@@ -502,9 +558,13 @@ function playNarrationChunk(chunk, entry, ctx) {
       a.removeEventListener("loadedmetadata", onMeta);
       a.removeEventListener("ended", onEnded);
       a.removeEventListener("error", onError);
+      if (ctx.signal) ctx.signal.removeEventListener("abort", onAbort);
     };
     const onEnded = () => { cleanup(); resolve(); };
     const onError = () => { cleanup(); reject(new Error("the narration wouldn't play")); };
+    const onAbort = () => { cleanup(); resolve(); };
+    if (ctx.signal && ctx.signal.aborted) { resolve(); return; }
+    if (ctx.signal) ctx.signal.addEventListener("abort", onAbort, { once: true });
 
     a.addEventListener("timeupdate", announce);
     a.addEventListener("loadedmetadata", onMeta);
@@ -515,7 +575,11 @@ function playNarrationChunk(chunk, entry, ctx) {
     a.src = entry.url;
     const started = a.play();
     if (started && typeof started.then === "function") {
-      started.then(() => { if (ctx.onStatus) ctx.onStatus({ state: "speaking", message: "" }); announce(); },
+      started.then(() => {
+        if (ctx.isCancelled && ctx.isCancelled()) return;
+        if (ctx.onStatus) ctx.onStatus({ state: "speaking", message: "" });
+        announce();
+      },
         (err) => { cleanup(); reject(err); });
     } else {
       announce();
@@ -529,6 +593,7 @@ async function speakNarrativeEleven(narrative, opts, state) {
   const style = opts.style || "jedi";
   const preset = STYLE_PRESETS[style] || STYLE_PRESETS.jedi;
   const apiKey = EL.readKey();
+  syncElevenAccount(apiKey);
   const settings = EL.voiceSettingsFor(style, opts.rate ?? preset.rate);
   const modelId = opts.elevenModel || EL.DEFAULT_MODEL_ID;
   const say = (s, message) => { if (opts.onStatus) opts.onStatus({ state: s, message }); };
@@ -538,26 +603,35 @@ async function speakNarrativeEleven(narrative, opts, state) {
     apiKey,
     name: opts.voiceName || EL.DEFAULT_VOICE_NAME,
     voiceId: opts.elevenVoiceId || "",
+    signal: state.controller && state.controller.signal,
   });
-  if (state.cancelled) return null;
+  const isCancelled = () => {
+    try { state.cancelled = state.cancelled || state.generation !== __narration.seq || EL.readKey() !== apiKey; }
+    catch { state.cancelled = true; }
+    if (state.cancelled && state.controller && !state.controller.signal.aborted) state.controller.abort();
+    return state.cancelled;
+  };
+  if (isCancelled()) return null;
 
   const maxChars = (typeof NARRATIVE_MAX_CHARS === "number") ? NARRATIVE_MAX_CHARS : 4500;
   const chunks = chunkNarrative(narrative.segments, maxChars);
   const ctx = {
     EL, apiKey, settings, modelId, voiceId: resolved.voiceId,
     onSegment: opts.onSegment, onStatus: opts.onStatus,
+    signal: state.controller && state.controller.signal, isCancelled,
   };
 
   say("synthesizing", `shaping the reading with ${resolved.name || opts.voiceName}…`);
   let pending = renderNarrationChunk(chunks[0], ctx);
   for (let i = 0; i < chunks.length; i++) {
     const entry = await pending;
-    if (state.cancelled) return null;
+    if (isCancelled()) return null;
     // Start the NEXT chunk rendering before playing this one, so the seam
     // between them costs nothing.
     pending = (i + 1 < chunks.length) ? renderNarrationChunk(chunks[i + 1], ctx) : null;
+    if (pending) pending.catch(() => {}); // observe prefetch failures while this clip plays
     await playNarrationChunk(chunks[i], entry, ctx);
-    if (state.cancelled) return null;
+    if (isCancelled()) return null;
   }
   say("idle", "");
   if (opts.onEnd) opts.onEnd();
@@ -606,10 +680,13 @@ function speakNarrativeBrowser(narrative, opts, state) {
  */
 function speakNarrative(narrative, opts = {}) {
   if (!narrative || !narrative.segments || !narrative.segments.length) return null;
-  const state = { cancelled: false };
+  stopSpeech();
+  const state = { cancelled: false, controller: speechAbortController() };
   const provider = resolveProvider(opts.provider);
   __narration.seq += 1;
   const generation = __narration.seq;
+  state.generation = generation;
+  __narration.active = state;
   const guard = () => { state.cancelled = state.cancelled || generation !== __narration.seq; return state.cancelled; };
 
   const handle = {

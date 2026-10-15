@@ -4,6 +4,7 @@ import vm from "node:vm";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { transformSync } from "esbuild";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
@@ -128,5 +129,100 @@ export async function run() {
   t("misspelled Wezlar resolves to Wetzlar without borrowing a city", sb.chapterCity("Wezlar").name === "Wetzlar");
   const alphaReturn = sb.returnChart(natal, "Sun", targetJd, alpha);
   t("current alpha returns use San Antonio while natal remains Bragg", alphaReturn.chart.birth.lat === 29.4241 && natal.birth.lat === 35.1408);
+
+  const returnHome = [
+    { placeKey: "Wetzlar · DE", startISO: "1980-10-22", endISO: "1993-10-22" },
+    { placeKey: "Fort Liberty (Bragg) · NC", startISO: "1993-10-22", endISO: "" },
+    { placeKey: "London · GB", startISO: "2035-01-01", endISO: "" },
+  ];
+  const homeContext = sb.chapterAware(natal, returnHome, targetJd);
+  t("moving back home replaces the earlier foreign residence", homeContext.active.place.placeKey === natal.birth.placeKey);
+  t("the natal-place chapter is retained before a future move", homeContext.chapters.length === 3 && homeContext.active.place.placeKey !== "London · GB");
+  t("residence immediately before returning home remains Wetzlar", sb.chapterAware(natal, returnHome,
+    sb.dateToJD(new Date("1993-10-21T23:59:59Z"))).active.place.placeKey === "Wetzlar · DE");
+  t("residence on the exact return-home boundary is the birthplace", sb.chapterAware(natal, returnHome,
+    sb.dateToJD(new Date("1993-10-22T00:00:00Z"))).active.place.placeKey === natal.birth.placeKey);
+  for (const body of ["Sun", "Moon"]) {
+    const r = sb.returnChart(natal, body, targetJd, returnHome);
+    t(`${body} return after moving home uses the natal coordinates`, r.chart.birth.lat === natal.birth.lat && r.chart.birth.lng === natal.birth.lng && r.placeLabel === natal.birth.placeLabel);
+  }
+  for (const [field, value] of [["startISO", "garbage"], ["endISO", "garbage"], ["startISO", "2025-02-30"], ["endISO", "2024-04-31"], ["startISO", "2025-13-01"], ["startISO", "2025-02-30T12:00:00Z"], ["startISO", "2025-01-01T24:00:00Z"]]) {
+    const invalid = sb.normalizeChapters([{ placeKey: "Wetzlar · DE", startISO: "2000-01-01", endISO: "", [field]: value }], natal);
+    t(`invalid chapter ${field} ${value} cannot become residence coverage`, invalid.dropped === 1 && invalid.chapters.length === 0);
+  }
+  t("a valid leap-day chapter date is preserved", sb.parseChapterDate("2024-02-29", null) === sb.dateToJD(new Date("2024-02-29T00:00:00Z")));
+  t("year-only boundaries retain their documented noon convention", sb.parseChapterDate("1981", null) === sb.dateToJD(new Date("1981-01-01T12:00:00Z")));
+  t("year-month boundaries retain their documented noon convention", sb.parseChapterDate("1981-06", null) === sb.dateToJD(new Date("1981-06-01T12:00:00Z")));
+  t("zoned ISO boundary times resolve to the correct instant", sb.parseChapterDate("1981-06-01T14:00:00+02:00", null) === sb.dateToJD(new Date("1981-06-01T12:00:00Z")));
+  const omitted = sb.normalizeChapters([{ placeKey: "Wetzlar · DE", startISO: "", endISO: "" }], natal);
+  t("omitted chapter boundaries still mean birth to ongoing", omitted.dropped === 0 && omitted.chapters[0].startJd === natal.jd && omitted.chapters[0].open);
+  const invalidContext = sb.chapterAware(natal, [{ placeKey: "Wetzlar · DE", startISO: "2025-02-30" }], targetJd);
+  t("all-invalid histories retain their dropped count for visible feedback", invalidContext.dropped === 1 && invalidContext.active === null && invalidContext.chapters.length === 0);
+
+  // Exercise the actual App handlers: a global edited flag previously
+  // allowed another person to inherit the alpha residence biography.
+  function appHarness(saved = null) {
+    const hooks = []; let cursor = 0;
+    const useState = initial => {
+      const index = cursor++;
+      if (!(index in hooks)) hooks[index] = typeof initial === "function" ? initial() : initial;
+      return [hooks[index], value => { hooks[index] = typeof value === "function" ? value(hooks[index]) : value; }];
+    };
+    const react = { useState, useMemo: fn => fn(), useCallback: fn => fn, useEffect() {}, useLayoutEffect() {},
+      useRef: initial => { const index = cursor++; if (!(index in hooks)) hooks[index] = { current: initial }; return hooks[index]; },
+      createElement: (type, props, ...children) => ({ type, props: { ...props, children: children.length === 1 ? children[0] : children } }) };
+    const box = { React: react, console, Date, ProfileStore: { load: () => saved, save: (...args) => sb.ProfileStore.save(...args), clear() {} },
+      sameBirthRecord: sb.sameBirthRecord, chapterBirthKey: sb.chapterBirthKey, chapterRowsFor: sb.chapterRowsFor, alphaLifeChapters: sb.alphaLifeChapters,
+      useTechniqueNavigation() {},
+      Landing() {}, document: { getElementById() {} }, ReactDOM: { createRoot: () => ({ render() {} }) } };
+    box.window = box;
+    box.useTweaks = initial => { const [value, set] = useState(initial); return [value, (key, next) => set(prior => ({ ...prior, ...(typeof key === "object" ? key : { [key]: next }) }))]; };
+    vm.createContext(box);
+    vm.runInContext(transformSync(read("app.jsx"), { loader: "jsx" }).code, box);
+    return () => { cursor = 0; return box.App().props.children.props; };
+  }
+  const otherBirth = { dateISO: "1993-06-10T11:45:00Z", lat: -33.8688, lng: 151.2093, tz: "Australia/Sydney",
+    subjectName: "Other reader", placeKey: "Sydney · AU", placeLabel: "Sydney · AU", timeUnknown: false,
+    formState: { year: 1993, month: 6, day: 10, hour12: 9, minute: 45, meridiem: "PM", place: "Sydney · AU", subjectName: "Other reader" } };
+  const ownChapters = [{ id: "other-la", placeKey: "Los Angeles · CA", startISO: "2010-01-01", endISO: "" }];
+  const renderApp = appHarness();
+  let entry = renderApp();
+  t("changing the form birth reads an empty owner-scoped chapter collection", entry.chaptersForBirth(otherBirth).length === 0);
+  entry.onChaptersChange(ownChapters, otherBirth); entry = renderApp();
+  t("a new reader can add a chapter without inheriting alpha rows", entry.chaptersForBirth(otherBirth).length === 1 && entry.chaptersForBirth(otherBirth)[0].id === "other-la");
+  t("the alpha journey remains separately editable", entry.chaptersForBirth(natal.birth).length === 4);
+  entry.onSaveProfile(otherBirth); entry = renderApp();
+  t("saving a new reader persists only their own residence rows", sb.ProfileStore.load().chapters.length === 1 && sb.ProfileStore.load().chapters[0].id === "other-la");
+  entry.onCast(otherBirth); let session = renderApp();
+  t("casting after a chapter edit cannot transfer the alpha biography", session.settings.lat === otherBirth.lat && session.chapters.length === 1 && session.chapters[0].id === "other-la");
+  session.onBack(); entry = renderApp();
+  t("renaming the same birth preserves that person's chapter collection", entry.chaptersForBirth({ ...otherBirth, subjectName: "Renamed reader" }).length === 1);
+  entry.onChaptersChange([{ ...ownChapters[0], id: "edited-alpha" }], natal.birth); entry = renderApp();
+  entry.onCast(otherBirth); session = renderApp();
+  t("editing the alpha collection before switching cannot overwrite another birth's chapters", session.chapters.length === 1 && session.chapters[0].id === "other-la");
+  const storedRender = appHarness({ settings, birthForm, chapters: rawChapters, savedAt: "2026-10-02T12:00:00Z" });
+  const storedEntry = storedRender();
+  t("stored custom histories are preserved instead of replaced by alpha defaults", storedEntry.chaptersForBirth(natal.birth).length === 2 && storedEntry.chaptersForBirth(natal.birth)[0].id === "ny");
+
+  // Render the real summary/editor in a lightweight element tree to verify
+  // validation remains visible when normalization drops every row.
+  const ui = { React: { useMemo: fn => fn(), useState: () => [false, () => {}], createElement: (type, props, ...children) => ({ type: typeof type === "string" ? type : "component", props, children }) },
+    normalizeChapters: sb.normalizeChapters, activeChapter: sb.activeChapter, chapterDigest: sb.chapterDigest,
+    chapterCity: sb.chapterCity, parseChapterDate: sb.parseChapterDate, dateToJD: sb.dateToJD,
+    CITIES: vm.runInContext("CITIES", sb), cityKey: vm.runInContext("cityKey", sb), SearchablePicker() {} };
+  ui.window = ui; vm.createContext(ui);
+  vm.runInContext(transformSync(profile, { loader: "jsx" }).code, ui);
+  const invalidRows = [{ placeKey: "Wetzlar · DE", startISO: "2025-02-30", endISO: "" }];
+  const summaryText = JSON.stringify(ui.LifeChapterSummary({ chart: natal, chapters: invalidRows }));
+  t("all-invalid residence rows show skipped-entry feedback in the chart", summaryText.includes("No usable residence history") && summaryText.includes("skipped because the place or dates were invalid"));
+  const editorTree = ui.LifeChaptersEditor({ chapters: invalidRows, onChange() {}, onSave() {} });
+  const editorText = JSON.stringify(editorTree);
+  t("the chapter editor identifies impossible dates and disables saving", editorText.includes("The start date must be a real calendar date.") && editorText.includes('"className":"profile-save","disabled":true'));
+  const consentRender = appHarness({settings:{...settings,shareBehavioralDataWithAI:true},birthForm,chapters:rawChapters,savedAt:"2026-10-02T12:00:00Z"});
+  consentRender().onCast(otherBirth);
+  t("private feedback sharing is reset when casting another birth",consentRender().settings.shareBehavioralDataWithAI===false);
+  const saveConsentRender = appHarness({settings:{...settings,shareBehavioralDataWithAI:true},birthForm,chapters:rawChapters,savedAt:"2026-10-02T12:00:00Z"});
+  saveConsentRender().onSaveProfile(otherBirth);
+  t("saving another birth cannot inherit private feedback consent",sb.ProfileStore.load().settings.shareBehavioralDataWithAI===false);
   return rows;
 }
