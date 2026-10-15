@@ -103,8 +103,10 @@ function narrativeOpening(chart) {
 
   const sun = (chart.planets || []).find(p => p.name === "Sun");
   const moon = (chart.planets || []).find(p => p.name === "Moon");
-  const sect = chart.isDayChart ? "a day chart — the Sun above the horizon, the diurnal sect in charge"
-    : "a night chart — the Sun below the horizon, the nocturnal sect in charge";
+  const sectOverride = chart.sectSource === "explicit override" || ["day", "night"].includes(birth.sect);
+  const sect = sectOverride ? `a selected ${chart.isDayChart ? "day" : "night"} chart convention, overriding the computed horizon`
+    : chart.isDayChart ? "a day chart — the Sun above the horizon, the diurnal sect in charge"
+      : "a night chart — the Sun below the horizon, the nocturnal sect in charge";
 
   if (!chart.timeUnknown && typeof chart.ascSignIdx === "number") {
     lines.push(`${nSignName(chart.ascSignIdx)} was rising, and everything here is measured from that horizon. It is ${sect}.`);
@@ -156,6 +158,13 @@ function dominantElement(chart) {
  * shadow-lane thread underneath.
  */
 function narrativeForCard(card, chart, { first = false } = {}) {
+  if (typeof readingFor === "function") {
+    const reading = readingFor(card, chart);
+    // Use the evidence-backed card verbatim. The local screen, voice and
+    // exported card therefore cite the same degrees, aspects, dates and
+    // observation protocol, with the same unknown-time withholding.
+    if (reading.evidence) return reading.body.map(line => line.text).join(" ");
+  }
   const p = card.principal;
   const actualSignName = typeof ZODIAC !== "undefined" ? ZODIAC[p.sign].name : card.name;
   const timeKnown = !chart.timeUnknown;
@@ -176,7 +185,7 @@ function narrativeForCard(card, chart, { first = false } = {}) {
   }
 
   if (p.retrograde) {
-    parts.push("Turning retrograde, that signification runs inward — reconsidered rather than asserted outward.");
+    parts.push("Traditionally, retrograde motion can suggest reconsideration. Compare that symbolic possibility with your experience.");
   }
 
   if (card.aspect) {
@@ -235,13 +244,13 @@ function narrativeClosing(chart) {
 
   lines.push("That is the whole wheel.");
   if (dominant) {
-    lines.push(`It runs ${String(dominant.name).toLowerCase()}-heavy, and that is the grain to work with rather than against.`);
+    lines.push(`${dominant.name} has the largest count in this chart's element census. That is a chart summary, not a measured temperament.`);
   }
   if (stelliums > 0) {
-    lines.push(`${stelliums === 1 ? "One sign is" : `${stelliums} signs are`} loaded past the ordinary — that concentration is where the pressure of this chart actually sits.`);
+    lines.push(`${stelliums === 1 ? "One sign has" : `${stelliums} signs have`} at least three classical planets. Traditionally that concentration gives the sign more emphasis; it does not measure psychological pressure.`);
   }
   if (!chart.timeUnknown && chart.voidOfCourse && chart.voidOfCourse.isVoc) {
-    lines.push("The Moon was void of course at the moment of birth: whatever it was carrying had already finished being decided.");
+    lines.push("The Moon was void of course under this calculation's stated aspect and sign-ingress definition. This astronomical convention does not establish that an event or decision was already settled.");
   }
 
   // The substrate's own two closing facts — both computed from this chart's
@@ -273,7 +282,7 @@ function narrativeClosing(chart) {
     }
   }
 
-  lines.push("The classical reading is the reading. The eleventh lane only adds what it could never see.");
+  lines.push("The classical interpretations are symbolic. Integer lanes describe arithmetic relationships in rounded positions; they do not establish causes, fate or measured behavioral traits.");
   return lines.join(" ");
 }
 

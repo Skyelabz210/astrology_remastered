@@ -90,5 +90,14 @@ export async function run() {
   const moduleSource = readFileSync(new URL('../../src/astro/user-export.js', import.meta.url), 'utf8');
   t('collector never reads arbitrary browser storage or cookies', !/localStorage|document\.cookie|sessionStorage/.test(moduleSource.replace(/\/\/[^\n]*/g, '')));
   t('vendored ZIP implementation matches the locked upstream version', readFileSync(new URL('../../vendor/fflate.js', import.meta.url), 'utf8') === readFileSync(new URL('../../node_modules/fflate/esm/browser.js', import.meta.url), 'utf8'));
+  const avatarOwner = JSON.stringify([new Date(birth.dateISO).toISOString(),birth.lat,birth.lng]);
+  const avatar = {profile:{ownerKey:avatarOwner,birth,observations:[{note:"A counterexample I want to keep",domain:"Sun",rating:0}]},summary:{ownerKey:avatarOwner,engagement:{xp:10,level:1},observationCount:1,preferences:{goals:"Finish my project"},history:[{at:"2026-10-14T12:00:00Z",domain:"Sun",note:"A counterexample I want to keep",rating:0}],limitation:"Participation is not proof"}};
+  const avatarData = collectPersonalData({chart,additional:{livingAvatar:{status:"ready",value:avatar}}});
+  const avatarZip = await buildPersonalZip(avatarData);
+  const avatarFiles = unzipSync(avatarZip.bytes);
+  t("living avatar and full journal have portable JSON entries",JSON.parse(strFromU8(avatarFiles["profile/living-avatar.json"])).observations[0].note==="A counterexample I want to keep" && avatarFiles["profile/avatar-summary.json"]);
+  t("offline report includes goals and authored counterexamples",strFromU8(avatarFiles["report.html"]).includes("Finish my project") && strFromU8(avatarFiles["report.html"]).includes("A counterexample I want to keep"));
+  const foreignAvatarData = collectPersonalData({chart,additional:{livingAvatar:{status:"ready",value:{...avatar,profile:{...avatar.profile,ownerKey:"foreign"}}}}});
+  t("another birth's living avatar is excluded from archive",foreignAvatarData.additional.livingAvatar.status==="unavailable" && !archiveReport(foreignAvatarData).includes("A counterexample I want to keep"));
   return rows;
 }

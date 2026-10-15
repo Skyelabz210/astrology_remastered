@@ -17,6 +17,7 @@ import {
   DEFAULT_VOICE_NAME,
   DEFAULT_MODEL_ID,
   KEY_STORAGE_KEY,
+  VOICE_CACHE_PREFIX,
   SPEED_RANGE,
   ElevenLabsError,
   voiceSettingsFor,
@@ -30,6 +31,8 @@ import {
   matchVoiceByName,
   resolveVoiceId,
   synthesize,
+  synthesizeWithTimestamps,
+  searchSharedVoices,
 } from "../../elevenlabs.js";
 
 /** In-memory stand-in for localStorage. */
@@ -202,8 +205,12 @@ export async function run() {
       r.voiceId === "vid_override" && r.source === "override" && fetchImpl.calls.length === 0);
   }
   {
-    const storage = makeStorage({ "resonance:elevenlabs-voice:nerissa": "vid_cached" });
-    const fetchImpl = makeFetch([]);
+    const storage = makeStorage();
+    const fetchImpl = makeFetch([
+      { match: "/voices", response: () => jsonOk({ voices: [{ voice_id: "vid_cached", name: "Nerissa" }] }) },
+    ]);
+    await resolveVoiceId({ apiKey: "k", storage, fetchImpl });
+    fetchImpl.calls.length = 0;
     const r = await resolveVoiceId({ apiKey: "k", storage, fetchImpl });
     t("a cached id is used without a network call",
       r.voiceId === "vid_cached" && r.source === "cache" && fetchImpl.calls.length === 0);
@@ -280,6 +287,102 @@ export async function run() {
       err && err.message);
   }
 
+  {
+    const storage = makeStorage({ "resonance:elevenlabs-voice:nerissa": "vid_other_account" });
+    const fetchImpl = makeFetch([
+      { match: "/voices", response: () => jsonOk({ voices: [{ voice_id: "vid_account", name: "Nerissa" }] }) },
+    ]);
+    const result = await resolveVoiceId({ apiKey: "new_account", storage, fetchImpl });
+    t("legacy unscoped voice IDs are re-resolved for the active account",
+      result.voiceId === "vid_account" && result.source === "account" && fetchImpl.calls.length === 1);
+    const persisted = storage.getItem(VOICE_CACHE_PREFIX + "nerissa");
+    t("persisted voice scope does not contain the API secret", !persisted.includes("new_account"));
+  }
+  {
+    const storage = makeStorage();
+    const fetchImpl = makeFetch([
+      { match: "/voices", response: (_url, init) => jsonOk({ voices: [{
+        voice_id: init.headers["xi-api-key"] === "account_A" ? "voice_A" : "voice_B", name: "Nerissa",
+      }] }) },
+    ]);
+    const [a, b] = await Promise.all([
+      resolveVoiceId({ apiKey: "account_A", storage, fetchImpl }),
+      resolveVoiceId({ apiKey: "account_B", storage, fetchImpl }),
+    ]);
+    t("concurrent accounts resolve their own voice IDs", a.voiceId === "voice_A" && b.voiceId === "voice_B");
+    t("concurrent accounts use distinct authenticated requests", fetchImpl.calls.length === 2);
+    const again = await resolveVoiceId({ apiKey: "account_A", storage, fetchImpl });
+    t("a different account cannot reuse the last account's persisted voice ID", again.voiceId === "voice_A");
+  }
+  {
+    const storage = makeStorage();
+    writeKey(storage, "account_A");
+    const fetchImpl = makeFetch([
+      { match: "/voices", response: (_url, init) => jsonOk({ voices: [{
+        voice_id: init.headers["xi-api-key"] === "account_A" ? "voice_A" : "voice_B", name: "Nerissa",
+      }] }) },
+    ]);
+    await resolveVoiceId({ apiKey: "account_A", storage, fetchImpl });
+    writeKey(storage, "account_B");
+    t("replacing an API key evicts its cached voice IDs", readCachedVoiceId(storage, "Nerissa") === "");
+    const changed = await resolveVoiceId({ apiKey: readKey(storage), storage, fetchImpl });
+    t("a replaced API key resolves the new account's voice", changed.voiceId === "voice_B" && changed.source === "account");
+    writeKey(storage, "");
+    t("disconnecting an API key clears the voice cache", readCachedVoiceId(storage, "Nerissa") === "");
+  }
+  {
+    const storage = makeStorage();
+    writeKey(storage, "account_A");
+    let complete;
+    let started;
+    const began = new Promise(resolve => { started = resolve; });
+    const fetchImpl = async () => {
+      started();
+      return new Promise(resolve => { complete = resolve; });
+    };
+    const pending = resolveVoiceId({ apiKey: "account_A", storage, fetchImpl });
+    await began;
+    writeKey(storage, "account_B");
+    complete(jsonOk({ voices: [{ voice_id: "voice_A", name: "Nerissa" }] }));
+    await pending;
+    t("an old in-flight lookup cannot repopulate the cache after key replacement",
+      readCachedVoiceId(storage, "Nerissa") === "");
+  }
+  {
+    const aStorage = makeStorage(), bStorage = makeStorage();
+    const fetchImpl = makeFetch([
+      { match: "/voices", response: () => jsonOk({ voices: [{ voice_id: "own_voice", name: "Nerissa" }] }) },
+    ]);
+    await Promise.all([
+      resolveVoiceId({ apiKey: "same_account", storage: aStorage, fetchImpl }),
+      resolveVoiceId({ apiKey: "same_account", storage: bStorage, fetchImpl }),
+    ]);
+    t("independent storage owners each receive their own cached resolution",
+      readCachedVoiceId(aStorage, "Nerissa") === "own_voice" && readCachedVoiceId(bStorage, "Nerissa") === "own_voice");
+  }
+  {
+    const storage = makeStorage();
+    const first = new AbortController(), second = new AbortController();
+    let abortFirst;
+    const firstStarted = new Promise(resolve => { abortFirst = resolve; });
+    const fetchImpl = (_url, init) => {
+      if (init.signal.aborted) return Promise.reject(new Error("aborted"));
+      if (!fetchImpl.started) {
+        fetchImpl.started = true;
+        abortFirst();
+        return new Promise(() => {});
+      }
+      return Promise.resolve(jsonOk({ voices: [{ voice_id: "live_voice", name: "Nerissa" }] }));
+    };
+    const cancelled = resolveVoiceId({ apiKey: "same_account", storage, fetchImpl, signal: first.signal })
+      .then(() => null, error => error);
+    await firstStarted;
+    const live = resolveVoiceId({ apiKey: "same_account", storage, fetchImpl, signal: second.signal });
+    first.abort();
+    const [error, result] = await Promise.all([cancelled, live]);
+    t("one caller's cancellation does not cancel another signal's lookup",
+      error && error.name === "AbortError" && result.voiceId === "live_voice");
+  }
   {
     // Two callers wanting the same voice at the same instant must share one
     // round trip — the real browser run made /v1/voices twice on the first
@@ -380,6 +483,37 @@ export async function run() {
     try { await synthesize({ apiKey: "k", voiceId: "v", text: "x", fetchImpl }); } catch (e) { err = e; }
     t("a 429 is reported as retryable", err instanceof ElevenLabsError && err.retryable === true);
     t("a 429 keeps the API's own message", /Quota exceeded/.test(err.message), err.message);
+  }
+  {
+    const stopped = new AbortController();
+    stopped.abort();
+    const fetchImpl = makeFetch([]);
+    let error;
+    try { await synthesize({ apiKey: "k", voiceId: "v", text: "x", fetchImpl, signal: stopped.signal }); }
+    catch (caught) { error = caught; }
+    t("an already cancelled synthesis makes no network request", error && error.name === "AbortError" && fetchImpl.calls.length === 0);
+  }
+  {
+    const operations = [
+      () => listVoices({ apiKey: "k", fetchImpl: () => new Promise(() => {}), timeoutMs: 5 }),
+      () => searchSharedVoices({ apiKey: "k", name: "Nerissa", fetchImpl: () => new Promise(() => {}), timeoutMs: 5 }),
+      () => synthesize({ apiKey: "k", voiceId: "v", text: "x", fetchImpl: () => new Promise(() => {}), timeoutMs: 5 }),
+      () => synthesizeWithTimestamps({ apiKey: "k", voiceId: "v", text: "x", fetchImpl: () => new Promise(() => {}), timeoutMs: 5 }),
+    ];
+    const results = await Promise.allSettled(operations.map(operation => operation()));
+    t("all voice transport paths time out even when fetch ignores cancellation",
+      results.every(result => result.status === "rejected" && result.reason.code === "timeout"));
+  }
+  {
+    let signal;
+    const fetchImpl = async (_url, init) => {
+      signal = init.signal;
+      return { ok: true, arrayBuffer: () => new Promise(() => {}) };
+    };
+    let error;
+    try { await synthesize({ apiKey: "k", voiceId: "v", text: "x", fetchImpl, timeoutMs: 5 }); }
+    catch (caught) { error = caught; }
+    t("response-body reads are covered by the deadline", error && error.code === "timeout" && signal.aborted);
   }
   {
     // A non-JSON error body (an HTML gateway page) must still produce a

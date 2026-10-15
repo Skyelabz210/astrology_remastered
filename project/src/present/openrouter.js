@@ -11,9 +11,20 @@ export function freeVisionModels(models) {
 export function createOpenRouter(fetcher = globalThis.fetch) {
   let apiKey = '', model = '', catalogue = [];
   let tail = Promise.resolve(), consent = true, generation = 0;
+  const listeners = new Set(), activeRequests = new Set();
+  let snapshot = Object.freeze({ available: false, model, consent, generation });
+  function changed() {
+    generation++;
+    for (const controller of activeRequests) controller.abort();
+    snapshot = Object.freeze({ available: Boolean(apiKey && model), model, consent, generation });
+    for (const listener of listeners) listener();
+  }
   async function request(path, options = {}) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 45000);
+    const scoped = path === 'chat/completions';
+    if (scoped) activeRequests.add(controller);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, 45000);
     try {
       const response = await fetcher('https://openrouter.ai/api/v1/' + path,
         { ...options, signal: controller.signal });
@@ -23,13 +34,18 @@ export function createOpenRouter(fetcher = globalThis.fetch) {
         : `OpenRouter request failed (${response.status}). Your local reading remains available.`);
       return await response.json();
     } catch (e) {
-      if (e.name === 'AbortError') throw new Error('OpenRouter timed out. Your local reading remains available.', { cause: e });
+      if (e.name === 'AbortError') throw new Error(timedOut
+        ? 'OpenRouter timed out. Your local reading remains available.'
+        : 'Interpreter permission or settings changed; request cancelled.', { cause: e });
       throw e;
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); activeRequests.delete(controller); }
   }
   return {
     available: () => Boolean(apiKey && model),
     model: () => model,
+    getState: () => snapshot,
+    subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+    catalogue: () => catalogue.map(m => ({ id: m.id, name: m.name || m.id })),
     async models() {
       catalogue = freeVisionModels((await request('models')).data);
       if (!catalogue.length) throw new Error('No free open-weight multimodal model is currently available on OpenRouter.');
@@ -37,12 +53,13 @@ export function createOpenRouter(fetcher = globalThis.fetch) {
     },
     configure(key, id) {
       if (!catalogue.some(m => m.id === id)) throw new Error('Select a verified free multimodal model first.');
-      apiKey = String(key || '').trim(); model = id;
-      if (!apiKey) throw new Error('Enter your OpenRouter API key. Free models also require a key.');
+      const nextKey = String(key || '').trim();
+      if (!nextKey) throw new Error('Enter your OpenRouter API key. Free models also require a key.');
+      if (apiKey !== nextKey || model !== id) { apiKey = nextKey; model = id; changed(); }
     },
-    chooseModel(id) { if (!catalogue.some(m => m.id === id)) throw new Error('Select a verified free multimodal model.'); if (model !== id) generation++; model = id; },
-    setConsent(enabled) { if (consent !== (enabled === true)) generation++; consent = enabled === true; },
-    disconnect() { apiKey = ''; model = ''; generation++; },
+    chooseModel(id) { if (!catalogue.some(m => m.id === id)) throw new Error('Select a verified free multimodal model.'); if (model !== id) { model = id; changed(); } },
+    setConsent(enabled) { if (consent !== (enabled === true)) { consent = enabled === true; changed(); } },
+    disconnect() { apiKey = ''; model = ''; changed(); },
     complete(prompt, image = null) {
       // Capture the account and model when queued, never silently switch owners.
       const key = apiKey, selected = model, queuedGeneration = generation;

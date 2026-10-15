@@ -1,6 +1,6 @@
 // Presentation adapters only. Each exact register passes ledger admission.
 import { admitForCore } from "../ledger/import-ledger.js";
-import { computeHcrmRegister } from "../core/hcrm-core.js";
+import { computeAdmittedRegister } from "./exact-api.js";
 import { divisionProfile, bodyEvents } from "../core/shadow-spine.js";
 import { carrySplit } from "../core/carry.js";
 import { B8 } from "../core/basis.js";
@@ -20,7 +20,7 @@ export function buildDiagnostics(entries, dateISO) {
   });
   const registers = entries.map(e => {
     const x = BigInt(e.longitude_arcsec);
-    return {register:computeHcrmRegister(e), events:bodyEvents(x,e.body),
+    return {register:computeAdmittedRegister(e), events:bodyEvents(x,e.body),
       carry:B8.map(p=>{const c=carrySplit(x,p);return {p:String(p), r:String(c.r), w:String(c.w)};})};
   });
   return {status:"ready", registers, divisions:[3n,12n,36n,108n,7n,13n].map(divisionProfile)};

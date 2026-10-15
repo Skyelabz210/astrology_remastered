@@ -303,9 +303,13 @@ export function detectPatterns(aspects, planets) {
       for (let k = j + 1; k < visibleNames.length; k++)
         for (let l = k + 1; l < visibleNames.length; l++) {
           const [A, B, C, D] = [visibleNames[i], visibleNames[j], visibleNames[k], visibleNames[l]];
-          if (has(A, C, "Opposition") && has(B, D, "Opposition") &&
-              has(A, B, "Square") && has(B, C, "Square") &&
-              has(C, D, "Square") && has(A, D, "Square"))
+          // Body order carries no geometric meaning. There are three
+          // possible pairings of the two opposition axes.
+          const crossed = [[A, B, C, D], [A, C, B, D], [A, D, B, C]].some(([a, b, c, d]) =>
+            has(a, b, "Opposition") && has(c, d, "Opposition") &&
+            has(a, c, "Square") && has(a, d, "Square") &&
+            has(b, c, "Square") && has(b, d, "Square"));
+          if (crossed)
             patterns.push({ kind: "Grand Cross", bodies: [A, B, C, D] });
         }
 

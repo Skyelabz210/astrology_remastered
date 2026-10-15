@@ -7,6 +7,7 @@
 
 const __cache = new Map();
 const __pending = new Map();
+const AGENT_CACHE_REVISION = "personal-reading-v2";
 
 // ── the readings survive the page ─────────────────────────────────────
 //
@@ -123,6 +124,7 @@ function chartIdentityKey(chart) {
     [p.name, Math.round(p.arcsec), p.house, p.retrograde ? 1 : 0].join(":")
   ).join(",");
   return [
+    AGENT_CACHE_REVISION,
     birth.dateISO,
     birth.lat,
     birth.lng,
@@ -133,7 +135,7 @@ function chartIdentityKey(chart) {
     Math.round(chart.asc * 3600),
     Math.round(chart.mc * 3600),
     bodies,
-    ...(window.OpenRouter && window.OpenRouter.available() ? [window.OpenRouter.model()] : []),
+    ...((window.Interpreter || window.OpenRouter)?.available() ? [(window.Interpreter || window.OpenRouter).model()] : []),
   ].join("|");
 }
 
@@ -210,7 +212,45 @@ function synastryFactBlock(syn) {
   } else {
     lines.push("Shared shadow lanes are withheld because at least one birth time is unknown.");
   }
+  lines.push(...mutualScanFactLines(syn));
   return lines.join("\n");
+}
+
+function completedMutualScan(syn) {
+  const item = syn.readingContext?.evidence?.mutualPerfections;
+  if (item?.status !== 'ready' || !Array.isArray(item.value?.scans)) return null;
+  const ownerKey = birth => typeof window.ReadingRuns?.profileKey === 'function'
+    ? window.ReadingRuns.profileKey(birth)
+    : JSON.stringify([new Date(birth.dateISO).toISOString(),birth.lat,birth.lng,birth.tz || null,birth.subjectName || 'You',!!birth.timeUnknown]);
+  try {
+    return item.value.scans.find(scan => scan?.status === 'ready' && Array.isArray(scan.hitsA)
+      && Array.isArray(scan.hitsB) && Array.isArray(scan.hits)
+      && Number.isFinite(scan.parameters?.startJd) && Number.isFinite(scan.parameters?.endJd)
+      && scan.parameters.startJd < scan.parameters.endJd
+      && Number.isFinite(scan.parameters?.nearDays) && scan.parameters.nearDays >= 0
+      && ownerKey(scan.input.birthA) === ownerKey(syn.chartA.birth)
+      && ownerKey(scan.input.birthB) === ownerKey(syn.chartB.birth)) || null;
+  } catch { return null; }
+}
+
+function mutualScanFactLines(syn) {
+  const scan = completedMutualScan(syn);
+  if (!scan) return ['Mutual-contact search evidence is unavailable: no completed scan for these two chart owners was supplied.'];
+  const { A, B } = synastrySubjects(syn), p = scan.parameters;
+  const atJd = jd => new Date((jd-2440587.5)*86400000).toISOString();
+  const lines = [`COMPLETED MUTUAL-CONTACT SEARCH — independent contacts to each natal chart, not cross-chart natal aspects or relationship events.`,
+    `Search center ${p.centerAt || atJd((p.startJd+p.endJd)/2)}; actual window ${atJd(p.startJd)} through ${atJd(p.endJd)}; pairing tolerance ${p.nearDays} days.`,
+    `Independent contacts: ${scan.hitsA.length} for ${A}, ${scan.hitsB.length} for ${B}; ${scan.hits.length} paired results in this completed scan.`];
+  const rows = scan.hits.filter(row => Number.isFinite(row.a?.jd) && Number.isFinite(row.b?.jd)
+    && row.a.jd >= p.startJd && row.a.jd <= p.endJd && row.b.jd >= p.startJd && row.b.jd <= p.endJd
+    && Math.abs(row.a.jd-row.b.jd) <= p.nearDays)
+    .sort((a,b) => Math.abs((a.a.jd+a.b.jd)/2-(p.startJd+p.endJd)/2)-Math.abs((b.a.jd+b.b.jd)/2-(p.startJd+p.endJd)/2))
+    .slice(0,6).sort((a,b) => a.a.jd-b.a.jd);
+  for (const row of rows) lines.push(`${ownerPossessive(A)} transiting ${row.a.transit} ${row.a.aspect.toLowerCase()} ${ownerPossessive(A)} natal ${row.a.natal}, exact at ${row.a.dateISO || atJd(row.a.jd)}; `
+    + `${ownerPossessive(B)} transiting ${row.b.transit} ${row.b.aspect.toLowerCase()} ${ownerPossessive(B)} natal ${row.b.natal}, exact at ${row.b.dateISO || atJd(row.b.jd)}; gap ${Math.abs(row.a.jd-row.b.jd)} days.`);
+  if (!scan.hits.length) lines.push('No paired contacts were found within this completed window and tolerance.');
+  lines.push(...(Array.isArray(scan.limitations) ? scan.limitations.slice(0,6) : []));
+  return lines;
 }
 
 function escapeRegex(text) {
@@ -220,7 +260,7 @@ function escapeRegex(text) {
 function sentenceRows(text) {
   return String(text || "")
     .replace(/[’]/g, "'")
-    .split(/(?<=[.!?])\s+/)
+    .split(/(?<=[.!?])\s+|[;\n]+/)
     .map((s) => s.trim())
     .filter(Boolean);
 }
@@ -236,7 +276,7 @@ function ownerPatterns(subject, role) {
 
 function ownedBodyPattern(subject, body, role) {
   const owners = ownerPatterns(subject, role).map(escapeRegex);
-  return new RegExp(`\\b(?:${owners.join("|")})\\s+${escapeRegex(body)}\\b`, "i");
+  return new RegExp(`\\b(?:${owners.join("|")})\\s+(?:natal\\s+)?${escapeRegex(body)}\\b`, "i");
 }
 
 function houseNumberFromToken(token) {
@@ -255,52 +295,72 @@ function ownerMentioned(text, subject, role) {
   );
 }
 
-function exactPlacementCitations(text, chart, subject, role = "natal") {
-  const rows = sentenceRows(text);
-  const cited = [];
-  for (const p of chart.planets || []) {
-    const sign = ZODIAC[p.sign] && ZODIAC[p.sign].name;
-    if (!sign) continue;
-    const ownerBody = ownedBodyPattern(subject, p.name, role);
-    if (rows.some((row) => ownerBody.test(row) && new RegExp(`\\b${escapeRegex(sign)}\\b`, "i").test(row))) {
-      cited.push(`${p.name} in ${sign}`);
-    }
-  }
-  return cited;
+// Parse each explicitly attached claim rather than accepting any matching fact
+// elsewhere in the sentence. This is a bounded prose check, not a proof that
+// every possible paraphrase or behavioral interpretation is correct.
+const CLAIM_ASPECTS = [
+  ['Conjunction', 'conjunction|conjunct(?:s|ed)?'],
+  ['Opposition', 'opposition|oppos(?:ite|es?|ed)'],
+  ['Trine', 'trines?|trined'], ['Square', 'squares?|squared'],
+  ['Sextile', 'sextiles?|sextiled'], ['Quincunx', 'quincunx(?:es)?'],
+  ['Semisquare', 'semi[ -]?squares?'], ['Semisextile', 'semi[ -]?sextiles?'],
+  ['Sesquiquadrate', 'sesquiquadrates?|sesqui[ -]?squares?'],
+  ['BiQuintile', 'bi[ -]?quintiles?'], ['Quintile', 'quintiles?'],
+  ['Tridecile', 'trideciles?'], ['Tredecile', 'tredeciles?'],
+  ['Undecile', 'undeciles?'], ['Septile', 'septiles?'],
+  ['Novile', 'noviles?'], ['Decile', 'deciles?'],
+];
+const CLAIM_ASPECT_PATTERN = CLAIM_ASPECTS.map(([, pattern]) => `(?:${pattern})`).join('|');
+const CLAIM_DEGREE_PATTERN = `(\\d{1,3}(?:\\.\\d+)?)\\s*(?:°|degrees?)(?:\\s*(\\d{1,2})\\s*[′'])?(?:\\s*(\\d{1,2}(?:\\.\\d+)?)\\s*[″"])?`;
+
+function normalizeClaimAspect(word) {
+  return CLAIM_ASPECTS.find(([, pattern]) => new RegExp(`^(?:${pattern})$`, 'i').test(word))?.[0] || null;
 }
 
-function exactNatalAspectCitations(text, chart, subject) {
-  const rows = sentenceRows(text);
-  const cited = [];
-  for (const a of chart.aspectGrid || []) {
-    const A = ownedBodyPattern(subject, a.a, "natal");
-    const B = ownedBodyPattern(subject, a.b, "natal");
-    const aspect = new RegExp(`\\b${escapeRegex(a.aspect)}(?:s|d|ed)?\\b`, "i");
-    if (rows.some((row) => A.test(row) && B.test(row) && aspect.test(row))) {
-      cited.push(`${a.a} ${a.aspect} ${a.b}`);
-    }
+function placementClaims(text, chart, subject, role = 'natal') {
+  const bodies = (chart.planets || []).map(p => p.name).sort((a,b) => b.length-a.length);
+  const owners = ownerPatterns(subject, role).map(escapeRegex).sort((a,b) => b.length-a.length);
+  if (!owners.length || !bodies.length) return [];
+  const signs = ZODIAC.map(z => escapeRegex(z.name)).join('|');
+  const pattern = new RegExp(`\\b(?:${owners.join('|')})\\s+(?:natal\\s+)?(${bodies.map(escapeRegex).join('|')})\\s+`
+    + `(?:(?:is|was|sits|falls|lies|lands)\\s+(?:placed\\s+|positioned\\s+|located\\s+)?|(?:occupies|occupying|placed|positioned|located)\\s+)?`
+    + `(?:in\\s+|at\\s+)?(?:the\\s+sign\\s+of\\s+)?(?:${CLAIM_DEGREE_PATTERN}\\s+)?(${signs})\\b`, 'gi');
+  const claims = [];
+  for (const match of String(text || '').replace(/[’]/g,"'").matchAll(pattern)) {
+    claims.push({ body: match[1], sign: match[5], degree: match[2] === undefined ? null : Number(match[2]),
+      minute: match[3] === undefined ? null : Number(match[3]), second: match[4] === undefined ? null : Number(match[4]),
+      degreeToken: match[2] });
   }
-  return cited;
+  return claims;
+}
+
+function exactPlacementCitations(text, chart, subject, role = 'natal') {
+  return placementClaims(text, chart, subject, role).flatMap(claim => {
+    const p = (chart.planets || []).find(p => p.name.toLowerCase() === claim.body.toLowerCase());
+    return p && ZODIAC[p.sign]?.name.toLowerCase() === claim.sign.toLowerCase() ? [`${p.name} in ${ZODIAC[p.sign].name}`] : [];
+  });
 }
 
 function explicitPlacementErrors(text, chart, subject, role) {
-  const bodies = (chart.planets || []).map((p) => p.name).sort((a, b) => b.length - a.length);
-  const signs = ZODIAC.map((z) => z.name).sort((a, b) => b.length - a.length);
-  const owners = ownerPatterns(subject, role).map(escapeRegex);
-  if (!owners.length || !bodies.length || !signs.length) return [];
-  const pattern = new RegExp(
-    `\\b(?:${owners.join("|")})\\s+(${bodies.map(escapeRegex).join("|")})\\s+`
-      + `(?:is\\s+|sits\\s+|falls\\s+|lies\\s+|placed\\s+)?(?:in\\s+)?`
-      + `(?:the\\s+sign\\s+of\\s+)?(${signs.map(escapeRegex).join("|")})\\b`,
-    "gi"
-  );
   const errors = [];
-  let match;
-  while ((match = pattern.exec(String(text || "")))) {
-    const planet = (chart.planets || []).find((p) => p.name.toLowerCase() === match[1].toLowerCase());
-    const actualSign = planet && ZODIAC[planet.sign] && ZODIAC[planet.sign].name;
-    if (actualSign && actualSign.toLowerCase() !== match[2].toLowerCase()) {
-      errors.push(`${ownerPossessive(subject)} ${planet.name} is in ${actualSign}, not ${match[2]}`);
+  for (const claim of placementClaims(text, chart, subject, role)) {
+    const p = (chart.planets || []).find(p => p.name.toLowerCase() === claim.body.toLowerCase());
+    const actualSign = p && ZODIAC[p.sign]?.name;
+    if (actualSign && actualSign.toLowerCase() !== claim.sign.toLowerCase()) {
+      errors.push(`${ownerPossessive(subject)} ${p.name} is in ${actualSign}, not ${claim.sign}`);
+    }
+    if (claim.degree === null) continue;
+    if (chart.timeUnknown && p.name === 'Moon') {
+      errors.push('the natal Moon degree is uncertain because the birth time is unknown');
+      continue;
+    }
+    const lon = Number.isFinite(p.lon) ? p.lon : Number.isFinite(p.arcsec) ? p.arcsec / 3600 : null;
+    if (lon === null) { errors.push(`the ${p.name} degree is unavailable`); continue; }
+    const stated = claim.degree * 3600 + (claim.minute || 0) * 60 + (claim.second || 0);
+    const precision = claim.second !== null ? 1 : claim.minute !== null ? 60 : 3600 / 10 ** ((claim.degreeToken.split('.')[1] || '').length);
+    const actual = ((lon % 360) + 360) % 360 % 30 * 3600;
+    if (claim.degree >= 30 || (claim.minute || 0) >= 60 || (claim.second || 0) >= 60 || Math.abs(stated - actual) > precision / 2 + 1e-6) {
+      errors.push(`the stated ${p.name} degree does not match this natal chart`);
     }
   }
   return errors;
@@ -310,59 +370,118 @@ function explicitNatalHouseErrors(text, chart, subject) {
   const errors = [];
   for (const row of sentenceRows(text)) {
     for (const planet of chart.planets || []) {
-      const owned = ownedBodyPattern(subject, planet.name, "natal").source;
-      const claim = new RegExp(
-        `${owned}[^.!?]{0,120}\\b(?:occupies|falls\\s+in|lands\\s+in|sits\\s+in|lies\\s+in|in)\\s+`
-          + `(?:the\\s+)?(${HOUSE_TOKEN_PATTERN})\\s+house\\b`,
-        "i"
-      ).exec(row);
-      if (!claim) continue;
-      const claimedHouse = houseNumberFromToken(claim[1]);
-      if (chart.timeUnknown) {
-        errors.push(`${ownerPossessive(subject)} ${planet.name} house is unavailable because the birth time is unknown`);
-      } else if (claimedHouse !== planet.house) {
-        errors.push(`${ownerPossessive(subject)} ${planet.name} is in the ${HOUSE_ORDINAL[planet.house]} house, not the ${HOUSE_ORDINAL[claimedHouse]} house`);
+      const owned = ownedBodyPattern(subject, planet.name, 'natal').source;
+      // Stop at another owned body or a new coordinated clause; a later
+      // planet's house must not be attributed to the first planet.
+      const bodyNames = (chart.planets || []).map(p => escapeRegex(p.name)).join('|');
+      const gap = `(?:(?!\\b(?:and|but)\\b|\\b(?:your|natal)\\s+(?:${bodyNames})\\b)[^.!?;]){0,120}?`;
+      const pattern = new RegExp(`${owned}${gap}\\b(?:occupies|falls\\s+in|lands\\s+in|sits\\s+in|lies\\s+in|in)\\s+(?:the\\s+)?(${HOUSE_TOKEN_PATTERN})\\s+house\\b`, 'gi');
+      for (const claim of row.matchAll(pattern)) {
+        const claimedHouse = houseNumberFromToken(claim[1]);
+        if (chart.timeUnknown) errors.push(`${ownerPossessive(subject)} ${planet.name} house is unavailable because the birth time is unknown`);
+        else if (claimedHouse !== planet.house) errors.push(`${ownerPossessive(subject)} ${planet.name} is in the ${HOUSE_ORDINAL[planet.house]} house, not the ${HOUSE_ORDINAL[claimedHouse]} house`);
       }
     }
   }
   return errors;
 }
 
-function aspectNameInSentence(sentence) {
-  const match = String(sentence).match(/\b(conjunction|conjuncts?|opposition|opposes?|trines?|squares?|sextiles?|quincunx(?:es)?)\b/i);
-  if (!match) return null;
-  const word = match[1].toLowerCase();
-  if (word.startsWith("conjunct")) return "Conjunction";
-  if (word.startsWith("oppos")) return "Opposition";
-  if (word.startsWith("trine")) return "Trine";
-  if (word.startsWith("square")) return "Square";
-  if (word.startsWith("sextile")) return "Sextile";
-  if (word.startsWith("quincunx")) return "Quincunx";
-  return null;
+function aspectClaims(text, owners) {
+  const allBodies = [...new Set(owners.flatMap(owner => (owner.chart.planets || []).map(p => p.name)))].sort((a,b) => b.length-a.length);
+  if (!allBodies.length) return [];
+  const labels = owners.flatMap(owner => ownerPatterns(owner.subject, owner.role)).sort((a,b) => b.length-a.length);
+  const bodyPattern = new RegExp(`\\b((?:${labels.map(escapeRegex).join('|')})\\s+(?:(natal|transiting|transit)\\s+)?|(?:(natal|transiting|transit)\\s+))(${allBodies.map(escapeRegex).join('|')})\\b`, 'gi');
+  const claims = [];
+  for (const row of sentenceRows(text)) {
+    const bodies = [...row.matchAll(bodyPattern)].flatMap(match => {
+      const mode = (match[2] || match[3] || 'natal').toLowerCase();
+      const owner = owners.find(owner => ownerPatterns(owner.subject, owner.role).some(label => match[1].toLowerCase().startsWith(label.toLowerCase() + ' ')))
+        || (match[3] && owners.length === 1 ? owners[0] : null);
+      return owner ? [{ name: allBodies.find(body => body.toLowerCase() === match[4].toLowerCase()), owner: owner.id, mode: mode === 'transit' ? 'transiting' : mode, index: match.index, end: match.index+match[0].length }] : [];
+    });
+    const aspects = [...row.matchAll(new RegExp(`\\b(${CLAIM_ASPECT_PATTERN})\\b`, 'gi'))];
+    aspects.forEach((token, i) => {
+      const left = bodies.filter(body => body.end <= token.index);
+      const nearest = left.at(-1);
+      const next = aspects[i+1];
+      const nextLeft = next && bodies.filter(body => body.end <= next.index && body.index > token.index).at(-1);
+      const stop = nextLeft ? nextLeft.index : next ? next.index : row.length;
+      const right = bodies.filter(body => body.index >= token.index + token[0].length && body.index < stop);
+      const pairs = [];
+      if (nearest && right.length) {
+        pairs.push([nearest,right[0]]);
+        for (let j=1;j<right.length;j+=1) {
+          if (/^\s*(?:,\s*)?(?:and|&)\s*$/i.test(row.slice(right[j-1].end,right[j].index))) pairs.push([nearest,right[j]]);
+          else break;
+        }
+      } else if (left.length >= 2 && !/[.!?;]/.test(row.slice(left.at(-2).end,token.index))) pairs.push([left.at(-2),nearest]);
+      for (const [a,b] of pairs) claims.push({ a,b, aspect: normalizeClaimAspect(token[1]), row,
+        start: Math.min(a.index,b.index,token.index), end: Math.max(a.end,b.end,token.index+token[0].length) });
+    });
+  }
+  return claims;
 }
 
-function mentionedOwnedBodies(sentence, chart, subject, role) {
-  return (chart.planets || [])
-    .filter((p) => ownedBodyPattern(subject, p.name, role).test(sentence))
-    .map((p) => p.name);
+function matchingNatalAspect(claim, chart) {
+  return claim.a.mode === 'natal' && claim.b.mode === 'natal' && (chart.aspectGrid || []).find(a =>
+    a.aspect.toLowerCase() === claim.aspect.toLowerCase() && ((a.a === claim.a.name && a.b === claim.b.name) || (a.a === claim.b.name && a.b === claim.a.name)));
+}
+
+function exactNatalAspectCitations(text, chart, subject) {
+  return aspectClaims(text,[{id:'natal',chart,subject,role:'natal'}]).filter(claim => matchingNatalAspect(claim,chart))
+    .map(claim => `${claim.a.name} ${claim.aspect} ${claim.b.name}`);
+}
+
+function contextualTransitEvidence(chart) {
+  const evidence = chart.readingContext?.evidence;
+  const trajectories = evidence?.behavioralTrajectories;
+  return {
+    current: evidence?.transits?.status === 'ready' ? evidence.transits.value?.hits || [] : [],
+    trajectories: trajectories?.status === 'ready' && trajectories.value?.status === 'ready' && !chart.timeUnknown
+      ? Object.values(trajectories.value.byBody || {}).flat() : [],
+  };
+}
+
+function contactDetailErrors(text, contact) {
+  const errors = [];
+  for (const match of text.matchAll(new RegExp(`\\borb(?:\\s+(?:is|of)|\\s*:)?\\s*${CLAIM_DEGREE_PATTERN}`, 'gi'))) {
+    if (/\b(?:allowed|maximum)\s*$/i.test(text.slice(Math.max(0,match.index-20),match.index))) continue;
+    const degree = Number(match[1]), minute = Number(match[2] || 0), second = Number(match[3] || 0);
+    const stated = degree*3600+minute*60+second;
+    const precision = match[3] !== undefined ? 1 : match[2] !== undefined ? 60 : 3600 / 10**((match[1].split('.')[1] || '').length);
+    const source = Number.isFinite(contact?.orbArcsec) ? contact.orbArcsec : Number.isFinite(contact?.orb) ? contact.orb*3600 : null;
+    if (source === null || minute >= 60 || second >= 60 || Math.abs(source-stated) > precision/2+1e-6) errors.push('the stated aspect orb does not match the supplied contact');
+  }
+  const phase = text.match(/(?:\bphase\s*(?:is|:)?\s*|,\s*)(applying|separating|exact)\b/i)?.[1];
+  if (phase && contact?.phase?.toLowerCase() !== phase.toLowerCase()) errors.push('the stated aspect phase does not match the supplied contact');
+  return errors;
 }
 
 function explicitNatalAspectErrors(text, chart, subject) {
-  const errors = [];
-  for (const row of sentenceRows(text)) {
-    const aspect = aspectNameInSentence(row);
-    if (!aspect) continue;
-    const bodies = mentionedOwnedBodies(row, chart, subject, "natal");
-    if (bodies.length < 2) continue;
-    let supported = false;
-    for (let i = 0; i < bodies.length; i += 1) {
-      for (let j = i + 1; j < bodies.length; j += 1) {
-        if ((chart.aspectGrid || []).some((a) =>
-          a.aspect === aspect && ((a.a === bodies[i] && a.b === bodies[j]) || (a.a === bodies[j] && a.b === bodies[i]))
-        )) supported = true;
-      }
+  const errors = [], evidence = contextualTransitEvidence(chart);
+  const claims = aspectClaims(text,[{id:'natal',chart,subject,role:'natal'}]);
+  for (const [index, claim] of claims.entries()) {
+    const next = claims.slice(index + 1).find(candidate => candidate.row === claim.row && candidate.start >= claim.end);
+    const details = claim.row.slice(claim.start, next ? next.start : undefined);
+    if (claim.a.mode === 'natal' && claim.b.mode === 'natal') {
+      const contact = matchingNatalAspect(claim,chart);
+      if (!contact) errors.push(`the stated ${claim.aspect.toLowerCase()} between ${claim.a.name} and ${claim.b.name} is not in this chart`);
+      else errors.push(...contactDetailErrors(details,contact));
+      continue;
     }
-    if (!supported) errors.push(`the stated ${aspect.toLowerCase()} between ${bodies.join(" and ")} is not in this chart`);
+    const transit = claim.a.mode === 'transiting' ? claim.a : claim.b.mode === 'transiting' ? claim.b : null;
+    const natal = claim.a.mode === 'natal' ? claim.a : claim.b.mode === 'natal' ? claim.b : null;
+    if (!transit || !natal) { errors.push('the stated transit must distinguish a transiting body from a natal body'); continue; }
+    const matches = hit => (hit.transitPlanet || hit.T) === transit.name && (hit.natalPlanet || hit.N) === natal.name && hit.aspect?.toLowerCase() === claim.aspect.toLowerCase();
+    const located = evidence.trajectories.filter(matches);
+    const current = evidence.current.find(matches);
+    if (!current && !located.length) errors.push(`the stated transiting ${transit.name} ${claim.aspect.toLowerCase()} natal ${natal.name} is not in the supplied transit evidence`);
+    else errors.push(...contactDetailErrors(details,current || located[0]));
+    const following = claim.row.slice(claim.end, next ? next.start : undefined);
+    const dates = [...following.matchAll(/\b\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?\b/g)].map(match => match[0]);
+    for (const date of dates) if (!located.some(hit => (date.length === 10 && hit.exactHitDate?.startsWith(date)) || Date.parse(hit.exactHitDate) === Date.parse(date))) {
+      errors.push(`the stated exact date for transiting ${transit.name} ${claim.aspect.toLowerCase()} natal ${natal.name} is not a located contact date`);
+    }
   }
   return errors;
 }
@@ -392,19 +511,27 @@ function validateNatalGrounding(text, chart, minimumFacts = 1, allowDataLimit = 
   return { ok: errors.length === 0, factCount: unique.length, citedFacts: unique, errors };
 }
 
+function synastryAspectClaims(text, syn) {
+  const { A, B } = synastrySubjects(syn);
+  return aspectClaims(text, [
+    { id: 'A', chart: syn.chartA, subject: A, role: A.toLowerCase() === 'you' ? 'natal' : 'primary' },
+    { id: 'B', chart: syn.chartB, subject: B, role: 'partner' },
+  ]);
+}
+
+function matchingCrossAspect(claim, syn) {
+  if (claim.a.mode !== 'natal' || claim.b.mode !== 'natal' || claim.a.owner === claim.b.owner) return null;
+  const A = claim.a.owner === 'A' ? claim.a : claim.b;
+  const B = claim.a.owner === 'B' ? claim.a : claim.b;
+  return (syn.hits || []).find(hit => hit.a === A.name && hit.b === B.name && hit.aspect.toLowerCase() === claim.aspect.toLowerCase());
+}
+
 function exactCrossAspectCitations(text, syn) {
   const { A, B } = synastrySubjects(syn);
-  const rows = sentenceRows(text);
-  const cited = [];
-  for (const h of syn.hits || []) {
-    const left = ownedBodyPattern(A, h.a, A.toLowerCase() === "you" ? "natal" : "primary");
-    const right = ownedBodyPattern(B, h.b, "partner");
-    const aspect = new RegExp(`\\b${escapeRegex(h.aspect)}(?:s|d|ed)?\\b`, "i");
-    if (rows.some((row) => left.test(row) && right.test(row) && aspect.test(row))) {
-      cited.push(`${ownerPossessive(A)} ${h.a} ${h.aspect} ${ownerPossessive(B)} ${h.b}`);
-    }
-  }
-  return cited;
+  return synastryAspectClaims(text,syn).flatMap(claim => {
+    const hit = matchingCrossAspect(claim,syn);
+    return hit ? [`${ownerPossessive(A)} ${hit.a} ${hit.aspect} ${ownerPossessive(B)} ${hit.b}`] : [];
+  });
 }
 
 function overlayEvidence(text, syn) {
@@ -445,22 +572,25 @@ function overlayEvidence(text, syn) {
 
 function explicitCrossAspectErrors(text, syn) {
   const { A, B } = synastrySubjects(syn);
-  const roleA = A.toLowerCase() === "you" ? "natal" : "primary";
-  const errors = [];
-  for (const row of sentenceRows(text)) {
-    const aspect = aspectNameInSentence(row);
-    if (!aspect) continue;
-    const bodiesA = mentionedOwnedBodies(row, syn.chartA, A, roleA);
-    const bodiesB = mentionedOwnedBodies(row, syn.chartB, B, "partner");
-    if (!bodiesA.length || !bodiesB.length) continue;
-    const supported = bodiesA.some((a) => bodiesB.some((b) =>
-      (syn.hits || []).some((hit) => hit.a === a && hit.b === b && hit.aspect === aspect)
-    ));
-    if (!supported) {
-      errors.push(`the stated ${aspect.toLowerCase()} does not match the named ${A}/${B} planet ownership`);
+  const scan = completedMutualScan(syn);
+  return synastryAspectClaims(text,syn).flatMap(claim => {
+    if (claim.a.mode === 'transiting' || claim.b.mode === 'transiting') {
+      const transit = claim.a.mode === 'transiting' ? claim.a : claim.b;
+      const natal = claim.a.mode === 'natal' ? claim.a : claim.b.mode === 'natal' ? claim.b : null;
+      const hits = scan && natal && transit.owner === natal.owner ? (natal.owner === 'A' ? scan.hitsA : scan.hitsB) : [];
+      const contact = hits.find(hit => hit.transit === transit.name && hit.natal === natal?.name
+        && hit.aspect?.toLowerCase() === claim.aspect.toLowerCase());
+      if (!contact) return ['the stated independent transit contact is not in the completed search for that chart owner'];
+      const dates = [...claim.row.slice(claim.end).matchAll(/\b\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?\b/g)].map(match => match[0]);
+      return dates.some(date => !(date.length === 10 && contact.dateISO?.startsWith(date)) && Date.parse(contact.dateISO) !== Date.parse(date))
+        ? ['the stated independent transit date does not match the completed owner-scoped search'] : [];
     }
-  }
-  return errors;
+    if (claim.a.owner === claim.b.owner) {
+      const chart = claim.a.owner === 'A' ? syn.chartA : syn.chartB;
+      return matchingNatalAspect(claim,chart) ? [] : [`the stated ${claim.aspect.toLowerCase()} does not match that owner's natal chart`];
+    }
+    return matchingCrossAspect(claim,syn) ? [] : [`the stated ${claim.aspect.toLowerCase()} does not match the named ${A}/${B} planet ownership`];
+  });
 }
 
 function validateSynastryGrounding(text, syn, minimumFacts = 1, allowDataLimit = false) {
@@ -489,8 +619,8 @@ function validateSynastryGrounding(text, syn, minimumFacts = 1, allowDataLimit =
   return { ok: errors.length === 0, factCount: cited.length, citedFacts: cited, errors };
 }
 
-async function completeVerified(prompt, verify, image = null) {
-  const first = stripMd(String(await interpreterComplete(prompt, image) || "").trim());
+async function completeVerified(prompt, verify, image = null, options = undefined) {
+  const first = stripMd(String(await interpreterComplete(prompt, image, options) || "").trim());
   const firstReport = verify(first);
   if (firstReport.ok) return first;
 
@@ -503,7 +633,7 @@ async function completeVerified(prompt, verify, image = null) {
     "REJECTED DRAFT",
     first,
   ].join("\n");
-  const second = stripMd(String(await interpreterComplete(repairPrompt, image) || "").trim());
+  const second = stripMd(String(await interpreterComplete(repairPrompt, image, options) || "").trim());
   const secondReport = verify(second);
   if (!secondReport.ok) {
     const error = new Error("I couldn't verify that answer against the chart data. Try asking about a specific planet, aspect, or house.");
@@ -523,7 +653,7 @@ function cacheKey(card, chart) {
   const a = card.aspect;
   const sig = chartIdentityKey(chart);
   return [
-    "model:personal-reading-v1", sig,
+    `model:${AGENT_CACHE_REVISION}`, sig,
     chart.readingContext ? chart.readingContext.cacheFingerprint : (typeof window.currentTransits === "function" ? `live-minute:${Math.floor(Date.now() / 60000)}` : "natal-only"),
     card.idx, p.name, p.sign, p.house, p.retrograde ? 1 : 0,
     card.dignity.kind,
@@ -606,7 +736,7 @@ function buildCardPrompt(card, chart) {
     `Card boundary-lane: ${card.laneR13} (${BOUNDARY_LANE_NAMES[card.laneR13]}).`,
     `Resonance ρ = ${card.resonance.toFixed(4)}.`,
     ...liveLines,
-    ...(chart.readingContext ? ["PERSONAL CONTEXT", chart.readingContext.personalText, chart.readingContext.limitations.join(" ")] : []),
+    ...personalPromptLines(chart),
   ].filter(Boolean);
   return lines.join("\n");
 }
@@ -732,8 +862,48 @@ function buildChartPrompt(chart, jdTarget = null, precomputedDigest = undefined,
     `Sect: ${chart.timeUnknown ? "withheld; unknown birth time" : chart.isDayChart ? "Day" : "Night"}. Lunar phase: ${chart.phase.phase}.`,
     ...(lifecycleLines ? ["", `RIGHT NOW`, `  ${lifecycleLines.join("\n  ")}`] : []),
     ...(progressionLines ? ["", `BY PROGRESSION`, `  ${progressionLines.join("\n  ")}`] : []),
-    ...(chart.readingContext ? ["", "PERSONAL CONTEXT (same reading instant)", chart.readingContext.personalText, chart.readingContext.eclipseText, "Calculation assumptions: " + chart.readingContext.limitations.join(" ")] : []),
+    ...personalPromptLines(chart),
   ].join("\n");
+}
+
+// The ordinary context text contains calculated astrology only. The living
+// profile is a separate, local evidence field and requires its own opt-in;
+// enabling chart interpretation alone never uploads observations or goals.
+function personalPromptLines(chart) {
+  const context = chart.readingContext;
+  if (!context) return [];
+  const lines = ["", "PERSONAL CONTEXT (same reading instant)", context.personalText,
+    context.eclipseText, "Calculation assumptions: " + (context.limitations || []).join(" ")];
+  if (context.input?.settings?.shareBehavioralDataWithAI === true && context.evidence?.livingProfile?.value) {
+    const summary = context.evidence.livingProfile.value;
+    const shared = typeof window.compactLivingSummary === 'function'
+      ? window.compactLivingSummary(summary, 10) : boundedLivingPromptSummary(summary);
+    lines.push("USER-SHARED BEHAVIORAL CONTEXT — self-reports, not computed astrological facts",
+      JSON.stringify(shared));
+  }
+  return lines;
+}
+
+// Standalone/older hosts may lack the context helper. Preserve the bounded
+// self-reported fields without copying an arbitrary full journal object.
+function boundedLivingPromptSummary(summary) {
+  const history = (Array.isArray(summary.history) ? summary.history : []).slice(-10).map(row => ({
+    id: row.id, at: row.at, domain: row.domain, kind: row.kind, rating: row.rating ?? null,
+    agreement: row.agreement ?? null, note: String(row.note || '').slice(0, 300),
+  }));
+  const aggregate = value => ({ count: value?.count || 0, checkIns: value?.checkIns || 0,
+    readingFeedback: value?.readingFeedback || 0, ratings: value?.ratings || null,
+    agreement: value?.agreement || null });
+  return { version: summary.version, revision: summary.revision, source: summary.source,
+    observationCount: summary.observationCount || 0,
+    preferences: Object.fromEntries(['goals','values','learningStyle','decisionStyle','attention','routines','socialContext']
+      .map(key => [key, String(summary.preferences?.[key] || '').slice(0, 500)])),
+    domains: (Array.isArray(summary.domains) ? summary.domains : []).slice(0, 5).map(domain => ({
+      body: domain.body, title: domain.title, ...aggregate(domain) })),
+    cognitive: aggregate(summary.cognitive), preferenceObservations: aggregate(summary.preferenceObservations),
+    history, notes: typeof summary.notes === 'string' ? summary.notes.slice(0, 300) : undefined,
+    goals: Array.isArray(summary.goals) ? summary.goals.slice(0, 5).map(goal => String(goal).slice(0, 300)) : undefined,
+    summaryScope: 'At most 10 recent observations, with notes limited to 300 characters; the complete journal remains local.' };
 }
 
 // ─────────────────────── host capability ───────────────────────
@@ -762,14 +932,20 @@ function buildChartPrompt(chart, jdTarget = null, precomputedDigest = undefined,
  * Does this host provide the agent interpreter?
  * @returns {boolean} true only when window.claude.complete is callable.
  */
-function interpreterComplete(prompt, image = null) {
+function interpreterComplete(prompt, image = null, options = undefined) {
+  if (window.Interpreter) {
+    if(window.Interpreter.available() || window.Interpreter.provider()==='Mistral')return window.Interpreter.complete(prompt,image,options);
+    if(window.claude && typeof window.claude.complete==='function')return window.claude.complete(prompt);
+    return window.Interpreter.complete(prompt,image,options);
+  }
   if (window.OpenRouter && window.OpenRouter.available()) return window.OpenRouter.complete(prompt, image);
   return window.claude.complete(prompt);
 }
 
 function agentAvailable() {
+  if (typeof window !== 'undefined' && window.Interpreter) return window.Interpreter.available() || (window.Interpreter.provider()==='OpenRouter' && !!window.claude && typeof window.claude.complete==='function');
   return typeof window !== "undefined"
-    && ((window.OpenRouter && window.OpenRouter.available())
+    && ((window.Interpreter && window.Interpreter.available()) || (window.OpenRouter && window.OpenRouter.available())
       || (!!window.claude && typeof window.claude.complete === "function"));
 }
 
@@ -786,10 +962,10 @@ function requireAgent() {
 }
 
 async function interpretCard(card, chart) {
-  requireAgent();
   const key = cacheKey(card, chart);
   if (__cache.has(key)) return __cache.get(key);
   if (__pending.has(key)) return __pending.get(key);
+  requireAgent();
 
   const prompt = buildCardPrompt(card, chart);
   const promise = (async () => {
@@ -808,8 +984,7 @@ async function interpretCard(card, chart) {
   return promise;
 }
 
-async function interpretChart(chart, jdTarget = null) {
-  requireAgent();
+function chartReadingCacheState(chart, jdTarget = null) {
   // The key's lifecycle component is derived from the DIGEST'S OWN
   // content, not from a day bucket: lifecycleDigest is not day-granular
   // — a shared shadow lane can flip within hours, a return can begin
@@ -839,6 +1014,11 @@ async function interpretChart(chart, jdTarget = null) {
   // without needing to know which exact jdTarget produced it.
   const chartIdentity = "chart:" + chartIdentityKey(chart);
   const key = chartIdentity + ":" + fingerprint;
+  return { digest, progressions, chartIdentity, key };
+}
+
+async function interpretChart(chart, jdTarget = null) {
+  const { digest, progressions, chartIdentity, key } = chartReadingCacheState(chart, jdTarget);
   if (__cache.has(key)) {
     const cached = __cache.get(key);
     remember(chartIdentity + ":latest", cached);
@@ -847,6 +1027,7 @@ async function interpretChart(chart, jdTarget = null) {
     return cached;
   }
   if (__pending.has(key)) return __pending.get(key);
+  requireAgent();
   const prompt = buildChartPrompt(chart, jdTarget, digest, progressions);
   const promise = (async () => {
     try {
@@ -889,17 +1070,29 @@ function persistAgentRun(chart) {
   if (ok && window.dispatchEvent) window.dispatchEvent(new CustomEvent('personal-reading-evidence'));
 }
 
+function useAgentProviderState() {
+  if (typeof window.useInterpreterState === 'function') return window.useInterpreterState();
+  const provider = window.Interpreter || window.OpenRouter;
+  const read = () => provider && typeof provider.getState === 'function' ? provider.getState()
+    : { available: agentAvailable(), model: provider && provider.model ? provider.model() : '', generation: 0 };
+  const [state, setState] = React.useState(read);
+  React.useEffect(() => provider && typeof provider.subscribe === 'function'
+    ? provider.subscribe(() => setState(read())) : undefined, [provider]);
+  return state || read();
+}
+
 function useAgentReading(card, chart, active) {
+  const provider = useAgentProviderState();
   const [state, setState] = React.useState({ loading: false, text: null, error: null });
   const stateKey = card && chart ? cacheKey(card, chart) : null;
   React.useEffect(() => {
     if (!active || !card || !chart) return;
-    if (!agentAvailable()) { setState({ ...AGENT_UNAVAILABLE, stateKey }); return; }
     const key = cacheKey(card, chart);
     if (__cache.has(key)) {
       setState({ stateKey, loading: false, text: __cache.get(key), error: null });
       return;
     }
+    if (!agentAvailable()) { setState({ ...AGENT_UNAVAILABLE, stateKey }); return; }
     setState({ stateKey, loading: true, text: null, error: null });
     let cancelled = false;
     interpretCard(card, chart).then(
@@ -907,11 +1100,12 @@ function useAgentReading(card, chart, active) {
       (err)  => { if (!cancelled) setState({ stateKey, loading: false, text: null, error: String(err && err.message || err) }); }
     );
     return () => { cancelled = true; };
-  }, [active, card && chart && cacheKey(card, chart)]);
+  }, [active, card && chart && cacheKey(card, chart), provider.available, provider.model, provider.generation]);
   return active && state.stateKey === stateKey ? state : { loading: false, text: null, error: null };
 }
 
 function useAgentChartReading(chart, active, jdTarget = null) {
+  const provider = useAgentProviderState();
   const [state, setState] = React.useState({ loading: false, text: null, error: null });
   const jdBucket = Number.isFinite(jdTarget) ? jdTarget : null;
   const contextKey = chart && chart.readingContext && chart.readingContext.cacheFingerprint;
@@ -919,6 +1113,11 @@ function useAgentChartReading(chart, active, jdTarget = null) {
   const stateKey = chart ? chartIdentityKey(chart) + (chart.readingContext ? chart.readingContext.cacheFingerprint : "") + ":" + jdBucket : null;
   React.useEffect(() => {
     if (!active || !chart) return;
+    const cache = chartReadingCacheState(chart, jdTarget);
+    if (__cache.has(cache.key)) {
+      setState({ stateKey, loading: false, text: __cache.get(cache.key), error: null });
+      return;
+    }
     if (!agentAvailable()) { setState({ ...AGENT_UNAVAILABLE, stateKey }); return; }
     setState({ stateKey, loading: true, text: null, error: null });
     let cancelled = false;
@@ -927,7 +1126,7 @@ function useAgentChartReading(chart, active, jdTarget = null) {
       (err)  => { if (!cancelled) setState({ stateKey, loading: false, text: null, error: String(err && err.message || err) }); }
     );
     return () => { cancelled = true; };
-  }, [active, identity, jdBucket, contextKey]);
+  }, [active, identity, jdBucket, contextKey, provider.available, provider.model, provider.generation]);
   return active && state.stateKey === stateKey ? state : { loading: false, text: null, error: null };
 }
 
@@ -958,6 +1157,7 @@ function buildSynastryAspectPrompt(hit, syn) {
     `${hit.b} signifies: ${planetSignifies(hit.b)}.`,
     `The ${hit.aspect} works as: ${aspectMeaning(hit.aspect)}.`,
     `This is among the strongest contacts between the two charts (relational weight ${hit.weight.toFixed(2)}).`,
+    ...mutualScanFactLines(syn),
   ].join("\n");
 }
 
@@ -998,11 +1198,15 @@ function buildSynastryOverviewPrompt(syn) {
   ].filter(Boolean).join("\n");
 }
 
+function synastryCacheIdentity(syn) {
+  return chartIdentityKey(syn.chartA) + "::" + chartIdentityKey(syn.chartB) + "::context:" + (syn.readingContext?.cacheFingerprint || "natal-only");
+}
+
 async function interpretSynastryOverview(syn) {
-  requireAgent();
-  const key = "syn:" + chartIdentityKey(syn.chartA) + "::" + chartIdentityKey(syn.chartB);
+  const key = "syn:" + synastryCacheIdentity(syn);
   if (__cache.has(key)) return __cache.get(key);
   if (__pending.has(key)) return __pending.get(key);
+  requireAgent();
   const prompt = buildSynastryOverviewPrompt(syn);
   const promise = (async () => {
     try {
@@ -1015,11 +1219,11 @@ async function interpretSynastryOverview(syn) {
 }
 
 async function interpretSynastryAspect(hit, syn) {
-  requireAgent();
-  const key = "synasp:" + chartIdentityKey(syn.chartA) + "::" + chartIdentityKey(syn.chartB)
+  const key = "synasp:" + synastryCacheIdentity(syn)
     + ":" + hit.a + ":" + hit.b + ":" + hit.aspect + ":" + Math.round(hit.orb * 3600);
   if (__cache.has(key)) return __cache.get(key);
   if (__pending.has(key)) return __pending.get(key);
+  requireAgent();
   const prompt = buildSynastryAspectPrompt(hit, syn);
   const promise = (async () => {
     try {
@@ -1032,21 +1236,25 @@ async function interpretSynastryAspect(hit, syn) {
 }
 
 function useSynastryReading(syn, active) {
+  const provider = useAgentProviderState();
   const [state, setState] = React.useState({ loading: false, text: null, error: null });
   const identityA = syn ? chartIdentityKey(syn.chartA) : null;
   const identityB = syn ? chartIdentityKey(syn.chartB) : null;
+  const stateKey = syn ? synastryCacheIdentity(syn) : null;
   React.useEffect(() => {
     if (!active || !syn) return;
-    if (!agentAvailable()) { setState(AGENT_UNAVAILABLE); return; }
-    setState({ loading: true, text: null, error: null });
+    const key = "syn:" + stateKey;
+    if (__cache.has(key)) { setState({ stateKey, loading: false, text: __cache.get(key), error: null }); return; }
+    if (!agentAvailable()) { setState({ ...AGENT_UNAVAILABLE, stateKey }); return; }
+    setState({ stateKey, loading: true, text: null, error: null });
     let cancelled = false;
     interpretSynastryOverview(syn).then(
-      (text) => { if (!cancelled) setState({ loading: false, text, error: null }); },
-      (err)  => { if (!cancelled) setState({ loading: false, text: null, error: String(err && err.message || err) }); }
+      (text) => { if (!cancelled) setState({ stateKey, loading: false, text, error: null }); },
+      (err)  => { if (!cancelled) setState({ stateKey, loading: false, text: null, error: String(err && err.message || err) }); }
     );
     return () => { cancelled = true; };
-  }, [active, identityA, identityB]);
-  return state;
+  }, [active, identityA, identityB, stateKey, provider.available, provider.model, provider.generation]);
+  return active && state.stateKey === stateKey ? state : { loading: false, text: null, error: null };
 }
 
 // ─────────────────────── chart-scoped follow-ups ──────────────────────
@@ -1086,7 +1294,8 @@ function buildNatalFollowUpPrompt(question, chart, history = []) {
     ``,
     `SOURCE OF TRUTH — CHART FOR ${subject.toUpperCase()}`,
     chartFactBlock(chart, subject),
-    ...(chart.readingContext ? ["PERSONAL CONTEXT", chart.readingContext.personalText, chart.readingContext.lifecycleText, chart.readingContext.progressionsText, chart.readingContext.eclipseText, chart.readingContext.limitations.join(" ")] : []),
+    ...personalPromptLines(chart),
+    ...(chart.readingContext ? [chart.readingContext.lifecycleText, chart.readingContext.progressionsText] : []),
   ].join("\n");
 }
 
@@ -1207,6 +1416,14 @@ function buildReadingMarkdown(chart, cards, narrative = null) {
     );
     if (source === "local") {
       lines.push("", "*Composed locally from the classical tables.*");
+    } else if (source === "agent" && typeof readingFor === "function") {
+      try {
+        const computed = readingFor(card, chart);
+        if (computed && computed.body && computed.body.length) {
+          lines.push("", "### Computed basis and observation checks", "",
+            ...computed.body.map(line => line.text));
+        }
+      } catch { /* unavailable local evidence must not prevent the export */ }
     }
   });
 

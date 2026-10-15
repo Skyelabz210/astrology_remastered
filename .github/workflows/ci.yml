@@ -3,6 +3,22 @@ name: CI
 on: [push, pull_request]
 
 jobs:
+  types:
+    name: TypeScript contracts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: project
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: project/package-lock.json
+      - run: npm ci
+      - run: npm run types:check
+      - run: npm run eclipses:check
   core-tests:
     name: core-tests (node ${{ matrix.node-version }})
     runs-on: ubuntu-latest

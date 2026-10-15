@@ -43,7 +43,7 @@ passing tests do not establish superiority over all other implementations.
 | Eclipses | Prenatal solar/lunar pair, lifetime contacts and upcoming events, geometry, sub-body coordinates, altitude and contact interpretation | Above horizon is necessary, not sufficient for local eclipse visibility. Angular/contact model limits remain displayed. |
 | Synastry | Two explicitly owned natal charts, cross-aspects, actual selected-house overlays, receptions, relationship diagnostics, independent mutual perfections | Scores are chosen weights, not measured compatibility probabilities. Cyclic midpoint uses the circular mean; exactly antipodal phases are ambiguous. No full composite/Davison chart engine. |
 | HCRM/CRAM | Strict admitted real-planet ledger, provenance/checksum, BigInt register/carry, shadow/closure diagnostics; exact arithmetic tests | Integer exactness starts after arcsecond quantization. Experimental residue coincidences are not physical or predictive evidence. Standalone console demonstration rows are not admitted production ledgers. |
-| Other traditions | Integer registry of thirteen traditions, division/frame/period constants; Mayan calendar/CTM computations | Vedic/KP natal interpretation, date-dependent ayanamsas, Vimshottari schedules, yoga/shadbala/ashtakavarga, Bazi/Zi Wei and other named tradition-specific reading pipelines are not implemented by the registry. |
+| Other traditions | Integer registry of thirteen traditions; behavioral page exposes admitted nakshatra/pada/ruler, four approximate date-dependent ayanamsha conventions, Vimshottari major/subperiod schedules, and timezone-bound Tzolk'in/Haab' dates | Official school-specific ayanamsha models, full Vedic/KP interpretation, yoga/shadbala/ashtakavarga, Bazi/Zi Wei and other complete tradition-specific reading pipelines remain absent. See EVOLUTION_IMPLEMENTATION.md for conventions. |
 | Horary/electional | Some reusable traditional condition and aspect helpers | No complete horary/electional judgments, translation/collection of light, prohibition/frustration or chart rectification engine. |
 
 ## Personal data and run flow
@@ -158,7 +158,7 @@ cannot replace another person's run, and evidence attachments include the owner
 or reject ambiguous IDs. The CRAM Calculator's dim text now uses
 the same corrected AA contrast level as the main stylesheet.
 
-Release 2026.10 / version 1.0.0 is shared by every page, reading input snapshot
+Release 2026.10 / version 1.1.0 is shared by every page, reading input snapshot
 and ZIP manifest. The footer sits outside the React root so navigation and
 error boundaries retain it. All historical branch tips are included by ancestry
 or verified patch equivalence; the original follow-up branch and its already
@@ -198,3 +198,19 @@ corrections, data/privacy boundaries, and remaining product limitations.
 
 
 Alpha residence journey: Fort Bragg (birth), Wetzlar from 1980-10-22 for 13 years, Fort Leonard Wood from 1993-10-22 for three years, San Antonio from 1996-10-22 onward. Move dates were approved as approximate and remain editable; UTC-midnight boundaries do not assert an arrival time. This fixture is restricted to the alpha birth epoch and coordinates. Saved custom histories are preserved, additional chapters are available to every user, and changing the birth record discards unedited inherited chapters. Natal birthplace stays fixed; return charts select residence on the return date. Approximation flags are retained in saved profiles and reading inputs.
+
+
+## Corrective release 1.1.0
+
+The main-branch roadmap is integrated with the living avatar. [EVOLUTION_IMPLEMENTATION.md](EVOLUTION_IMPLEMENTATION.md) maps optional Mistral/proxy support, source-linked consultation, keepsakes, tradition views, admitted theatre geometry, all 21 core declaration files, Vertex and the 274-event offline eclipse catalogue to their implementations and remaining limits.
+
+The deeper reading audit is [SYSTEM_READING_AUDIT.md](SYSTEM_READING_AUDIT.md).
+It supersedes the sign-only behavioral baseline and records independent
+reproductions missed by the preceding green suite: homeward residence selection,
+chapter ownership while editing, impossible dates, polar horizon branch/status,
+Grand Cross ordering, mean-apogee motion and Ascendant rounding. Shared chart
+evidence now supplies local cards, speech, behavioral profiles and exports.
+See [CALCULATION_CONVENTIONS.md](CALCULATION_CONVENTIONS.md) for exact conventions
+and [TECHNIQUE_ACCESS_MAP.md](TECHNIQUE_ACCESS_MAP.md) for measured navigation
+rather than an implementation inventory. Historical target calculations can be
+saved with their actual scan evidence; the standalone HCRM profile is hydrated.

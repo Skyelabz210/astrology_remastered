@@ -638,6 +638,7 @@ function mutualPerfections(natalA, natalB, jdCenter, spanDays = 366, nearDays = 
 // Expose
 isRetrograde; // silence linter: relies on astro.jsx globals
 Object.assign(window, {
+  PERFECTION_TRANSITERS, PERFECTION_ASPECTS,
   MAYA_EPOCH_JD,
   TZOLKIN_SIGNS, HAAB_MONTHS,
   mayaLongCount, tzolkin, haab, calendarRound,

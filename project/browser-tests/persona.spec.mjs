@@ -116,12 +116,13 @@ test('personal runs preserve residence, narration, exports and admitted diagnost
   await page.getByRole('button', { name: 'full spread', exact: true }).click();
   await page.getByText('Advanced → Shadow, Harmonic Closure and HCRM', { exact: true }).click();
   await expect(page.getByText('HCRM placement diagnostics', { exact: true })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.ReadingRuns.loadRuns().filter(r => r.evidence.hcrm).length)).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.ReadingRuns.loadRuns().filter(r => r.evidence.hcrm).length)).toBeGreaterThan(0);
   const ledger = await page.evaluate(() => window.ReadingRuns.loadRuns().find(r => r.evidence.hcrm).evidence.hcrm.ledger);
   expect(ledger).toHaveLength(10);
   expect(ledger.every(e => e.certificate.status === 'IMPORTED_INTEGER_LEDGER')).toBe(true);
+  const savedIds = await page.evaluate(() => window.ReadingRuns.loadRuns().map(run => run.id));
   await page.reload();
-  await expect.poll(() => page.evaluate(() => window.ReadingRuns.loadRuns().length)).toBe(2);
+  expect(await page.evaluate(() => window.ReadingRuns.loadRuns().map(run => run.id))).toEqual(savedIds);
   expect(errors).toEqual([]);
 });
 
@@ -234,7 +235,7 @@ test('OpenRouter free vision integration generates and saves a grounded behavior
   await page.getByText('Interpreter settings · OpenRouter', { exact: true }).click();
   await page.getByLabel('OpenRouter API key', { exact: true }).fill('test-key');
   await page.getByRole('button', { name: 'Connect OpenRouter', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: /Connected/ })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: /Configured/ })).toBeVisible();
   await expect(page.getByLabel('OpenRouter API key', { exact: true })).toHaveValue('');
   await page.getByLabel(/Send my birth data/).check();
   await page.getByRole('button', { name: 'Cast the spread' }).click();

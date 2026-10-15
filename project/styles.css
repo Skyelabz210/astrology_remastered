@@ -732,10 +732,9 @@ body::before {
   line-height: 1.42;
   color: var(--card-ink);
   flex-shrink: 1;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  -webkit-box-orient: vertical;
+  min-height: 0;
+  overflow: auto;
+  display: block;
 }
 .zc-back-body p { margin: 0 0 3px 0; }
 .zc-agent-loading {
@@ -3001,3 +3000,47 @@ body::before {
 .glb-cities { overflow: clip; border-radius: 50%; }
 
 .previous-behavior .saved-reading { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Each behavioral domain keeps its computed facts and hypotheses visible. */
+.behavior-card { min-width: 0; scroll-margin-top: 24px; }
+.behavior-card h3 { margin: 22px 0 8px; font-size: 15px; }
+.behavior-card details { margin: 16px 0; }
+.behavior-card li, .behavior-card p { overflow-wrap: anywhere; }
+.behavior-card small, .behavior-uncertainty { color: #c3c9b9; line-height: 1.5; }
+.behavior-card a { color: #c6dfb4; text-underline-offset: 3px; }
+.behavior-card a:focus-visible { outline: 2px solid #c6dfb4; outline-offset: 4px; }
+
+.living-avatar { border: 1px solid #596954; border-radius: 18px; padding: 24px; margin: 24px 0; background: #1b241e; color: #e8ecdf; }
+.living-avatar-head { display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+.living-kicker { font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+.living-xp { display:grid; gap:8px; }.living-xp strong {font-size:26px;color:#d0eab0;}
+.avatar-orbit {max-width:360px;margin:auto;color:#d0eab0;} .avatar-orbit svg {width:100%;height:auto;}
+.avatar-quests {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+.avatar-quests article {border:1px solid #596954;border-radius:12px;padding:16px;min-width:0;}
+.avatar-quests a {color:#d0eab0;display:block;margin-bottom:12px;}
+.avatar-check-in,.avatar-preferences {margin-top:24px;display:grid;gap:14px;}
+.avatar-fields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.living-avatar label {display:grid;gap:8px;line-height:1.5;}
+.living-avatar select,.living-avatar textarea {box-sizing:border-box;width:100%;min-width:0;color:#e8ecdf;background:#101a14;border:1px solid #849976;border-radius:8px;padding:12px;font:inherit;}
+.living-avatar textarea {min-height:90px;resize:vertical;}.living-avatar details {margin:22px 0;}
+.living-avatar button {justify-self:start;}.living-avatar p,.living-avatar li {overflow-wrap:anywhere;}
+.living-avatar :focus-visible {outline:3px solid #d0eab0;outline-offset:3px;}
+.living-summary {position:relative;z-index:2;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;color:#d0eab0;background:#1b241e;border-bottom:1px solid #596954;}
+@media(max-width:600px){.living-avatar {padding:16px;}.avatar-quests,.avatar-fields {grid-template-columns:minmax(0,1fr);}}
+.evolution-panel { margin: 2rem 0; padding: 1.25rem; border: 1px solid var(--line, #666); border-radius: 12px; }
+.evolution-panel details, .evolution-panel p, .evolution-settings p { margin: .8rem 0; }
+.evolution-panel label, .evolution-settings label { display: grid; gap: .5rem; margin: .8rem 0; }
+.evolution-panel button, .evolution-settings button { margin: .3rem; padding: .65rem 1rem; }
+.evolution-panel textarea { min-height: 6rem; width: 100%; }
+.evolution-panel p, .evolution-panel code { overflow-wrap: anywhere; white-space: pre-wrap; }
+.evolution-table { overflow-x: auto; }
+.evolution-table th, .evolution-table td { text-align: left; padding: .5rem; }
+.evolution-settings { min-width: 0; margin-top: 1rem; }
+.theatre-geometry { margin: 1rem auto; width: min(90%, 900px); overflow-wrap: anywhere; }
+.theatre-geometry summary { cursor: pointer; padding: .8rem 0; }
+.theatre-geometry svg { display: block; margin: 1rem auto; max-width: 100%; }
+.prime-theatre-views { border: 1px solid currentColor; border-radius: 12px; padding: 1rem; margin: 1rem 0; background: #151d24; color: #edf7f1; }
+.prime-geometry-pair { display: flex; flex-wrap: wrap; justify-content: center; }
+.prime-geometry-pair svg { width: min(100%,280px); }
+.prime-theatre-views label, .prime-depth { display: grid; gap: .5rem; }
+.prime-theatre-views select { max-width: 100%; }

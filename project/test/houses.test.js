@@ -350,23 +350,10 @@ export function run() {
       errAt66 ? `unexpectedly threw ${errAt66.name}` : ""
     );
 
-    // ascMc() beyond 66.56° silently returns the Descendant (180° error)
-    // for some RAMC values instead of the true Ascendant — an earlier
-    // version of this module claimed ascMc() stays correct at high
-    // latitude and left it unguarded; that claim was false (verified
-    // failing for real at Tromsø, Norway, 69.6°N), so it now throws the
-    // same as Placidus/Koch/Alcabitius.
-    let ascMcThrew = null;
-    try {
-      ascMc(jdUt1, jdTt, 75, 0);
-    } catch (e) {
-      ascMcThrew = e;
-    }
-    t(
-      "ascMc(latDeg=75) throws PolarLatitudeError (corrected: no longer silently wrong)",
-      ascMcThrew instanceof PolarLatitudeError,
-      ascMcThrew ? `threw ${ascMcThrew.name}` : "no exception thrown"
-    );
+    // Polar ASC uses the eastern horizon; cusp policies remain separate.
+    const polarAngles = ascMc(jdUt1, jdTt, 75, 0);
+    t("ascMc(latDeg=75) returns a defined eastern-horizon angle",
+      Number.isFinite(polarAngles.ascDeg) && Number.isFinite(polarAngles.mcDeg));
 
     let ascMcOkAt66 = true;
     let ascMcErrAt66 = null;

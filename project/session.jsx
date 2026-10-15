@@ -262,6 +262,7 @@ function ReadingSession({ chart: natalChart, settings, setTweak, onOpenSpread, o
         agentOn={agentOn}
         onToggleAgent={() => setTweak('agentOn', !agentOn)}
       />
+      {window.LivingAvatarSummary && <window.LivingAvatarSummary chart={chart} onOpen={onOpenBehavior} />}
 
       {typeof window !== "undefined" && window.LifeChapterSummary && (
         <window.LifeChapterSummary chart={chart} chapters={chapters} />
@@ -302,6 +303,10 @@ function ReadingSession({ chart: natalChart, settings, setTweak, onOpenSpread, o
                 elevenModel:   settings.elevenModel,
               });
             }}
+            onOpenLinkedCard={idx => {
+              const linkedPos = order.indexOf(idx);
+              if (linkedPos >= 0) { stopNarration(); setPos(linkedPos); }
+            }}
           />
       }
 
@@ -314,6 +319,7 @@ function ReadingSession({ chart: natalChart, settings, setTweak, onOpenSpread, o
         />
       )}
 
+      {shuffled && window.ExactTheatreGeometry && <window.ExactTheatreGeometry chart={chart} body={cards[pos]?.principal.name} />}
       {shuffled && <FollowUpQuestions mode="natal" chart={chart} agentOn={agentOn} />}
     </div>
   );
@@ -325,8 +331,9 @@ function ReadingSession({ chart: natalChart, settings, setTweak, onOpenSpread, o
 function CinematicStage({ card, timeUnknown, ascLane, agent, localReading, spokenText, pos, total,
                          voiceOn, voiceSpeaking, voiceStatus, narrating, narrationSeg,
                          narrationTotal, narrationSegment, onPlayWholeChart, onResumeWholeChart,
-                         onStopNarration, onSpeakNow }) {
+                         onStopNarration, onSpeakNow, onOpenLinkedCard }) {
   const p = card.principal;
+  const links = localReading && localReading.evidence && localReading.evidence.resonance || [];
 
   return (
     <div className="cs" style={{
@@ -384,6 +391,14 @@ function CinematicStage({ card, timeUnknown, ascLane, agent, localReading, spoke
             </p>
           )}
           {agent.text && <WordReveal text={agent.text} resonance={card.resonance} />}
+          {agent.text && localReading && localReading.evidence && (
+            <details className="cs-local-reading">
+              <summary>Computed basis and self-observation</summary>
+              {localReading.body.map((line, i) => <p key={i} className="cs-local-line">
+                {line.text}<span className="cs-source-tag"> — {line.sourceTag}</span>
+              </p>)}
+            </details>
+          )}
           {!agent.loading && !agent.text && localReading && (
             <div className="cs-local-reading">
               {localReading.body.map((line, i) => (
@@ -396,6 +411,17 @@ function CinematicStage({ card, timeUnknown, ascLane, agent, localReading, spoke
           )}
           </>)}
         </div>
+
+        {links.some(link => Number.isInteger(link.cardIdx) && link.cardIdx !== card.idx) && (
+          <nav className="cs-narration" aria-label="Related placement readings">
+            {links.filter(link => Number.isInteger(link.cardIdx) && link.cardIdx !== card.idx).map(link => (
+              <button key={link.body} className="cs-unblock cs-unblock-dim"
+                onClick={() => onOpenLinkedCard && onOpenLinkedCard(link.cardIdx)}>
+                Read {link.body} · {link.aspect}
+              </button>
+            ))}
+          </nav>
+        )}
 
         {/* The whole chart, as one piece. This is the primary control now:
             the reading is a single continuous narrative, and these buttons

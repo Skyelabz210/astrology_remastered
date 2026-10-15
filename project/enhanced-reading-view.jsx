@@ -13,6 +13,7 @@ function EnhancedReadingPanel({chart}) {
         if (!cancelled && chart.readingContext && window.ReadingRuns) {
           const c = chart.readingContext;
           const ok = window.ReadingRuns.attachEvidence(null, JSON.stringify([c.at, c.input]), 'hcrm', data, c.profileKey);
+          if (window.LivingProfile) window.LivingProfile.ensureProfile(chart, { ...c, evidence: { ...c.evidence, hcrm: { status: 'ready', value: data } } });
           if (ok) window.dispatchEvent(new CustomEvent('personal-reading-evidence'));
         }
         return data;

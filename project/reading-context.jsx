@@ -1,11 +1,46 @@
 // One frozen instant and one personal input snapshot shared by the reader,
 // agent prompts, narration, export and saved calculation history.
+function compactLivingSummary(summary, maxNotes = 20) {
+  if (!summary || typeof summary !== 'object') return null;
+  const limit = Math.min(20, Math.max(0, Math.trunc(Number(maxNotes) || 0)));
+  const originalHistory = Array.isArray(summary.history) ? summary.history : [];
+  const history = (limit ? originalHistory.slice(-limit) : []).map(row => ({
+      id: row.id, at: row.at, domain: row.domain, kind: row.kind,
+      rating: row.rating ?? null, agreement: row.agreement ?? null,
+      note: String(row.note || '').slice(0, 300), contextAt: row.contextAt || null,
+      readingId: typeof row.readingId === 'string' ? row.readingId.slice(0, 120) : null,
+    }));
+  const aggregate = (value = {}, domain = null) => ({ count: value.count || 0,
+    checkIns: value.checkIns || 0, readingFeedback: value.readingFeedback || 0,
+    ratings: value.ratings ? { ...value.ratings } : null,
+    agreement: value.agreement ? { ...value.agreement } : null,
+    recentObservationIds: history.filter(row => domain === null || row.domain === domain).slice(-3).map(row => row.id) });
+  return { version: summary.version, ownerKey: summary.ownerKey, revision: summary.revision,
+    createdAt: summary.createdAt, updatedAt: summary.updatedAt, source: summary.source,
+    baselineBasisKey: summary.baselineBasisKey, preferences: { ...(summary.preferences || {}) },
+    observationCount: summary.observationCount || 0,
+    domains: (Array.isArray(summary.domains) ? summary.domains : []).slice(0, 5).map(domain => ({
+      id: domain.id, body: domain.body, title: domain.title, ...aggregate(domain, domain.body) })),
+    cognitive: { title: summary.cognitive?.title, source: summary.cognitive?.source,
+      preferences: { ...(summary.cognitive?.preferences || {}) }, ...aggregate(summary.cognitive, 'cognitive') },
+    preferenceObservations: aggregate(summary.preferenceObservations, 'preferences'),
+    engagement: summary.engagement ? { ...summary.engagement } : null, history,
+    revisionHistory: (Array.isArray(summary.revisionHistory) ? summary.revisionHistory : []).slice(-10).map(row => ({ ...row })),
+    limitation: summary.limitation,
+    summaryScope: `Counts describe the retained journal; this snapshot includes at most ${limit} recent observations with notes limited to 300 characters. Domain references point to those retained snapshot notes. The complete retained journal stays in Living Profile storage and the private ZIP export.` };
+}
+
 function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
   if (!chart || !Number.isFinite(jd)) return null;
   const at = new Date((jd - 2440587.5) * 86400000).toISOString();
   const evidence = {};
   const evaluate = (name, fn) => {
-    try { evidence[name] = { status: 'ready', value: fn() }; }
+    try {
+      const value = fn();
+      evidence[name] = value && value.status === 'unavailable'
+        ? { status: 'unavailable', message: value.message || 'Calculation unavailable', value }
+        : { status: 'ready', value };
+    }
     catch (error) { evidence[name] = { status: 'unavailable', message: String(error.message || error) }; }
     return evidence[name].value || null;
   };
@@ -14,6 +49,16 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
   const transits = evaluate('transits', () => window.currentTransits(chart, jd));
   const persona = evaluate('traditional', () => window.PersonaModel.personaForChart(chart, new Date(at), window.Astronomy));
   const residence = evaluate('residence', () => window.chapterAware(chart, chapters, jd));
+  evaluate('behavioralTrajectories', () => {
+    if (!window.BehavioralProfile || typeof window.BehavioralProfile.behavioralTrajectories !== 'function') throw new Error('Behavioral trajectory calculation unavailable');
+    return window.BehavioralProfile.behavioralTrajectories(chart, jd,
+      window.EPHEMERIS_MODE === 'SYNTHETIC' ? null : window.Astronomy);
+  });
+  if (window.LivingProfile && typeof window.LivingProfile.loadProfile === 'function'
+      && typeof window.LivingProfile.summarizeProfile === 'function') {
+    const living = window.LivingProfile.loadProfile(chart.birth);
+    if (living) evaluate('livingProfile', () => compactLivingSummary(window.LivingProfile.summarizeProfile(living)));
+  }
   // Only the relevant computed residence is retained, not duplicate charts.
   if (residence) evidence.residence.value = { active: residence.active, dropped: residence.dropped,
     lines: typeof window.chapterDigest === 'function' ? window.chapterDigest(chart, residence.chapters || []) : [] };
@@ -24,6 +69,7 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
   });
   const personalLines = [];
   if (residence && residence.active) personalLines.push(`Your residence at this reading's instant is ${residence.active.place.label}. Return charts use the residence on each return date.`);
+  if (residence && residence.dropped) personalLines.push(`${residence.dropped} residence ${residence.dropped === 1 ? 'entry was' : 'entries were'} excluded because the location or date interval was invalid. Correct those entries to include them in location-based calculations.`);
   if (persona) {
     personalLines.push(`${persona.dominantElement} is the leading element among the seven classical planets; the leading modality is ${persona.dominantModality}.`);
     if (persona.profection) personalLines.push(`The annual profection lord is ${persona.profection.lord}.`);
@@ -39,13 +85,18 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
     'Firdaria uses 365.2425-day years; zodiacal releasing is level 1 with 360-day Egyptian years.',
     'Fixed-star positions omit proper motion; lunar mansions use equal tropical sectors.'];
   if ((chapters || []).some(ch => ch.approximate)) limitations.push("Residence dates marked approximate are editable estimates; location-based readings near a move date may change when dates are corrected. Date-only chapter boundaries use UTC midnight, not a known flight or arrival time.");
+  if (residence && residence.dropped) limitations.push(`${residence.dropped} invalid residence entries were excluded; return charts use only valid dated locations or the natal birthplace fallback.`);
   if (chart.timeUnknown) limitations.push('Unknown birth time: the assumed epoch affects lunar degrees, transits and return dates; houses, sect-dependent time lords and exact natal lanes are withheld from interpretation.');
   for (const [name, item] of Object.entries(evidence)) if (item.status !== 'ready') limitations.push(`${name}: ${item.message}`);
   const input = { birth: { ...chart.birth }, chapters: JSON.parse(JSON.stringify(chapters || [])),
+    ...(evidence.livingProfile?.status === 'ready' && evidence.livingProfile.value ? {
+      livingAvatar: { ownerKey: evidence.livingProfile.value.ownerKey,
+        revision: evidence.livingProfile.value.revision, baselineBasisKey: evidence.livingProfile.value.baselineBasisKey },
+    } : {}),
     houseSystemActual: chart.houseSystemActual, settings: { orbScale: settings.orbScale ?? 1, eclipseOrb,
-      sect: settings.sect || 'auto' }, ephemeris: window.Astronomy ? 'Astronomy Engine 2.1.19' : 'synthetic demo',
-    interpreter: settings.agentOn === true && window.OpenRouter && window.OpenRouter.available() ? { provider: 'OpenRouter', model: window.OpenRouter.model() } : null,
-    modelRevision: 'personal-reading-v1', release: window.APP_RELEASE || null };
+      sect: settings.sect || 'auto', shareBehavioralDataWithAI: settings.shareBehavioralDataWithAI === true }, ephemeris: window.Astronomy && window.EPHEMERIS_MODE !== 'SYNTHETIC' ? 'Astronomy Engine 2.1.19' : 'synthetic demo',
+    interpreter: settings.agentOn === true && (window.Interpreter || window.OpenRouter)?.available() ? { provider: window.Interpreter?.provider() || 'OpenRouter', model: (window.Interpreter || window.OpenRouter).model() } : null,
+    modelRevision: 'personal-reading-v2', release: window.APP_RELEASE || null };
   const owner = window.ReadingRuns ? window.ReadingRuns.profileKey(chart.birth) : JSON.stringify(chart.birth);
   const cacheFingerprint = window.ReadingRuns ? window.ReadingRuns.evidenceFingerprint([at, input, evidence]) : JSON.stringify([at, input, evidence]);
   return { jd, at, profileKey: owner, input, evidence, limitations, cacheFingerprint,
@@ -58,13 +109,40 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
       outOfBounds: chart.outOfBounds, voidOfCourse: chart.voidOfCourse,
       joys: chart.timeUnknown ? [] : chart.joys, elementCount: chart.elementCount, modalityCount: chart.modalityCount,
       asc: chart.timeUnknown ? null : chart.asc, mc: chart.timeUnknown ? null : chart.mc,
+      anglesMode: chart.anglesMode, angleSource: chart.angleSource, angleConvention: chart.angleConvention,
+      solarAltitude: chart.timeUnknown ? null : chart.solarAltitude, sectSource: chart.sectSource,
       isDayChart: chart.timeUnknown ? null : chart.isDayChart } };
 }
 
+function useInterpreterState() {
+  const provider = window.Interpreter || window.OpenRouter;
+  const read = () => provider && typeof provider.getState === 'function'
+    ? provider.getState()
+    : { available: Boolean(provider && provider.available()), model: provider ? provider.model() : '', generation: 0 };
+  const [state, setState] = React.useState(read);
+  React.useEffect(() => {
+    const refresh = () => setState(read());
+    refresh();
+    return provider && typeof provider.subscribe === 'function' ? provider.subscribe(refresh) : undefined;
+  }, [provider]);
+  return state || read();
+}
+
 function usePersonalReading(natal, chapters, settings) {
+  const interpreter = useInterpreterState();
+  const living = window.LivingProfile;
+  const readRevision = () => living && typeof living.getRevision === 'function' && natal
+    ? living.getRevision(natal.birth) : 0;
+  const [livingRevision, setLivingRevision] = React.useState(readRevision);
+  React.useEffect(() => {
+    const refresh = () => setLivingRevision(readRevision());
+    refresh();
+    return living && typeof living.subscribe === 'function' ? living.subscribe(refresh) : undefined;
+  }, [living, natal]);
   const jd = React.useMemo(() => window.dateToJD(new Date()), []);
   const context = React.useMemo(() => buildPersonalReadingContext(natal, jd, chapters, settings),
-    [natal, jd, chapters, settings.orbScale, settings.eclipseOrb, settings.sect, settings.agentOn]);
+    [natal, jd, chapters, settings.orbScale, settings.eclipseOrb, settings.sect, settings.agentOn,
+      settings.shareBehavioralDataWithAI, interpreter.available, interpreter.model, interpreter.generation, livingRevision]);
   const chart = React.useMemo(() => natal && ({ ...natal, readingContext: context }), [natal, context]);
   return { chart, context };
 }
@@ -115,4 +193,4 @@ function PersonalReadingHistory({ chart, context, narrative }) {
     </details>
   </section>;
 }
-Object.assign(window, { buildPersonalReadingContext, usePersonalReading, PersonalReadingHistory });
+Object.assign(window, { compactLivingSummary, buildPersonalReadingContext, useInterpreterState, usePersonalReading, PersonalReadingHistory });

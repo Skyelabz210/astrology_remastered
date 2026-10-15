@@ -213,6 +213,7 @@ export default [
     ],
   },
   js.configs.recommended,
+  { files: ["project/src/ai/**/*.js"], languageOptions: { globals: globals.browser } },
   { files: ["project/src/present/openrouter.js", "project/src/present/behavioral-profile.js", "project/src/present/place-search.js"], languageOptions: { globals: globals.browser } },
   { files: ["project/release-stamp.js"], languageOptions: { globals: globals.browser } },
   { files: ["project/playwright.config.mjs"], languageOptions: { globals: NODE_GLOBALS } },

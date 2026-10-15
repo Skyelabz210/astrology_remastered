@@ -166,7 +166,7 @@ const PLANET_ORDER = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","
 if (typeof window !== "undefined") {
   window.EPHEMERIS_MODE = window.Astronomy ? "REAL" : "SYNTHETIC";
   // Which ASC/MC path is live. "REAL" = houses.js ascMc(); "APPROX" =
-  // this file's fallback closed form, which has a known ~109° ASC error.
+  // this file's approximate GMST/fixed-obliquity closed form.
   Object.defineProperty(window, "ANGLES_MODE", {
     configurable: true,
     get() { return (window.Houses && typeof window.Houses.ascMcFromDate === "function") ? "REAL" : "APPROX"; },
@@ -271,7 +271,7 @@ function isRetrograde(planet, jd) {
   // disagree (this is the fix for the historical bug where the synthetic
   // planetSpeed below was a constant positive mean rate independent of this
   // heuristic flag).
-  if (window.Astronomy && REAL_EPHEMERIS_BODIES.has(planet)) {
+  if (window.Astronomy && (REAL_EPHEMERIS_BODIES.has(planet) || ["NorthNode", "Lilith"].includes(planet))) {
     return planetSpeed(planet, jd) < 0;
   }
   if (planet === "NorthNode") return true;
@@ -340,6 +340,7 @@ function planetDeclination(lon, eclLatDeg) {
 // Closed-form fallback uses approximate GMST and fixed J2000 obliquity.
 // The eastern horizon branch is selected explicitly; precision is disclosed.
 function approxAscendantDeg(date, lat, lng) {
+  if (Math.abs(lat) === 90) throw new RangeError("A rising Ascendant is undefined at the geographic poles");
   const jd = dateToJD(date);
   // GMST in degrees, approximate
   const gmstDeg = mod360(280.46061837 + 360.98564736629 * (jd - 2451545.0));
@@ -349,11 +350,15 @@ function approxAscendantDeg(date, lat, lng) {
   const latRad = lat * Math.PI / 180;
   const eRad   = obliquity * Math.PI / 180;
   const raRad  = ra * Math.PI / 180;
-  const ascRad = Math.atan2(
-    -Math.cos(raRad),
-    Math.sin(raRad) * Math.cos(eRad) + Math.tan(latRad) * Math.sin(eRad)
-  );
-  return mod360(ascRad * 180 / Math.PI + 180);
+  const ascY = -Math.cos(raRad);
+  const ascX = Math.sin(raRad) * Math.cos(eRad) + Math.tan(latRad) * Math.sin(eRad);
+  if (Math.hypot(ascY, ascX) < 1e-12) throw new RangeError("The horizon and ecliptic coincide; a unique Ascendant is unavailable");
+  const ascRad = Math.atan2(ascY, ascX);
+  let candidate = ascRad + Math.PI;
+  const east = -Math.cos(candidate) * Math.sin(raRad) + Math.sin(candidate) * Math.cos(eRad) * Math.cos(raRad);
+  if (Math.abs(east) < 1e-12) throw new RangeError("A unique rising Ascendant is unavailable at this horizon");
+  if (east < 0) candidate += Math.PI;
+  return mod360(candidate * 180 / Math.PI);
 }
 
 // Ascendant. Prefers WP-11's real solver (tools/ephemeris/houses.js ascMc(),
@@ -365,21 +370,10 @@ function ascendantDeg(date, lat, lng) {
   return real ? real.ascDeg : approxAscendantDeg(date, lat, lng);
 }
 
-// Shared accessor for the real solver, with the polar case handled once.
-//
-// houses.js `ascMc()` THROWS PolarLatitudeError above |lat| = 66.56° — a
-// deliberate correctness fix (it previously returned the Descendant, a 180°
-// error, verified at Tromsø 69.6°N). But WP-19 removed the ±66° entry clamp on
-// purpose, so those latitudes are reachable from the form. Letting the throw
-// escape would take down the whole chart, including the planetary positions,
-// which are perfectly well-defined at any latitude.
-//
-// So: fall back to the local closed form there, and report APPROX. That value
-// carries the same large error as the no-module case, and it is NOT presented
-// as trustworthy — app.jsx's ChartStatusBanners already raises WP-19's polar
-// house-system warning for exactly these latitudes via
-// Validate.polarHouseWarning(). Callers that need to distinguish "no module"
-// from "polar" can read ANGLES_MODE alongside that banner.
+// Shared accessor. Loaded horizon solvers choose the eastern intersection
+// at polar latitudes; geographic poles/degenerate horizons raise a real fault.
+// A legacy solver's explicit polar refusal can still use the corrected
+// approximate eastern-horizon fallback, with per-chart source disclosure.
 function realAngles(date, lat, lng) {
   const H = typeof window !== "undefined" ? window.Houses : null;
   if (!H || typeof H.ascMcFromDate !== "function") return null;
@@ -478,6 +472,7 @@ const QUADRANT_HOUSE_SYSTEMS = new Set([
 
 function computeNatal(birth) {
   birth = { houseSystem: "whole", sect: "auto", ...birth };
+  birth.sect = birth.sect || "auto";
   if (!Number.isFinite(new Date(birth.dateISO).getTime()) || !Number.isFinite(birth.lat)
       || Math.abs(birth.lat) > 90 || !Number.isFinite(birth.lng) || Math.abs(birth.lng) > 180)
     throw new RangeError("A valid birth instant and latitude/longitude are required");
@@ -485,15 +480,23 @@ function computeNatal(birth) {
     throw new RangeError(`Unsupported house system: ${birth.houseSystem}`);
   const date = new Date(birth.dateISO);
   const jd = dateToJD(date);
-  const asc = ascendantDeg(date, birth.lat, birth.lng);
+  const solvedAngles = realAngles(date, birth.lat, birth.lng);
+  const asc = solvedAngles ? solvedAngles.ascDeg : approxAscendantDeg(date, birth.lat, birth.lng);
   const mc  = midheavenDeg(date, birth.lng);
   const desc = mod360(asc + 180);
   const ic   = mod360(mc  + 180);
   const ascSignIdx = Math.floor(asc / 30);
   const mcSignIdx  = Math.floor(mc  / 30);
-  // WP-21: day/night sect determination (AstroCore.sectIsDay) — see this
-  // file's header. Byte-identical to the pre-WP-21 inline ternary.
-  const isDayChart = AstroCore.sectIsDay(planetLongitude("Sun", jd), asc, birth.sect || "auto");
+  // Sect follows the physical solar hemisphere. At polar latitude the
+  // eastern Ascendant alone does not identify which ecliptic half is above.
+  let solarAltitude = null;
+  if (window.Astronomy) {
+    const A = window.Astronomy;
+    const sunEq = A.EquatorFromVector(A.RotateVector(A.Rotation_EQJ_EQD(A.MakeTime(date)), A.GeoVector(A.Body.Sun, date, true)));
+    solarAltitude = A.Horizon(date, new A.Observer(birth.lat, birth.lng, 0), sunEq.ra, sunEq.dec).altitude;
+  }
+  const isDayChart = birth.sect === "day" || (birth.sect === "auto" && (solarAltitude === null
+    ? AstroCore.sectIsDay(planetLongitude("Sun", jd), asc, "auto") : solarAltitude > 0));
 
   // Quadrant houses (Placidus, Koch, ...). houses.js's cusp functions were
   // built and Swiss-Ephemeris-verified in WP-11/WP-12 but never had a
@@ -509,7 +512,8 @@ function computeNatal(birth) {
   let houseSystemActual = birth.houseSystem;
   let houseCusps = null;
   if (birth.houseSystem === "porphyry") {
-    if (window.Houses && window.Houses.porphyryCuspsFloat) houseCusps = window.Houses.porphyryCuspsFloat(asc, mc);
+    // Fixed ASC/IC/DSC/MC labeling cannot trisect reversed polar quadrants.
+    if (window.Houses && window.Houses.porphyryCuspsFloat && mod360(mc - asc) > 180) houseCusps = window.Houses.porphyryCuspsFloat(asc, mc);
     else { houseSystemActual = "whole"; }
   }
   if (QUADRANT_HOUSE_SYSTEMS.has(birth.houseSystem)) {
@@ -528,10 +532,12 @@ function computeNatal(birth) {
   // The Ascendant's own shadow lane — the chart-specific term inside every
   // card's resonance, returned on the chart so the reading can NAME it
   // instead of only feeling it as glow.
-  const ascR11 = Math.round(asc * 3600) % 11;
+  const ascR11 = (Math.round(asc * 3600) % 1296000) % 11;
 
   const positionWarnings = [];
-  if (window.ANGLES_MODE === "APPROX") positionWarnings.push("Angles use the closed-form fallback with approximate sidereal time and fixed J2000 obliquity; the house solver is unavailable.");
+  if (!solvedAngles) positionWarnings.push("Ascendant uses the closed-form fallback with approximate sidereal time and fixed J2000 obliquity; the house solver did not supply this chart's angle.");
+  if (Math.abs(birth.lat) > 66.56) positionWarnings.push(`Polar chart: Ascendant uses the eastern geometric horizon intersection. ${solarAltitude === null ? "Automatic sect is an approximate ecliptic estimate." : "Automatic sect follows geometric Sun altitude."} Historical polar house conventions differ.`);
+  if (houseSystemActual !== birth.houseSystem) positionWarnings.push(`Requested ${birth.houseSystem} houses are unavailable for this chart; using ${houseSystemActual} houses.`);
   if (window.Astronomy) positionWarnings.push("North/South Node use mean lunar nodes; Lilith uses mean lunar apogee. These are approximate elements, not true/osculating positions.");
   if (birth.includeSyntheticBodies) positionWarnings.push("Chiron uses a synthetic demo position; no Chiron ephemeris is installed.");
   const planets = PLANET_ORDER.filter(p => p !== "Chiron" || !window.Astronomy || birth.includeSyntheticBodies).map(p => {
@@ -805,9 +811,15 @@ function computeNatal(birth) {
     mc,
     desc,
     ic,
+    vertex: birth.timeUnknown || !window.Houses?.vertexFromDate ? null : window.Houses.vertexFromDate(date,birth.lat,birth.lng),
     ascSignIdx,
     mcSignIdx,
     isDayChart,
+    solarAltitude,
+    sectSource: birth.sect !== "auto" ? "explicit override" : solarAltitude === null ? "ecliptic estimate" : "geocentric geometric Sun altitude",
+    anglesMode: solvedAngles ? "REAL" : "APPROX",
+    angleSource: solvedAngles ? "GAST and mean-obliquity horizon solver" : "approximate GMST and fixed-obliquity horizon",
+    angleConvention: "Eastern geometric horizon intersection; geographic poles and degenerate intersections are unavailable",
     // houseSystemActual differs from birth.houseSystem exactly when a
     // requested quadrant system fell back to Whole per
     // POLAR_FALLBACK_POLICY (polar latitude) or window.Houses being

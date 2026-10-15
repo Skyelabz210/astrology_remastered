@@ -167,20 +167,13 @@
 // points (those whose declination approaches ± the obliquity) become
 // circumpolar or never-rising — |tan(φ)·tan(δ)| can exceed 1, and the
 // semi-arc trisection this algorithm depends on has no solution for those
-// longitudes. ascMc() ALSO throws beyond this latitude (a correction to an
-// earlier version of this module, which claimed the ASC/MC formulas stay
-// correct up to ±90° because they never divide by zero or feed asin() an
-// out-of-domain value). That claim was true about not blowing up, but false
-// about staying CORRECT: beyond 66.56°, for RAMC ranges where the true
-// rising point's declination approaches ±obliquity (worst case near the
-// solstice colures, RAMC≈88–92°/268–272°), the atan2 branch this formula
-// follows crosses over to the antipodal point and silently returns the
-// DESCENDANT instead — a full 180° error, not a gradual one, and reachable
-// at real inhabited latitudes (verified failing for several hours a day at
-// Tromsø, Norway, 69.6°N). Since ascMc() has no way to numerically detect
-// which branch it's on, and the other quadrant systems below already
-// establish the convention of refusing outright past this same boundary
-// rather than risking a silently-wrong answer, ascMc() now does the same.
+// longitudes. Ascendant construction is handled separately: the eastern
+// horizon intersection is selected by projecting onto the local east vector,
+// which removes the fixed-atan2 antipode error at polar latitudes. Exactly
+// geographic poles and tangent/coincident horizons have no unique rising
+// intersection and are rejected. The six guarded quadrant systems retain
+// their existing conservative polar policy; supporting the Ascendant does
+// not establish every quadrant construction there.
 
 import { gastDeg, meanObliquityDeg, ttFromUtc } from "./timescale.js";
 
@@ -192,29 +185,18 @@ const MAX_ITERATIONS = 100;
 const CONVERGENCE_TOL_DEG = 1e-7;
 
 /**
- * Thrown by placidusCusps(), kochCusps(), alcabitiusCusps(), ascMc(),
- * regiomontanusCusps(), campanusCusps(), and topocentricCusps() when
- * |latDeg| exceeds the latitude beyond which their construction is
- * undefined (Placidus/Koch/Alcabitius) or empirically wrong for some
- * ecliptic longitudes/RAMC values (ascMc() and the three systems that
- * derive their angular cusps from it) — see the module header for why.
- * Placidus/Koch/Alcabitius share the identical mathematical root cause:
- * each computes asin(tan(latDeg)·tan(δ)) for a declination δ that is itself
- * bounded by ±obliquity (Placidus: the sought cusp's own declination varies
- * over the whole ecliptic, up to ±ε; Koch: δ is the Midheaven's declination,
- * also an ecliptic point, so also bounded by ±ε; Alcabitius: δ is the
- * Ascendant's declination, likewise ±ε) — so the exact same 66.56° ≈ 90°-ε
- * threshold applies to all three, not just Placidus. ascMc()'s failure mode
- * is different (an atan2 branch flip, not an asin domain error) but empirically
- * shares the same 66.56° threshold — see module header.
+ * Thrown by the six quadrant cusp systems guarded by the conservative
+ * 66.56-degree policy. Semi-arc systems can encounter circumpolar points;
+ * the other guarded quadrant systems have not been independently validated
+ * with the reversed polar geometry. This policy does not reject an otherwise
+ * defined eastern geometric Ascendant, or latitude-independent MC.
  */
 export class PolarLatitudeError extends Error {
   constructor(latDeg, systemLabel = "Placidus") {
     super(
-      `PolarLatitudeError: ${systemLabel} house cusps are undefined at |lat|=${Math.abs(latDeg)}° ` +
-        `(limit ${POLAR_LATITUDE_LIMIT_DEG}° ≈ 90° - mean obliquity): some ecliptic ` +
-        `longitudes are circumpolar (never rise/set) at this latitude, so their diurnal/nocturnal ` +
-        `semi-arc trisection has no real solution.`
+      `PolarLatitudeError: ${systemLabel} house cusps are unsupported by this solver at |lat|=${Math.abs(latDeg)}° ` +
+        `(conservative limit ${POLAR_LATITUDE_LIMIT_DEG}° ≈ 90° - mean obliquity). ` +
+        `Circumpolar semi-arcs can be undefined; other polar cusp constructions require separate validation.`
     );
     this.name = "PolarLatitudeError";
     this.latDeg = latDeg;
@@ -296,12 +278,12 @@ function ramcDeg(jdUt1, jdTt, lngDeg) {
  * @param {number} latDeg - geographic latitude, degrees, north positive.
  * @param {number} lngDeg - geographic longitude, degrees, EAST positive.
  * @returns {{ascDeg: number, mcDeg: number}}
- * @throws {PolarLatitudeError} if |latDeg| > 66.56 — see module header.
+ * @throws {RangeError} for invalid coordinates, geographic poles or a degenerate horizon.
  */
 export function ascMc(jdUt1, jdTt, latDeg, lngDeg) {
-  if (Math.abs(latDeg) > POLAR_LATITUDE_LIMIT_DEG) {
-    throw new PolarLatitudeError(latDeg, "Ascendant/Midheaven");
-  }
+  if (![jdUt1, jdTt, latDeg, lngDeg].every(Number.isFinite) || Math.abs(latDeg) > 90)
+    throw new RangeError("Valid times and geographic coordinates are required");
+  if (Math.abs(latDeg) === 90) throw new RangeError("A rising Ascendant is undefined at the geographic poles");
   const theta = ramcDeg(jdUt1, jdTt, lngDeg); // RAMC
   const eps = meanObliquityDeg(jdTt);
 
@@ -315,7 +297,15 @@ export function ascMc(jdUt1, jdTt, latDeg, lngDeg) {
 
   const ascY = Math.cos(thetaRad);
   const ascX = -(Math.sin(thetaRad) * Math.cos(epsRad) + Math.tan(latRad) * Math.sin(epsRad));
-  const ascDeg = normalizeDeg(Math.atan2(ascY, ascX) * RAD2DEG);
+  if (Math.hypot(ascY, ascX) < 1e-12) throw new RangeError("The horizon and ecliptic coincide; a unique Ascendant is unavailable");
+  let ascRad = Math.atan2(ascY, ascX);
+  // Project onto the local east vector (-sin RAMC, cos RAMC, 0).
+  // Its sign distinguishes the rising and setting horizon intersections,
+  // including polar latitudes where a fixed atan2 branch becomes western.
+  const east = -Math.cos(ascRad) * Math.sin(thetaRad) + Math.sin(ascRad) * Math.cos(epsRad) * Math.cos(thetaRad);
+  if (Math.abs(east) < 1e-12) throw new RangeError("The ecliptic is tangent to the horizon; a rising Ascendant is unavailable");
+  if (east < 0) ascRad += Math.PI;
+  const ascDeg = normalizeDeg(ascRad * RAD2DEG);
 
   return { ascDeg, mcDeg };
 }
@@ -816,22 +806,13 @@ export function porphyryCuspsFloat(ascDeg, mcDeg) {
 /**
  * Polar-latitude fallback policy: which latitude range each quadrant system
  * is considered valid over, and what this codebase recommends falling back
- * to beyond it (whole-sign houses, the only system that remains meaningful
- * at every latitude including exactly +-90°, since it depends only on
- * which sign the Ascendant/each body falls in, not on rise/set geometry).
+ * to beyond it (Whole sign when the eastern Ascendant is defined).
+ * Geographic poles and degenerate horizons do not supply a rising Ascendant.
  *
- * "hard" entries (Placidus, Koch, Alcabitius, Regiomontanus, Campanus,
- * Topocentric) are all enforced in code: the functions above throw
- * PolarLatitudeError at exactly this boundary. Placidus/Koch/Alcabitius
- * because their asin(tan(lat)*tan(dec)) construction has no real solution
- * beyond it for some ecliptic longitudes (see PolarLatitudeError's class
- * comment) — a genuine domain limit. Regiomontanus/Campanus/Topocentric
- * because their angular cusps (1/4/7/10) are exact identities of ascMc(),
- * which itself was found to silently return the Descendant instead of the
- * Ascendant (a 180° error, not a domain blow-up) for some RAMC values
- * beyond this same latitude — a correction to an earlier version of this
- * table, which had labeled these three "soft" on the mistaken assumption
- * that "doesn't throw" meant "stays correct."
+ * "hard" entries remain a conservative policy for six cusp constructions.
+ * Supporting the corrected eastern Ascendant does not by itself validate
+ * their non-angular polar cusps. Placidus/Koch/Alcabitius can additionally
+ * have genuine circumpolar semi-arc domain failures.
  *
  * "none" entries (Meridian, Morinus) have no latitude dependence at all —
  * their formulas are a pure function of RAMC and obliquity, verified by
@@ -881,6 +862,23 @@ export const POLAR_FALLBACK_POLICY = {
 export function ascMcFromDate(date, latDeg, lngDeg) {
   const jdUt1 = date.getTime() / 86400000 + 2440587.5;
   return ascMc(jdUt1, ttFromUtc(jdUt1), latDeg, lngDeg);
+}
+
+// Western intersection of the prime vertical and ecliptic. The local north
+// vector is orthogonal to the prime-vertical plane; solve its dot product
+// with an ecliptic unit vector, then select the western antipode. At a
+// zenith/nadir degeneracy the east/west choice is undefined and withheld.
+export function vertexFromDate(date, latDeg, lngDeg) {
+  if(!Number.isFinite(date.getTime()) || !Number.isFinite(latDeg) || Math.abs(latDeg)>=90 || !Number.isFinite(lngDeg) || Math.abs(lngDeg)>180)return null;
+  const jd=date.getTime()/86400000+2440587.5,tt=ttFromUtc(jd);
+  const theta=(gastDeg(jd,tt)+lngDeg)*Math.PI/180,phi=latDeg*Math.PI/180,eps=meanObliquityDeg(tt)*Math.PI/180;
+  const a=Math.sin(phi)*Math.cos(theta),b=Math.cos(phi)*Math.sin(eps)-Math.sin(phi)*Math.sin(theta)*Math.cos(eps);
+  if(Math.hypot(a,b)<1e-12)return null;
+  let lambda=Math.atan2(a,b);
+  const east=-Math.sin(theta)*Math.cos(lambda)+Math.cos(theta)*Math.sin(lambda)*Math.cos(eps);
+  if(Math.abs(east)<1e-12)return null;
+  if(east>0)lambda+=Math.PI;
+  return ((lambda*180/Math.PI)%360+360)%360;
 }
 
 // Dispatch table for the 8 quadrant house systems this module computes with
@@ -942,6 +940,7 @@ if (typeof window !== "undefined") {
   window.Houses = {
     ascMc,
     ascMcFromDate,
+    vertexFromDate,
     placidusCusps,
     kochCusps,
     regiomontanusCusps,

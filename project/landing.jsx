@@ -168,7 +168,7 @@ function SearchablePicker({ label, value, options, onChange, placeholder }) {
 
 function Landing({
   initial, onCast, mode, onBack, agentOn, onToggleAgent,
-  chapters, onChaptersChange, profileState, onSaveProfile, onClearProfile,
+  chapters, chaptersForBirth, onChaptersChange, profileState, onSaveProfile, onClearProfile,
 }) {
   const isPartner = mode === "partner";
   const isHcrm = mode === "hcrm";
@@ -218,8 +218,8 @@ function Landing({
   const hours   = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   const minutes = Array.from({ length: 60 }, (_, i) => i);
 
-  const buildPayload = () => {
-    setFormError(null);
+  const buildPayload = (reportError = true) => {
+    if (reportError) setFormError(null);
     // WP-19: real-calendar date validation (leap years etc.). The
     // Month/Day/Year pickers above are already constrained to real dates
     // by construction — `daysInMonth` is leap-year aware and the Day
@@ -231,11 +231,11 @@ function Landing({
     // also gives requirement 3 an inline, user-visible message instead of
     // trusting the picker silently.
     if (typeof window !== "undefined" && window.Validate && !window.Validate.isValidCalendarDate({ year, month, day })) {
-      setFormError(`${months[month - 1]} ${day}, ${year} is not a real calendar date.`);
+      if (reportError) setFormError(`${months[month - 1]} ${day}, ${year} is not a real calendar date.`);
       return null;
     }
     const city = findCity(place);
-    if (!city) { setFormError("Choose a listed birthplace before casting. Unknown names cannot supply verified coordinates or a time zone."); return null; }
+    if (!city) { if (reportError) setFormError("Choose a listed birthplace before casting. Unknown names cannot supply verified coordinates or a time zone."); return null; }
     const h24 = meridiem === "AM"
       ? (hour12 === 12 ? 0  : hour12)
       : (hour12 === 12 ? 12 : hour12 + 12);
@@ -299,6 +299,14 @@ function Landing({
     };
   };
 
+  // Resolve the form's owner without setting validation state during render.
+  // Read its chapter collection immediately, rather than waiting until Cast.
+  const chapterBirth = React.useMemo(() => {
+    if (!chaptersForBirth) return null;
+    try { return buildPayload(false); } catch { return null; }
+  }, [year, month, day, hour12, minute, meridiem, place, subjectName, timeUnknown]);
+  const formChapters = chaptersForBirth ? chaptersForBirth(chapterBirth) : chapters;
+
   const submit = (e) => {
     if (e) e.preventDefault();
     const payload = buildPayload();
@@ -340,12 +348,10 @@ function Landing({
 
           <form className="landing-form" onSubmit={submit}>
             {!isHcrm && <window.InterpreterSettings onConnected={() => onToggleAgent && onToggleAgent(false)} />}
-            {!isHcrm && (
-              <fieldset className="lf-set">
+            <fieldset className="lf-set">
                 <legend className="lf-leg">{isPartner ? "Their name" : "Name for the reading"}</legend>
                 <TweakLikeText value={subjectName} onChange={setSubjectName} placeholder={isPartner ? "a name or initial" : "your name or initial"} />
-              </fieldset>
-            )}
+            </fieldset>
             <fieldset className="lf-set">
               <legend className="lf-leg">Date of birth</legend>
               <label className="calendar-label">Calendar<input aria-label="Birth calendar" type="date" min="1800-01-01" max={`${currentYear}-12-31`} value={`${year}-${pad(month)}-${pad(day)}`} onChange={e => {
@@ -428,7 +434,7 @@ function Landing({
               <p className="lf-hint">…or hold and drag the globe in any direction, then choose a city pin. Only a listed location is committed.</p>
             </fieldset>
 
-            <button type="submit" className="lf-submit">
+            <button type="submit" className="lf-submit" aria-label={isPartner ? "Read the relationship" : isHcrm ? "Build the register map" : "Cast the spread"}>
               <span>{isPartner ? "Read the relationship" : isHcrm ? "Build the register map" : "Cast the spread"}</span>
               <span className="lf-arrow">→</span>
             </button>
@@ -452,18 +458,19 @@ function Landing({
                 : "Chart math — positions, houses, aspects, dignities, eclipses — is computed entirely in your browser; none of it is sent anywhere. " + (voiceEgress
                     ? "Voice narration is set to ElevenLabs and a key is stored, so the text of each reading (and that key) is sent to ElevenLabs to be spoken aloud. Reading text can contain your personal chart details; switch the voice engine to \"Browser\" in the tweaks panel to keep narration offline. "
                     : "") + (agentOn === true
-                    ? "Because you ticked the checkbox above, right after you submit this form this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "the name you enter above and your birth date, time, and location") + " to OpenRouter and its selected model provider to generate the spoken-style \"Agent interpreter\" reading — untick it to keep everything local."
-                    : "The checkbox above is off by default, so nothing is sent to OpenRouter and its selected model provider — every reading uses the local, non-AI text instead.")}
+                    ? "Because you ticked the checkbox above, right after you submit this form this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "the name you enter above and your birth date, time, and location") + " to the selected AI provider to generate the spoken-style \"Agent interpreter\" reading — untick it to keep everything local."
+                    : "The checkbox above is off by default, so nothing is sent to an AI provider — every reading uses the local, non-AI text instead.")}
             </p>
 
-            {!isPartner && !isHcrm && typeof window !== "undefined" && window.LifeChaptersEditor && (
+            {!isPartner && !isHcrm && <p className="lf-hint">Your first chart run creates and saves your birth profile and living avatar on this device. Add goals and check-ins from the behavioral profile.</p>}
+            {!isPartner && typeof window !== "undefined" && window.LifeChaptersEditor && (
               <window.LifeChaptersEditor
-                chapters={chapters}
+                chapters={formChapters}
                 birthPlaceKey={place}
-                onChange={onChaptersChange}
+                onChange={(rows) => onChaptersChange(rows, chapterBirth)}
                 onApplyAlpha={Number(year) === 1980 && Number(month) === 10 && Number(day) === 21 && Number(hour12) === 5 && Number(minute) === 31 && meridiem === "PM" && !timeUnknown && findCity(place)?.lat === 35.1408 ? () => {
                   const payload = buildPayload();
-                  if (payload) onChaptersChange(window.alphaLifeChapters(payload));
+                  if (payload) onChaptersChange(window.alphaLifeChapters(payload), payload);
                 } : null}
                 profileState={profileState}
                 onSave={() => {

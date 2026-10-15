@@ -4,17 +4,70 @@
 // weighted cross-aspect grid, house overlays, and the CTM phase-syndrome
 // compatibility dial.
 
-const { useState: $synUseState, useMemo: $synUseMemo, useEffect: $synUseEffect } = React;
+const { useState: $synUseState, useMemo: $synUseMemo, useEffect: $synUseEffect, useRef: $synUseRef } = React;
+
+// Append completed calculations to the exact relationship run, never a natal
+// run or a different partner's run. Pending scans and stale completions do not
+// enter history; repeated identical windows replace their own snapshot.
+function saveMutualScan(context, chartA, chartB, scan, isCurrent = () => true) {
+  const runs = window.ReadingRuns;
+  if (!runs || !context || !isCurrent() || scan?.status !== "ready" || !scan.id ||
+      !Array.isArray(scan.hitsA) || !Array.isArray(scan.hitsB) || !Array.isArray(scan.hits) ||
+      !Number.isFinite(scan.parameters?.centerJd) || !Number.isFinite(scan.parameters?.spanDays) ||
+      scan.parameters.spanDays <= 0 || !Number.isFinite(scan.parameters?.nearDays) || scan.parameters.nearDays < 0) return false;
+  try {
+    const owner = runs.profileKey(chartA.birth), partner = runs.profileKey(chartB.birth);
+    if (context.profileKey !== owner || context.input.kind !== "synastry" ||
+        runs.profileKey(context.input.birth) !== owner || runs.profileKey(context.input.partnerBirth) !== partner ||
+        runs.profileKey(scan.input.birthA) !== owner || runs.profileKey(scan.input.birthB) !== partner) return false;
+    const id = JSON.stringify([context.at, context.input]);
+    const run = runs.loadRuns(null, owner).find(r => r.id === id);
+    if (!run || run.input.kind !== "synastry" || runs.profileKey(run.input.partnerBirth) !== partner || !isCurrent()) return false;
+    const previous = run.evidence.mutualPerfections?.value?.scans;
+    const scans = [scan, ...(Array.isArray(previous) ? previous.filter(s => s.id !== scan.id) : [])];
+    const ok = runs.attachEvidence(null, id, "mutualPerfections", { status: "ready", value: { version: 1, scans } }, owner);
+    if (ok && window.dispatchEvent && typeof Event === "function") window.dispatchEvent(new Event("personal-reading-evidence"));
+    return ok;
+  } catch { return false; }
+}
 
 function SynastryView({ chartA, chartB, chapters = [], settings, setTweak, onBack }) {
+  const mutualNow = useNow(60000);
+  const [mutualTargetDate, setMutualTargetDate] = $synUseState(null);
+  const mutualTarget = mutualTargetDate ? new Date(`${mutualTargetDate}T12:00:00Z`) : mutualNow;
+  const jdTarget = dateToJD(mutualTarget);
   const rawSyn = $synUseMemo(() => computeSynastry(chartA, chartB), [chartA, chartB]);
   const personal = window.usePersonalReading(chartA, chapters, settings);
-  const context = $synUseMemo(() => {
+  const capturedContext = $synUseMemo(() => {
     const c = personal.context;
     const input = { ...c.input, kind: 'synastry', partnerBirth: { ...chartB.birth } };
     const evidence = { ...c.evidence, synastry: { status: 'ready', value: rawSyn } };
     return { ...c, input, evidence, cacheFingerprint: window.ReadingRuns.evidenceFingerprint([c.at, input, evidence]) };
   }, [personal.context, rawSyn, chartB]);
+  // A selected date is exact input, even within the current 30-day bucket.
+  // The context identifies both owners, selected calculation conventions and
+  // the frozen reading instant; birth JD alone cannot distinguish profiles.
+  const mutualScanKey = JSON.stringify([capturedContext.cacheFingerprint,
+    chartA.birth, chartB.birth, mutualTargetDate || Math.round(jdTarget / 30)]);
+  const [mutualScan, setMutualScan] = $synUseState(null);
+  const [mutualFailure, setMutualFailure] = $synUseState(null);
+  const [mutualSaveFailed, setMutualSaveFailed] = $synUseState(false);
+  const mutualScope = $synUseRef(null);
+  mutualScope.current = mutualScanKey;
+  const completedScan = mutualScan?.key === mutualScanKey ? mutualScan : null;
+  const context = $synUseMemo(() => {
+    if (!completedScan) return capturedContext;
+    const runId = JSON.stringify([capturedContext.at, capturedContext.input]);
+    const run = window.ReadingRuns.loadRuns(null, capturedContext.profileKey).find(r => r.id === runId);
+    const previous = run?.evidence.mutualPerfections?.value?.scans;
+    // Preserve earlier completed windows when PersonalReadingHistory saves the
+    // enriched context again (for example when an AI reading resolves).
+    const scans = [completedScan, ...(Array.isArray(previous) ? previous.filter(s => s.id !== completedScan.id) : [])];
+    const evidence = { ...capturedContext.evidence,
+      mutualPerfections: { status: "ready", value: { version: 1, scans } } };
+    return { ...capturedContext, evidence,
+      cacheFingerprint: window.ReadingRuns.evidenceFingerprint([capturedContext.at, capturedContext.input, evidence]) };
+  }, [capturedContext, completedScan]);
   const archiveChart = $synUseMemo(() => ({ ...chartA, readingContext: context }), [chartA, context]);
   const syn = $synUseMemo(() => ({ ...rawSyn, readingContext: context }), [rawSyn, context]);
   // `=== true`, not `!== false`: DEFAULT_SETTINGS.agentOn is opt-in now, so a
@@ -34,31 +87,52 @@ function SynastryView({ chartA, chartB, chapters = [], settings, setTweak, onBac
   // render. Targetable the same way the solo lifecycle panel is: "now"
   // keeps ticking, or an arbitrary date re-centers both charts' scans
   // on that day (noon UTC).
-  const mutualNow = useNow(60000);
-  const [mutualTargetDate, setMutualTargetDate] = $synUseState(null);
-  const mutualTarget = mutualTargetDate ? new Date(`${mutualTargetDate}T12:00:00Z`) : mutualNow;
-  const jdTarget = dateToJD(mutualTarget);
-  const [mutualHits, setMutualHits] = $synUseState(null);
   // Bucketed to a 30-day window of the target, same as the solo panel's
   // perfections scan — so "now" ticking every minute doesn't retrigger
   // the twelve-step scan, only crossing into a new window does.
-  const mutualScanKey = `${chartA.jd}:${chartB.jd}:${Math.round(jdTarget / 30)}`;
   $synUseEffect(() => {
     let alive = true;
-    setMutualHits(null);
+    const isCurrent = () => alive && mutualScope.current === mutualScanKey;
+    setMutualScan(null);
+    setMutualFailure(null);
+    setMutualSaveFailed(false);
     const centre = jdTarget;
+    if (!Number.isFinite(centre)) {
+      setMutualFailure("Choose a valid target date.");
+      return () => { alive = false; };
+    }
     const bodies = ["Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"];
     const steps = bodies.map((b) => ["A", b]).concat(bodies.map((b) => ["B", b]));
     const hitsA = [], hitsB = [];
     const runStep = (i) => {
-      if (!alive) return;
+      if (!isCurrent()) return;
       if (i >= steps.length) {
-        setMutualHits(mergeNearPerfections(hitsA, hitsB, MUTUAL_SAME_DAY_WINDOW));
+        const hits = mergeNearPerfections(hitsA, hitsB, MUTUAL_SAME_DAY_WINDOW);
+        const parameters = { method: "independent lifecycle perfection scans merged by time distance",
+          centerJd: centre, centerAt: new Date((centre - 2440587.5) * 86400000).toISOString(),
+          spanDays: 366, startJd: centre - 183, endJd: centre + 183,
+          nearDays: MUTUAL_SAME_DAY_WINDOW, transitBodies: bodies,
+          aspects: ["Conjunction", "Sextile", "Square", "Trine", "Opposition"],
+          targetMode: mutualTargetDate ? "selected date at noon UTC" : "captured now in a 30-day refresh bucket" };
+        const input = { birthA: { ...chartA.birth }, birthB: { ...chartB.birth } };
+        const scan = { version: 1, status: "ready", key: mutualScanKey,
+          id: window.ReadingRuns.evidenceFingerprint([input, parameters]),
+          completedAt: new Date().toISOString(), input, parameters, hitsA, hitsB, hits,
+          limitations: ["These are numerical contact searches, not predictions of relationship events.",
+            ...(chartA.timeUnknown || chartB.timeUnknown ? ["At least one birth time is unknown: natal degrees use an assumed epoch, and its angles are excluded."] : [])] };
+        if (!isCurrent()) return;
+        setMutualScan(scan);
+        setMutualSaveFailed(!saveMutualScan(capturedContext, chartA, chartB, scan, isCurrent));
         return;
       }
       const [who, body] = steps[i];
-      const hits = transitPerfections(who === "A" ? chartA : chartB, centre, 366, [body]).hits;
-      (who === "A" ? hitsA : hitsB).push(...hits);
+      try {
+        const hits = transitPerfections(who === "A" ? chartA : chartB, centre, 366, [body]).hits;
+        (who === "A" ? hitsA : hitsB).push(...hits);
+      } catch (error) {
+        if (isCurrent()) setMutualFailure(String(error.message || error));
+        return;
+      }
       setTimeout(() => runStep(i + 1), 0);
     };
     const timer = setTimeout(() => runStep(0), 0);
@@ -68,13 +142,13 @@ function SynastryView({ chartA, chartB, chapters = [], settings, setTweak, onBac
   // The dozen nearest the target, restored to chronological order for
   // display — same two-step sort the solo lifecycle panel's perfections use.
   const mutualRows = $synUseMemo(() => {
-    if (!mutualHits) return null;
-    return mutualHits
+    if (!completedScan) return null;
+    return completedScan.hits
       .map((m) => ({ ...m, dTarget: m.jd - jdTarget }))
       .sort((x, y) => Math.abs(x.dTarget) - Math.abs(y.dTarget))
       .slice(0, 12)
       .sort((x, y) => x.jd - y.jd);
-  }, [mutualHits, jdTarget]);
+  }, [completedScan, jdTarget]);
   const mutualTargetLabel = mutualTargetDate
     ? mutualTarget.toLocaleDateString(undefined, { dateStyle: "medium" })
     : "now";
@@ -106,7 +180,7 @@ function SynastryView({ chartA, chartB, chapters = [], settings, setTweak, onBac
             className={`hdr-pill ${agentOn ? "is-on" : ""}`}
             onClick={() => setTweak('agentOn', !agentOn)}
             title={agentOn
-              ? "Agent interpreter on — sends both charts' data to Claude for each reading. Click to turn off."
+              ? "Agent interpreter on — sends both charts' data to the configured AI provider for each reading. Click to turn off."
               : "Agent interpreter off — readings stay local. Click to turn on."}
             aria-pressed={agentOn}
           >
@@ -286,7 +360,7 @@ function SynastryView({ chartA, chartB, chapters = [], settings, setTweak, onBac
           happen to land close in time. */}
       <div className="syn-ctm">
         <div className="cl-head">
-          <h3 className="syn-panel-h">Mutual activations · the sky within a day of both charts</h3>
+          <h3 className="syn-panel-h">Mutual activations · paired contacts within {MUTUAL_SAME_DAY_WINDOW * 24} hours</h3>
           <div className="cl-target">
             <button
               className={`cl-target-btn ${mutualTargetDate === null ? "is-on" : ""}`}
@@ -307,15 +381,29 @@ function SynastryView({ chartA, chartB, chapters = [], settings, setTweak, onBac
         </div>
         <p className="syn-ctm-note syn-mutual-note">
           Two independent scans of the year around {mutualTargetLabel} — the same exact perfection timeline each
-          chart has on its own — compared for dates within a day of each other. This is common, not
-          rare: two unrelated charts still land a mutual hit roughly a dozen times a year by pure
-          chance, so treat closeness in time as suggestive at best, never as evidence the sky is
-          doing something to the relationship.
+          chart has on its own — compared for dates within {MUTUAL_SAME_DAY_WINDOW * 24} hours of each other.
+          These are numerical contact searches. Closeness in time does not establish that the sky causes
+          a relationship event or measures compatibility.
         </p>
-        {!mutualRows ? (
+        {completedScan && <p className="syn-ctm-note" role="status">
+          Completed window: {new Date((completedScan.parameters.startJd - 2440587.5) * 86400000).toISOString().slice(0, 10)}
+          {" to "}{new Date((completedScan.parameters.endJd - 2440587.5) * 86400000).toISOString().slice(0, 10)}
+          {". "}{completedScan.hitsA.length} contacts for {A}, {completedScan.hitsB.length} for {B}; {completedScan.hits.length} pairs.
+          {!mutualSaveFailed && " Saved with this relationship reading."}
+        </p>}
+        {completedScan && (chartA.timeUnknown || chartB.timeUnknown) && <p className="syn-ctm-note">
+          At least one birth time is unknown. Its natal degrees use an assumed time, its angles are excluded,
+          and the displayed contact dates can change when the birth time is corrected.
+        </p>}
+        {mutualSaveFailed && <p className="syn-error" role="alert">
+          This completed scan could not be saved in browser history. Its results remain available in this reading.
+        </p>}
+        {mutualFailure ? (
+          <p className="syn-error" role="alert">The scan could not finish: {mutualFailure}. No partial results were saved.</p>
+        ) : !mutualRows ? (
           <div className="cl-row"><span className="l">scanning the year around {mutualTargetLabel} for both charts…</span></div>
         ) : mutualRows.length === 0 ? (
-          <div className="cl-row"><span className="l">no mutual activations within a day, across the year around {mutualTargetLabel}</span></div>
+          <div className="cl-row"><span className="l">no paired contacts within {MUTUAL_SAME_DAY_WINDOW * 24} hours in this completed window</span></div>
         ) : (
           <table className="tp-table">
             <thead>
@@ -339,17 +427,25 @@ function SynastryView({ chartA, chartB, chapters = [], settings, setTweak, onBac
 }
 
 function SynAspectDetail({ hit, syn, A, B, agentOn }) {
-  const [state, setState] = $synUseState({ loading: agentOn, text: null });
+  const provider = typeof window.useInterpreterState === "function" ? window.useInterpreterState()
+    : { available: typeof window.agentAvailable === "function" && window.agentAvailable() };
+  const identity = chart => typeof window.chartIdentityKey === "function" ? window.chartIdentityKey(chart) : JSON.stringify(chart.birth);
+  const stateKey = JSON.stringify([identity(syn.chartA), identity(syn.chartB),
+    syn.readingContext?.cacheFingerprint, A, B, hit.a, hit.b, hit.aspect, hit.orb,
+    provider.available, provider.model, provider.generation]);
+  const canRequest = agentOn && provider.available;
+  const [state, setState] = $synUseState({ stateKey, loading: canRequest, text: null });
   $synUseEffect(() => {
-    if (!agentOn) { setState({ loading: false, text: null }); return; }
+    if (!canRequest) { setState({ stateKey, loading: false, text: null }); return; }
     let cancelled = false;
-    setState({ loading: true, text: null });
+    setState({ stateKey, loading: true, text: null });
     interpretSynastryAspect(hit, syn).then(
-      (text) => { if (!cancelled) setState({ loading: false, text }); },
-      () => { if (!cancelled) setState({ loading: false, text: null }); }
+      (text) => { if (!cancelled) setState({ stateKey, loading: false, text }); },
+      () => { if (!cancelled) setState({ stateKey, loading: false, text: null }); }
     );
     return () => { cancelled = true; };
-  }, [agentOn, hit.a, hit.b, hit.aspect]);
+  }, [agentOn, stateKey]);
+  const current = canRequest && state.stateKey === stateKey ? state : { loading: canRequest, text: null };
   const localText = `${aspectMeaning(hit.aspect)} — ${A}'s ${hit.a} signifies ${planetSignifies(hit.a)}; ${B}'s ${hit.b} signifies ${planetSignifies(hit.b)}.`;
   return (
     <div className="syn-asp-detail">
@@ -360,7 +456,7 @@ function SynAspectDetail({ hit, syn, A, B, agentOn }) {
         </span>
       </div>
       <div className="syn-asp-detail-body">
-        {state.loading ? <span className="syn-loading">reading this contact…</span> : (state.text || localText)}
+        {current.loading ? <span className="syn-loading">reading this contact…</span> : (current.text || localText)}
       </div>
     </div>
   );
@@ -415,4 +511,4 @@ function dedupeLanes(lanes) {
   return lanes.filter(l => { if (seen.has(l.lane)) return false; seen.add(l.lane); return true; });
 }
 
-Object.assign(window, { SynastryView });
+Object.assign(window, { SynastryView, saveMutualScan });
