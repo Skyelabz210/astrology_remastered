@@ -48,6 +48,11 @@ test('Mistral opt-in is reactive, key storage is explicit, and consultant reject
   await page.getByRole('button',{name:'Ask with source traces',exact:true}).click();
   await expect(page.locator('.evolution-generated')).toContainText('Your Sun in Libra can be a starting point for reflection.');
   expect(calls).toBe(2);
+  await expect(page.locator('.evolution-panel').getByRole('status')).toContainText('Saved to this reading');
+  const run=await page.evaluate(()=>window.ReadingRuns.loadRuns().find(r=>r.evidence.consultant));
+  expect(run.evidence.consultantTurns).toHaveLength(1);
+  expect(run.evidence.consultant.answer.sections[0].citations).toEqual(['placement:Sun']);
+  expect(JSON.stringify(run)).not.toContain('TEST_MISTRAL_KEY');
   await page.getByRole('button',{name:'Forget Mistral key',exact:true}).click();
   await expect(page.getByRole('button',{name:'Ask with source traces',exact:true})).toBeDisabled();
   await expect(page.locator('.evolution-generated')).toHaveCount(0);

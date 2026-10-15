@@ -9,6 +9,9 @@ test('local chart evidence, linked readings, exported text and scrollable card b
   await expect(page.locator('.cs-local-line').first()).toContainText(/\d+°\d+′\d+″/);
   await expect(page.locator('.cs-local-reading')).toContainText('counterexample');
   await expect(page.locator('.cs-local-reading')).toContainText('set this interpretation aside');
+  await page.locator('.theatre-geometry > summary').click();
+  await expect(page.getByRole('region',{name:'Prime Resonance theatre views'})).toBeVisible();
+  await expect(page.locator('.theatre-geometry')).toContainText('Residue lanes:');
   const linked = page.getByRole('navigation', { name: 'Related placement readings' }).getByRole('button').first();
   await expect(linked).toBeVisible();
   const target = (await linked.textContent()).replace(/^Read /i,'').split(' · ')[0];

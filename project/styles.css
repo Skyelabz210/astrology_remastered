@@ -3039,3 +3039,8 @@ body::before {
 .theatre-geometry { margin: 1rem auto; width: min(90%, 900px); overflow-wrap: anywhere; }
 .theatre-geometry summary { cursor: pointer; padding: .8rem 0; }
 .theatre-geometry svg { display: block; margin: 1rem auto; max-width: 100%; }
+.prime-theatre-views { border: 1px solid currentColor; border-radius: 12px; padding: 1rem; margin: 1rem 0; background: #151d24; color: #edf7f1; }
+.prime-geometry-pair { display: flex; flex-wrap: wrap; justify-content: center; }
+.prime-geometry-pair svg { width: min(100%,280px); }
+.prime-theatre-views label, .prime-depth { display: grid; gap: .5rem; }
+.prime-theatre-views select { max-width: 100%; }

@@ -76,7 +76,7 @@ export async function run() {
   });
   const chart={birth:birthRecord,jd:2451545,planets,aspectGrid:[],cards:[],isDayChart:true,houseSystemActual:'whole'};
   const pack=await prepareSourcePack(chart,Astronomy);
-  t('AI pack consists of ten admitted real ephemeris entries',pack.ledger.length===10&&pack.facts.filter(f=>f.kind==='admitted-position').length===10);
+  t('AI pack consists of ten admitted real ephemeris entries and JSON-safe traces',pack.ledger.length===10&&pack.facts.filter(f=>f.kind==='admitted-position').length===10&&JSON.stringify(pack.facts).includes('exact-residues'));
   t('synthetic chart mismatch fails admission-grounded prompt',await rejects(()=>prepareSourcePack({...chart,planets:planets.map((p,i)=>i? p : {...p,lon:0})},Astronomy)));
   t('unknown time precise source pack is withheld',await rejects(()=>prepareSourcePack({...chart,timeUnknown:true},Astronomy)));
   const good={title:'Reflection',sections:[{title:'Motivation',text:'Consider this reflection.',citations:['placement:Sun']}]};

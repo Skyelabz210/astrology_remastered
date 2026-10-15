@@ -43,9 +43,9 @@ export function structuredPrompt(pack, task, reports = null) {
 export function parseStructuredReading(answer, pack) {
   const json = String(answer).trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
   const value = JSON.parse(json), ids = new Set(pack.facts.map(f=>f.id));
-  if (!value || typeof value.title !== 'string' || value.title.length > 200 || !Array.isArray(value.sections) || value.sections.length < 1 || value.sections.length > 12) throw new Error('The response does not match the reading schema.');
+  if (!value || Object.keys(value).some(key=>!['title','sections'].includes(key)) || typeof value.title !== 'string' || value.title.length > 200 || !Array.isArray(value.sections) || value.sections.length < 1 || value.sections.length > 12) throw new Error('The response does not match the reading schema.');
   for (const section of value.sections) {
-    if (typeof section.title !== 'string' || section.title.length > 200 || typeof section.text !== 'string' || !section.text.trim() || section.text.length > 6000 || !Array.isArray(section.citations) || !section.citations.length || section.citations.length > 12 || section.citations.some(id=>!ids.has(id))) throw new Error('A reading section is missing a valid source citation.');
+    if (!section || Object.keys(section).some(key=>!['title','text','citations'].includes(key)) || typeof section.title !== 'string' || section.title.length > 200 || typeof section.text !== 'string' || !section.text.trim() || section.text.length > 6000 || !Array.isArray(section.citations) || !section.citations.length || section.citations.length > 12 || section.citations.some(id=>!ids.has(id))) throw new Error('A reading section is missing a valid source citation.');
   }
   return { title: value.title, sections: value.sections.map(s=>({title:s.title,text:s.text,citations:[...new Set(s.citations)]})) };
 }

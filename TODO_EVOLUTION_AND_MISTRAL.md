@@ -3,7 +3,7 @@
 **Target Release:** Astrology Remastered v2.0 (Resonance Unified)  
 **Primary Integration Focus:** Mistral AI Intelligence Layer, Resonance Reading Theatre, Exact Substrate Modernization, Life Chapters, and Souvenir Artifact Generation.
 
-**Implementation:** The v1.1.0 avatar integration and roadmap delivery are mapped, with source files and remaining limits, in [EVOLUTION_IMPLEMENTATION.md](project/docs/EVOLUTION_IMPLEMENTATION.md). OpenRouter remains the default free-model route; Mistral is an explicit alternative. The two referenced external app sources are not present here, so an exact component port remains open.
+**Implementation:** The v1.1.0 avatar integration and roadmap delivery are mapped, with source files and remaining limits, in [EVOLUTION_IMPLEMENTATION.md](project/docs/EVOLUTION_IMPLEMENTATION.md). OpenRouter remains the default free-model route; Mistral is an explicit alternative. Three geometry/depth views are adapted from the located Prime Resonance repository; a pixel-identical screen port and Celestial Registry integration remain open.
 
 ---
 
@@ -64,6 +64,7 @@ Central to this release is the adoption of **Mistral AI** as the unified artific
 ## 3. Resonance Reading Theatre & Karaoke Audio Engine
 
 - [ ] **3.1 Unified Audiovisual Reading Theatre**
+  - [x] Adapt Prime Resonance's aspect geometry, house-depth arc and depth-phase views to this app's admitted integer data and current Session/card stage (`prime-theatre.jsx`, source commit recorded in the implementation report).
   - [ ] Port the interactive Theatre Screen from `Prime Resonance` (`ResonanceTheatreScreen`, `ResonanceCard`, `AspectGeometryView`, `HouseDepthArc`, `DepthPhaseIndicator`).
   - [x] Reconcile visual state with exact BigInt residue data rather than approximate floats.
 
