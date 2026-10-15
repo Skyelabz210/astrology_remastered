@@ -463,7 +463,7 @@ function Landing({
             </p>
 
             {!isPartner && !isHcrm && <p className="lf-hint">Your first chart run creates and saves your birth profile and living avatar on this device. Add goals and check-ins from the behavioral profile.</p>}
-            {!isPartner && !isHcrm && typeof window !== "undefined" && window.LifeChaptersEditor && (
+            {!isPartner && typeof window !== "undefined" && window.LifeChaptersEditor && (
               <window.LifeChaptersEditor
                 chapters={formChapters}
                 birthPlaceKey={place}
