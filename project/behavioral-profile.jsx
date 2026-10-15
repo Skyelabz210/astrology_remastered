@@ -42,7 +42,7 @@ function BehavioralProfilePage({ settings, chapters = [], onBack, setTweak }) {
     if (!ok) setStatus('Browser storage is unavailable. Export your profile to keep it.');
   }, [context, profile, narrative]);
   async function generate() {
-    const selectedModel = window.OpenRouter && window.OpenRouter.available() ? window.OpenRouter.model() : 'host interpreter';
+    const selectedModel = (window.Interpreter || window.OpenRouter)?.available() ? (window.Interpreter || window.OpenRouter).model() : 'host interpreter';
     setBusy(true); setStatus('Writing your behavioral profile…');
     try {
       if (!window.agentAvailable()) throw new Error('Connect OpenRouter in interpreter settings first.');
@@ -58,6 +58,7 @@ function BehavioralProfilePage({ settings, chapters = [], onBack, setTweak }) {
     <header className="persona-header"><button type="button" className="hdr-pill" onClick={onBack}>← Back</button><h1>Behavioral profile</h1></header>
     <p>{chart.birth.subjectName || 'You'} · {chart.birth.placeLabel}</p><p>{local.limitation}</p>
     <window.LivingBehavioralAvatar chart={chart} context={context} local={local} />
+    {window.EvolutionPanel && <window.EvolutionPanel chart={chart} context={context} settings={settings} />}
     <div className="persona-grid">{local.sections.map(s => <section key={s.body} id={`behavior-${s.body}`} className="behavior-card">
       <h2>{s.title}</h2><p className="behavior-source">{s.anchor.text}</p>
       {s.uncertainty && <p className="behavior-uncertainty">{s.uncertainty}</p>}
@@ -71,7 +72,7 @@ function BehavioralProfilePage({ settings, chapters = [], onBack, setTweak }) {
     </section>)}</div>
     <details><summary>Current reading context · {new Date(context.at).toLocaleString()}</summary><p>{context.personalText}</p><p>{context.progressionsText}</p></details>
     <window.InterpreterSettings onConnected={() => setStatus('Configured. Authentication is checked when you generate your profile.')} />
-    <label className="lf-check"><input type="checkbox" checked={settings.agentOn === true} onChange={e => setTweak("agentOn", e.target.checked)} /><span>Allow sending my birth record, chart image, and reading context to OpenRouter for AI interpretation.</span></label>
+    <label className="lf-check"><input type="checkbox" checked={settings.agentOn === true} onChange={e => setTweak("agentOn", e.target.checked)} /><span>Allow sending my birth record, chart image, and reading context to the selected AI provider.</span></label>
     <label className="lf-check"><input type="checkbox" checked={settings.shareBehavioralDataWithAI === true} onChange={event => setTweak("shareBehavioralDataWithAI",event.target.checked)} /><span>Include my goals, check-ins and feedback when generating an AI profile.</span></label>
     <p>Generating sends your computed chart data, its chart image, and the current reading context to your selected provider.</p>
     <button type="button" className="hdr-pill" disabled={busy || settings.agentOn !== true} onClick={generate}>{busy ? 'Writing…' : 'Generate behavioral profile'}</button>

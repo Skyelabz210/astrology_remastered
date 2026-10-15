@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "HCRM \u2014 exact integer register core, astrological variant coverage, and shadow-spine certification.",
+  "description": "HCRM — exact integer register core, astrological variant coverage, and shadow-spine certification.",
   "engines": {
     "node": ">=20"
   },
@@ -14,7 +14,11 @@
     "bench": "node bench/bench.mjs",
     "lint": "cd .. && eslint --config eslint.config.mjs --no-error-on-unmatched-pattern project 'scripts/**/*.{js,mjs}'",
     "build": "node tools/build-standalone.mjs \"Resonance Spread.html\" resonance-spread.html && node tools/build-standalone.mjs",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "types:generate": "node tools/core-types.mjs",
+    "types:check": "node tools/core-types.mjs --check && tsc -p tsconfig.types.json",
+    "eclipses:generate": "node tools/build-eclipse-catalogue.mjs",
+    "eclipses:check": "node tools/build-eclipse-catalogue.mjs --check"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",
@@ -25,7 +29,8 @@
     "eslint": "10.8.1",
     "globals": "17.9.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "astronomy-engine": "2.1.19",

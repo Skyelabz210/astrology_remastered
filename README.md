@@ -15,7 +15,7 @@ Astronomy Engine for ten planets, mean elements for lunar nodes and Lilith, and
 omits unsupported Chiron by default. See the [whole-app coverage and personal-reading audit](project/docs/FULL_APP_AUDIT.md) and [Persona repair report](project/docs/PERSONA_ACCURACY_REPAIR.md).
 
 ```
-7319/7319 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+7548/7548 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 The test banner records automated checks, not proof of every mathematical or interpretive claim in this repository.
@@ -24,6 +24,8 @@ See [`project/STATUS.md`](project/STATUS.md) for current layer classification an
 corrective-pass history (P1–P28).
 
 The first chart run now creates a [living behavioral avatar](project/docs/LIVING_AVATAR.md), with user goals, cognitive preferences, reflection quests, check-ins, feedback and participation XP. It evolves through authored observations and retains inspectable sources; private notes require a separate opt-in before AI sharing.
+
+The [evolution integration report](project/docs/EVOLUTION_IMPLEMENTATION.md) maps the main-branch roadmap to optional Mistral support, source-linked consultation, personal keepsakes, Jyotisha/Mayan views, admitted theatre geometry, all 21 core type declarations and the offline eclipse catalogue. It records the remaining external-port, audio and astronomical-model limits.
 
 The version-2 reading evidence schema connects exact displayed placements, all natal contacts, traditional condition, bounded transit trajectories, counterexample prompts and linked placements. See the [system reading audit and improvement steps](project/docs/SYSTEM_READING_AUDIT.md) and [measured technique access map](project/docs/TECHNIQUE_ACCESS_MAP.md).
 

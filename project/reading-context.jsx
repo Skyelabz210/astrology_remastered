@@ -95,7 +95,7 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
     } : {}),
     houseSystemActual: chart.houseSystemActual, settings: { orbScale: settings.orbScale ?? 1, eclipseOrb,
       sect: settings.sect || 'auto', shareBehavioralDataWithAI: settings.shareBehavioralDataWithAI === true }, ephemeris: window.Astronomy && window.EPHEMERIS_MODE !== 'SYNTHETIC' ? 'Astronomy Engine 2.1.19' : 'synthetic demo',
-    interpreter: settings.agentOn === true && window.OpenRouter && window.OpenRouter.available() ? { provider: 'OpenRouter', model: window.OpenRouter.model() } : null,
+    interpreter: settings.agentOn === true && (window.Interpreter || window.OpenRouter)?.available() ? { provider: window.Interpreter?.provider() || 'OpenRouter', model: (window.Interpreter || window.OpenRouter).model() } : null,
     modelRevision: 'personal-reading-v2', release: window.APP_RELEASE || null };
   const owner = window.ReadingRuns ? window.ReadingRuns.profileKey(chart.birth) : JSON.stringify(chart.birth);
   const cacheFingerprint = window.ReadingRuns ? window.ReadingRuns.evidenceFingerprint([at, input, evidence]) : JSON.stringify([at, input, evidence]);
@@ -115,7 +115,7 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
 }
 
 function useInterpreterState() {
-  const provider = window.OpenRouter;
+  const provider = window.Interpreter || window.OpenRouter;
   const read = () => provider && typeof provider.getState === 'function'
     ? provider.getState()
     : { available: Boolean(provider && provider.available()), model: provider ? provider.model() : '', generation: 0 };

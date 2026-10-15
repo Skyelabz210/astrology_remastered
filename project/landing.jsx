@@ -436,7 +436,7 @@ function Landing({
               <p className="lf-hint">…or hold and drag the globe in any direction, then choose a city pin. Only a listed location is committed.</p>
             </fieldset>
 
-            <button type="submit" className="lf-submit">
+            <button type="submit" className="lf-submit" aria-label={isPartner ? "Read the relationship" : isHcrm ? "Build the register map" : "Cast the spread"}>
               <span>{isPartner ? "Read the relationship" : isHcrm ? "Build the register map" : "Cast the spread"}</span>
               <span className="lf-arrow">→</span>
             </button>
@@ -460,8 +460,8 @@ function Landing({
                 : "Chart math — positions, houses, aspects, dignities, eclipses — is computed entirely in your browser; none of it is sent anywhere. " + (voiceEgress
                     ? "Voice narration is set to ElevenLabs and a key is stored, so the text of each reading (and that key) is sent to ElevenLabs to be spoken aloud. Reading text can contain your personal chart details; switch the voice engine to \"Browser\" in the tweaks panel to keep narration offline. "
                     : "") + (agentOn === true
-                    ? "Because you ticked the checkbox above, right after you submit this form this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "the name you enter above and your birth date, time, and location") + " to OpenRouter and its selected model provider to generate the spoken-style \"Agent interpreter\" reading — untick it to keep everything local."
-                    : "The checkbox above is off by default, so nothing is sent to OpenRouter and its selected model provider — every reading uses the local, non-AI text instead.")}
+                    ? "Because you ticked the checkbox above, right after you submit this form this page automatically sends " + (isPartner ? "the name you enter above and both charts' computed placements" : "the name you enter above and your birth date, time, and location") + " to the selected AI provider to generate the spoken-style \"Agent interpreter\" reading — untick it to keep everything local."
+                    : "The checkbox above is off by default, so nothing is sent to an AI provider — every reading uses the local, non-AI text instead.")}
             </p>
 
             {!isPartner && !isHcrm && <p className="lf-hint">Your first chart run creates and saves your birth profile and living avatar on this device. Add goals and check-ins from the behavioral profile.</p>}

@@ -29,6 +29,10 @@ const TECHNIQUE_DESTINATIONS = Object.freeze([
   { id: 'eclipses', label: 'Eclipses and natal contacts', screen: 'spread', target: 'Eclipses · geophysical', note: 'Prenatal pair, lifetime contacts and future window; requires the full astronomical ephemeris.' },
   { id: 'transit-perfections', label: 'Transit perfections', screen: 'spread', target: 'Perfections · the road behind and ahead', note: 'Six slow planets, a year around the target, and the 16 nearest crossings.' },
   { id: 'behavioral-profile', label: 'Behavioral profile', screen: 'behavior', target: 'Behavioral profile', note: 'Chart-based reflection with explicit evidence and uncertainty; not a clinical personality assessment.' },
+  { id: 'jyotisha', label: 'Jyotisha · nakshatras and Vimshottari', screen: 'behavior', target: 'Traditions and your evolving avatar', note: 'Integer lunar mansions, padas, major and subperiods; date-dependent approximate ayanamsha conventions are disclosed.' },
+  { id: 'mayan-calendar', label: 'Mayan calendar · Tzolk’in and Haab’', screen: 'behavior', target: 'Traditions and your evolving avatar', note: 'Birth civil date in the recorded timezone; GMT 584283 correlation.' },
+  { id: 'souvenir', label: 'Celestial souvenir', screen: 'behavior', target: 'Celestial souvenir', note: 'Personal HTML, Markdown and JSON keepsake; optional source-linked AI expansion.' },
+  { id: 'consultant', label: 'Chart consultant', screen: 'behavior', target: 'Chart consultant', note: 'Opt-in selected AI provider; schema-checked answers cite admitted source facts.' },
   { id: 'synastry', label: 'Synastry · two birth records', screen: 'synastry', target: null, note: 'Opens the relationship result when a partner is entered; otherwise opens the second-birth form. Data entry is required.' },
 ]);
 
@@ -94,7 +98,7 @@ function TechniqueDirectory() {
   };
   return <>
     <button className="technique-trigger" ref={trigger} type="button" onClick={() => { setQuery(''); dialog.current.showModal(); }} aria-haspopup="dialog">Explore techniques</button>
-    <dialog className="technique-dialog" ref={dialog} aria-labelledby="technique-directory-title" onCancel={() => trigger.current.focus()}>
+    <dialog className="technique-dialog" ref={dialog} aria-labelledby="technique-directory-title" onCancel={() => trigger.current.focus()} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}}}>
       <div className="technique-heading"><h2 id="technique-directory-title">Explore techniques</h2><button type="button" onClick={close} aria-label="Close technique directory">×</button></div>
       <p>Uses your current chart. On birth entry, cast changed details first. Calculation limits and missing birth-time data still apply.</p>
       <label className="technique-search">Find a technique<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label>

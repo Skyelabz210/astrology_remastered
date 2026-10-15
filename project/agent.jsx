@@ -135,7 +135,7 @@ function chartIdentityKey(chart) {
     Math.round(chart.asc * 3600),
     Math.round(chart.mc * 3600),
     bodies,
-    ...(window.OpenRouter && window.OpenRouter.available() ? [window.OpenRouter.model()] : []),
+    ...((window.Interpreter || window.OpenRouter)?.available() ? [(window.Interpreter || window.OpenRouter).model()] : []),
   ].join("|");
 }
 
@@ -619,8 +619,8 @@ function validateSynastryGrounding(text, syn, minimumFacts = 1, allowDataLimit =
   return { ok: errors.length === 0, factCount: cited.length, citedFacts: cited, errors };
 }
 
-async function completeVerified(prompt, verify, image = null) {
-  const first = stripMd(String(await interpreterComplete(prompt, image) || "").trim());
+async function completeVerified(prompt, verify, image = null, options = undefined) {
+  const first = stripMd(String(await interpreterComplete(prompt, image, options) || "").trim());
   const firstReport = verify(first);
   if (firstReport.ok) return first;
 
@@ -633,7 +633,7 @@ async function completeVerified(prompt, verify, image = null) {
     "REJECTED DRAFT",
     first,
   ].join("\n");
-  const second = stripMd(String(await interpreterComplete(repairPrompt, image) || "").trim());
+  const second = stripMd(String(await interpreterComplete(repairPrompt, image, options) || "").trim());
   const secondReport = verify(second);
   if (!secondReport.ok) {
     const error = new Error("I couldn't verify that answer against the chart data. Try asking about a specific planet, aspect, or house.");
@@ -932,14 +932,20 @@ function boundedLivingPromptSummary(summary) {
  * Does this host provide the agent interpreter?
  * @returns {boolean} true only when window.claude.complete is callable.
  */
-function interpreterComplete(prompt, image = null) {
+function interpreterComplete(prompt, image = null, options = undefined) {
+  if (window.Interpreter) {
+    if(window.Interpreter.available() || window.Interpreter.provider()==='Mistral')return window.Interpreter.complete(prompt,image,options);
+    if(window.claude && typeof window.claude.complete==='function')return window.claude.complete(prompt);
+    return window.Interpreter.complete(prompt,image,options);
+  }
   if (window.OpenRouter && window.OpenRouter.available()) return window.OpenRouter.complete(prompt, image);
   return window.claude.complete(prompt);
 }
 
 function agentAvailable() {
+  if (typeof window !== 'undefined' && window.Interpreter) return window.Interpreter.available() || (window.Interpreter.provider()==='OpenRouter' && !!window.claude && typeof window.claude.complete==='function');
   return typeof window !== "undefined"
-    && ((window.OpenRouter && window.OpenRouter.available())
+    && ((window.Interpreter && window.Interpreter.available()) || (window.OpenRouter && window.OpenRouter.available())
       || (!!window.claude && typeof window.claude.complete === "function"));
 }
 
@@ -1066,7 +1072,7 @@ function persistAgentRun(chart) {
 
 function useAgentProviderState() {
   if (typeof window.useInterpreterState === 'function') return window.useInterpreterState();
-  const provider = window.OpenRouter;
+  const provider = window.Interpreter || window.OpenRouter;
   const read = () => provider && typeof provider.getState === 'function' ? provider.getState()
     : { available: agentAvailable(), model: provider && provider.model ? provider.model() : '', generation: 0 };
   const [state, setState] = React.useState(read);

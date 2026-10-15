@@ -109,7 +109,7 @@ function HCRMApp() {
   const [screen, setScreen] = $haState("console");
   const [birth, setBirth] = $haState(() => ({ ...HCRM_DEFAULTS,
     ...(storedProfile && storedProfile.settings || {}) }));
-  const [formState, setFormState] = $haState(() => storedProfile && storedProfile.birthForm || hcrmBirthForm(birth));
+  const [formState, setFormState] = $haState(() => Number.isInteger(storedProfile?.birthForm?.year) ? storedProfile.birthForm : hcrmBirthForm(birth));
   const [chapterDrafts, setChapterDrafts] = $haState(() => ({
     [window.chapterBirthKey(birth)]: storedProfile && Array.isArray(storedProfile.chapters)
       ? storedProfile.chapters : window.alphaLifeChapters(birth),

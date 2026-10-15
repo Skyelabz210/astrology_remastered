@@ -1,0 +1,113 @@
+import { createMistral, createInterpreter } from '../../src/ai/mistral.js';
+import { createMistralProxy } from '../../src/ai/mistral-proxy.js';
+import { ayanamshaArcsec, nakshatra, vimshottari, mayanCalendar, DASHA_YEARS } from '../../src/astro/traditions.js';
+import { prepareSourcePack, parseStructuredReading, structuredPrompt } from '../../src/ai/source-pack.js';
+import { buildSouvenir, souvenirHtml } from '../../src/present/souvenir.js';
+import * as Astronomy from 'astronomy-engine';
+import { theatreGeometry } from '../../src/present/theatre-geometry.js';
+import { computeAdmittedRegister } from '../../src/present/exact-api.js';
+import { vertexFromDate } from '../../tools/ephemeris/houses.js';
+import { ECLIPSE_CATALOGUE } from '../../src/astro/eclipse-catalogue.js';
+export async function run() {
+  const rows=[],t=(name,ok,detail='')=>rows.push({name,ok:!!ok,detail});
+  const rejects=async(fn)=>{try{await fn();return false;}catch{return true;}};
+  const sent=[],stored=new Map(),storage={getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)};
+  const fetcher=async(url,options)=>{sent.push({url,...options});return {ok:true,json:async()=>({choices:[{message:{content:'Source-linked reflection'}}]})};};
+  const client=createMistral(fetcher,storage);
+  client.configure('PRIVATE_TEST_KEY');
+  t('BYOK stays memory-only by default',stored.size===0 && !JSON.stringify(client.getState()).includes('PRIVATE_TEST_KEY'));
+  t('no request without consent',await rejects(()=>client.complete('chart')) && sent.length===0);
+  client.setConsent(true);await client.complete('chart','data:image/png;base64,AAAA');
+  t('direct Mistral uses selected model and authorization',sent[0].headers.Authorization==='Bearer PRIVATE_TEST_KEY' && JSON.parse(sent[0].body).model==='mistral-large-latest');
+  t('text-only Mistral models do not receive chart images',typeof JSON.parse(sent[0].body).messages[0].content==='string');
+  client.configure('PRIVATE_TEST_KEY','pixtral-large-latest',{remember:true});await client.complete('chart','data:image/png;base64,AAAA');
+  t('Pixtral receives a multimodal chart',JSON.parse(sent[1].body).messages[0].content[1].image_url.url.startsWith('data:image/'));
+  t('remembered key is explicitly persisted',stored.size===1);
+  t('cross-origin proxies are rejected',await rejects(()=>client.configure('','mistral-large-latest',{proxy:'https://example.org/collect'})));
+  t('network-path and backslash proxies are rejected',await rejects(()=>client.configure('','mistral-large-latest',{proxy:'//example.org'})) && await rejects(()=>client.configure('','mistral-large-latest',{proxy:'/\\example.org'})));
+  t('key cannot be forwarded to proxy',await rejects(()=>client.configure('PRIVATE_TEST_KEY','mistral-large-latest',{proxy:'/api/mistral'})));
+  client.configure('','mistral-large-latest',{proxy:'/api/mistral'});await client.complete('chart');
+  t('proxy has no browser authorization or saved key',sent[2].url==='/api/mistral' && !sent[2].headers.Authorization && stored.size===0);
+  const queued=client.complete('queued');client.setConsent(false);
+  t('permission revocation cancels queued work',await rejects(()=>queued) && sent.length===3);
+  client.disconnect();t('disconnect removes availability and persisted credentials',!client.available()&&stored.size===0);
+  const router=createMistral(fetcher),mistral=createMistral(fetcher);router.configure('ROUTER_TEST');mistral.configure('MISTRAL_TEST');
+  const facade=createInterpreter(router,mistral);facade.setConsent(true);let updates=0;facade.subscribe(()=>updates++);facade.select('Mistral');
+  t('provider switch carries explicit consent and revokes old provider',facade.getState().provider==='Mistral' && mistral.getState().consent && !router.getState().consent && updates>0);
+  t('provider snapshots are stable between changes',facade.getState()===facade.getState());
+  const denied=createMistralProxy({fetcher,getKey:()=> 'SERVER_TEST_KEY'});
+  t('Edge adapter rejects unauthenticated deployment by default',(await denied(new Request('https://test/api/mistral',{method:'POST',body:'{}'}))).status===403);
+  const proxy=createMistralProxy({authorize:async()=>true,getKey:()=> 'SERVER_TEST_KEY',fetcher:async(url,options)=>{
+    t('Edge key stays on fixed upstream and token limit is bounded',url==='https://api.mistral.ai/v1/chat/completions' && options.headers.Authorization==='Bearer SERVER_TEST_KEY' && JSON.parse(options.body).max_tokens===2400);
+    return {ok:true,json:async()=>({choices:[{message:{content:'safe'}}]})};
+  }});
+  const req=body=>new Request('https://test/api/mistral',{method:'POST',body:JSON.stringify(body)});
+  t('Edge adapter rejects arbitrary models',(await proxy(req({model:'unapproved',messages:[]}))).status===400);
+  t('Edge adapter handles grounded text request',(await proxy(req({model:'mistral-large-latest',messages:[{role:'user',content:'chart'}],max_tokens:999999}))).status===200);
+  t('J2000 offsets match declared frame values',ayanamshaArcsec(2451545,'lahiri')===85871n && ayanamshaArcsec(2451545,'krishnamurti')===85691n);
+  t('date-dependent precession advances the sidereal offset',ayanamshaArcsec(2488070,'lahiri')>ayanamshaArcsec(2451545,'lahiri'));
+  for(let index=0;index<27;index++)for(let pada=1;pada<=4;pada++){
+    const n=nakshatra(BigInt(index)*48000n+BigInt(pada-1)*12000n,0n);
+    t(`nakshatra and pada boundary ${index}:${pada}`,n.index===index&&n.pada===pada);
+  }
+  t('sidereal subtraction wraps at Aries',nakshatra(0n,1n).index===26&&nakshatra(0n,1n).pada===4);
+  t('float longitude cannot enter integer mansion calculation',await rejects(()=>nakshatra(12.5,0n)));
+  t('out-of-ring integers are rejected',await rejects(()=>nakshatra(1296000n,0n)));
+  const dasha=vimshottari(24000n,0n,'2000-01-01T12:00:00Z','2000-01-01T12:00:00Z');
+  const birth=Date.parse('2000-01-01T12:00:00Z');
+  t('fractional lunar mansion balances first dasha',Date.parse(dasha.periods[0].until)-birth===3.5*365.25*86400000);
+  t('Vimshottari lord years sum to 120',DASHA_YEARS.reduce((a,b)=>a+b,0)===120);
+  for(const [i,p] of dasha.periods.entries()){
+    t(`major duration ${i}`,Date.parse(p.until)-Date.parse(p.from)===p.years*365.25*86400000);
+    t(`subperiods exactly close major ${i}`,p.subperiods[0].from===p.from && p.subperiods[8].until===p.until && p.subperiods.every((s,j)=>j===0||s.from===p.subperiods[j-1].until));
+    if(i)t(`major timeline contiguous ${i}`,p.from===dasha.periods[i-1].until);
+  }
+  const boundary=dasha.periods[0].until;
+  t('period boundaries are half-open',vimshottari(24000n,0n,'2000-01-01T12:00:00Z',boundary).active.lord==='Venus');
+  const maya=mayanCalendar('2012-12-21');
+  t('GMT reference date gives 4 Ajaw 3 Kankin',maya.tzolkin.number===4&&maya.tzolkin.name==='Ajaw'&&maya.haab.day===3&&maya.haab.month==='Kankin');
+  t('GMT 13-baktun reference is 1872000 days',maya.daysSinceEpoch===1872000);
+  t('Gregorian leap invalid date is rejected',await rejects(()=>mayanCalendar('1900-02-29')) && !await rejects(()=>mayanCalendar('2000-02-29')));
+  const birthRecord={dateISO:'2000-01-01T12:00:00Z',lat:29.4,lng:-98.5,subjectName:'Reader',houseSystem:'whole'};
+  const time=Astronomy.MakeTime(new Date(birthRecord.dateISO));
+  const planets=['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'].map(name=>{
+    const lon=Astronomy.Ecliptic(Astronomy.GeoVector(Astronomy.Body[name],time,true)).elon;
+    return {name,lon,sign:Math.floor(lon/30),house:1,speed:1};
+  });
+  const chart={birth:birthRecord,jd:2451545,planets,aspectGrid:[],cards:[],isDayChart:true,houseSystemActual:'whole'};
+  const pack=await prepareSourcePack(chart,Astronomy);
+  t('AI pack consists of ten admitted real ephemeris entries',pack.ledger.length===10&&pack.facts.filter(f=>f.kind==='admitted-position').length===10);
+  t('synthetic chart mismatch fails admission-grounded prompt',await rejects(()=>prepareSourcePack({...chart,planets:planets.map((p,i)=>i? p : {...p,lon:0})},Astronomy)));
+  t('unknown time precise source pack is withheld',await rejects(()=>prepareSourcePack({...chart,timeUnknown:true},Astronomy)));
+  const good={title:'Reflection',sections:[{title:'Motivation',text:'Consider this reflection.',citations:['placement:Sun']}]};
+  t('structured source-linked output accepts known citations',parseStructuredReading(JSON.stringify(good),pack).sections.length===1);
+  t('unknown trace IDs are rejected',await rejects(()=>parseStructuredReading(JSON.stringify({...good,sections:[{...good.sections[0],citations:['made-up']}]}),pack)));
+  t('empty citations are rejected',await rejects(()=>parseStructuredReading(JSON.stringify({...good,sections:[{...good.sections[0],citations:[]}]}),pack)));
+  t('structured prompt does not include unshared user data',!structuredPrompt(pack,'reflection').includes('PRIVATE_NOTE'));
+  const avatar={ownerKey:JSON.stringify([new Date(birthRecord.dateISO).toISOString(),29.4,-98.5]),preferences:{goals:'<script>private</script>'},history:[]};
+  const souvenir=buildSouvenir(chart,null,avatar);
+  t('local souvenir includes five chart-specific sections',souvenir.sections.length===5&&souvenir.sections[0].anchor.includes('°'));
+  t('offline souvenir escapes authored data and has no external runtime',!souvenirHtml(souvenir).includes('<script>') && souvenirHtml(souvenir).includes('&lt;script&gt;private&lt;/script&gt;'));
+  t('foreign avatar cannot enter a souvenir',await rejects(()=>buildSouvenir(chart,null,{...avatar,ownerKey:'foreign'})));
+  t('admission API rejects decimal astronomical input',await rejects(()=>computeAdmittedRegister({...pack.ledger[0],longitude_arcsec:'1.5'})));
+  t('admission API rejects synthetic certificates',await rejects(()=>computeAdmittedRegister({...pack.ledger[0],certificate:{status:'SYNTHETIC_DEMO',notes:'demo'}})));
+  const geometry=theatreGeometry({...chart,ascSignIdx:9},'Sun',pack.ledger);
+  t('theatre geometry derives exact residues from admitted ledger',geometry.register.longitude_arcsec===pack.ledger[0].longitude_arcsec && geometry.register.residues_B8.mod_11===String(BigInt(pack.ledger[0].longitude_arcsec)%11n));
+  t('house depth uses a bounded exact arc fraction',geometry.houseDepth && BigInt(geometry.houseDepth.withinArcsec)<BigInt(geometry.houseDepth.spanArcsec) && BigInt(geometry.houseDepth.partsPerMillion)<=1000000n);
+  t('unknown time has no theatre house depth',theatreGeometry({...chart,timeUnknown:true},'Sun',pack.ledger).houseDepth===null);
+  t('theatre cannot use a foreign-epoch ledger',await rejects(()=>theatreGeometry(chart,'Sun',pack.ledger.map(e=>({...e,event_id:'1990-01-01T12:00:00.000Z#'+e.body})))));
+  for(const lat of [-78.2,-33.8,0,29.4,51.5,78.2])for(const epoch of ['1980-10-21T21:31:00Z','2000-01-01T12:00:00Z','2026-10-15T05:00:00Z']){
+    const date=new Date(epoch),longitude=vertexFromDate(date,lat,-98.5),a=longitude*Math.PI/180;
+    const vector=new Astronomy.Vector(Math.cos(a),Math.sin(a),0,Astronomy.MakeTime(date));
+    const eq=Astronomy.EquatorFromVector(Astronomy.RotateVector(Astronomy.Rotation_ECT_EQD(date),vector));
+    const horizon=Astronomy.Horizon(date,new Astronomy.Observer(lat,-98.5,0),eq.ra,eq.dec);
+    t(`Vertex lies on western prime vertical ${lat} ${epoch}`,longitude!==null && Math.abs(horizon.azimuth-270)<.03,JSON.stringify(horizon));
+  }
+  t('Vertex is withheld at geographic poles',vertexFromDate(new Date('2000-01-01T12:00:00Z'),90,0)===null);
+  const events=ECLIPSE_CATALOGUE.events;
+  t('complete computed eclipse catalogue spans 1970–2030',events.length>250 && events.every(e=>e.peakISO>=ECLIPSE_CATALOGUE.from && e.peakISO<ECLIPSE_CATALOGUE.until));
+  t('catalogue ordering is strictly chronological',events.every((e,i)=>i===0 || e.peakMs>events[i-1].peakMs));
+  t('catalogue contains reference solar eclipses',events.some(e=>e.type==='solar'&&e.peakISO.startsWith('2024-04-08'))&&events.some(e=>e.type==='solar'&&e.peakISO.startsWith('1999-08-11')));
+  t('coordinate basis distinguishes shadow axis and zenith',events.filter(e=>e.type==='lunar').every(e=>e.geoBasis==='sublunar') && events.filter(e=>e.type==='solar'&&e.kind==='partial').every(e=>e.geoBasis==='subsolar'));
+  return rows;
+}

@@ -811,6 +811,7 @@ function computeNatal(birth) {
     mc,
     desc,
     ic,
+    vertex: birth.timeUnknown || !window.Houses?.vertexFromDate ? null : window.Houses.vertexFromDate(date,birth.lat,birth.lng),
     ascSignIdx,
     mcSignIdx,
     isDayChart,

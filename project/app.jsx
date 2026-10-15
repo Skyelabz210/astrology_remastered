@@ -85,7 +85,7 @@ function App() {
     ...DEFAULT_SETTINGS,
     ...(storedProfile && storedProfile.settings ? storedProfile.settings : {}),
   });
-  React.useLayoutEffect(() => { if (window.OpenRouter) window.OpenRouter.setConsent(settings.agentOn === true); }, [settings.agentOn]);
+  React.useLayoutEffect(() => { const provider = window.Interpreter || window.OpenRouter; if (provider) provider.setConsent(settings.agentOn === true); }, [settings.agentOn]);
   const t = { tweaks: settings, setTweak };
   const [screen, setScreen] = $useState("landing");
   const [landingState, setLandingState] = $useState(
@@ -944,6 +944,7 @@ function TraditionalPanel({ chart }) {
               <div className="tp-row"><span className="l">MC midheaven</span><span className="v">{chart.mc.toFixed(2)}° {ZODIAC[chart.mcSignIdx].name}</span></div>
               <div className="tp-row"><span className="l">DSC descendant</span><span className="v">{chart.desc.toFixed(2)}°</span></div>
               <div className="tp-row"><span className="l">IC imum coeli</span><span className="v">{chart.ic.toFixed(2)}°</span></div>
+              <div className="tp-row"><span className="l">Vertex · western prime vertical</span><span className="v">{Number.isFinite(chart.vertex) ? chart.vertex.toFixed(2)+'°' : 'unavailable'}</span></div>
             </>
           )}
         </div>

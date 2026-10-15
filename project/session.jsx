@@ -319,6 +319,7 @@ function ReadingSession({ chart: natalChart, settings, setTweak, onOpenSpread, o
         />
       )}
 
+      {shuffled && window.ExactTheatreGeometry && <window.ExactTheatreGeometry chart={chart} body={cards[pos]?.principal.name} />}
       {shuffled && <FollowUpQuestions mode="natal" chart={chart} agentOn={agentOn} />}
     </div>
   );

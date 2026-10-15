@@ -11,10 +11,10 @@ test('local chart evidence, linked readings, exported text and scrollable card b
   await expect(page.locator('.cs-local-reading')).toContainText('set this interpretation aside');
   const linked = page.getByRole('navigation', { name: 'Related placement readings' }).getByRole('button').first();
   await expect(linked).toBeVisible();
-  const target = (await linked.innerText()).replace(/^Read /,'').split(' · ')[0];
+  const target = (await linked.textContent()).replace(/^Read /i,'').split(' · ')[0];
   await linked.click();
   await expect(page.locator('.cs-title')).toContainText(target);
-  const anchor = (await page.locator('.cs-local-line').first().innerText()).split(' — ')[0];
+  const anchor = (await page.locator('.cs-local-line').first().textContent()).split(' — ')[0];
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'export', exact: true }).click();
   const file = await download;
@@ -30,7 +30,7 @@ test('local chart evidence, linked readings, exported text and scrollable card b
   await reading.focus();
   await reading.press('End');
   expect(await reading.evaluate(el => getComputedStyle(el).overflowY)).toBe('auto');
-  expect(await reading.evaluate(el => el.scrollHeight > el.clientHeight && el.scrollTop > 0)).toBe(true);
+  await expect.poll(() => reading.evaluate(el => el.scrollHeight > el.clientHeight && el.scrollTop > 0)).toBe(true);
   await expect(card).toHaveAttribute('aria-pressed','true');
   expect(errors).toEqual([]);
 });

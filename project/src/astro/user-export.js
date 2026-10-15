@@ -1,10 +1,11 @@
 import { zipSync, strToU8 } from '../../vendor/fflate.js';
 import { profileKey } from './reading-runs.js';
 import { APP_RELEASE } from '../present/release.js';
+import { buildSouvenir, souvenirHtml, souvenirMarkdown } from '../present/souvenir.js';
 
 const BIRTH_FIELDS = ['dateISO', 'lat', 'lng', 'tz', 'subjectName', 'placeLabel',
   'placeKey', 'timeUnknown', 'houseSystem', 'sect', 'orbScale'];
-const CHART_FIELDS = ['jd', 'asc', 'mc', 'desc', 'ic', 'ascSignIdx', 'mcSignIdx',
+const CHART_FIELDS = ['jd', 'asc', 'mc', 'desc', 'ic', 'vertex', 'ascSignIdx', 'mcSignIdx',
   'isDayChart', 'timeUnknown', 'houseSystemActual', 'houseCusps', 'planets', 'cards',
   'lots', 'phase', 'shape', 'aspectGrid', 'antisciaContacts', 'joys', 'receptions',
   'elementCount', 'modalityCount', 'hemisphereCount', 'quadrantCount', 'stelliums',
@@ -93,6 +94,12 @@ export function natalChartSvg(chart) {
     return [250 + radius * Math.cos(radians), 250 + radius * Math.sin(radians)];
   };
   const marks = [];
+  for (const aspect of chart.aspectGrid || []) {
+    const a = chart.planets?.find(p=>p.name === aspect.a), b = chart.planets?.find(p=>p.name === aspect.b);
+    if (!Number.isFinite(a?.lon) || !Number.isFinite(b?.lon)) continue;
+    const [ax,ay] = radial(a.lon,110), [bx,by] = radial(b.lon,110);
+    marks.push(`<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#858091" stroke-width=".6"><title>${escapeHtml(`${aspect.a} ${aspect.aspect} ${aspect.b}; orb ${aspect.orb} degrees`)}</title></line>`);
+  }
   for (let sign = 0; sign < 12; sign++) {
     const [x, y] = radial(sign * 30, 215), [tx, ty] = radial(sign * 30 + 15, 232);
     marks.push(`<line x1="250" y1="250" x2="${x}" y2="${y}" stroke="#b8b6ac" stroke-width=".6"/><text x="${tx}" y="${ty}" text-anchor="middle" fill="#3c4354" font-size="20">${GLYPHS[sign]}</text>`);
@@ -139,6 +146,14 @@ export async function buildPersonalZip(data, { crypto = globalThis.crypto } = {}
     'readings/current.txt': strToU8(data.readings.text),
     'README.txt': strToU8('Resonance personal archive\n\nExtract this ZIP and open report.html to read it offline.\ncharts/natal.svg: vector natal chart.\ndata/personal-data.json: complete selected-user snapshot, readings, prior runs, calculated charts, provenance and availability.\nmanifest.json: format, owner and SHA-256 file checksums where available.\n\nThe archive contains personal birth information and readings. It contains no provider credentials and makes no network requests. It is a snapshot, not a cross-device account or automatic backup.\n'),
   };
+  const avatarSummary = data.additional?.livingAvatar?.value?.summary || null;
+  const generated = data.runs.find(run=>run.evidence?.souvenir)?.evidence.souvenir || null;
+  const souvenir = buildSouvenir(data.chart,data.context,avatarSummary,generated);
+  files['souvenir.html'] = strToU8(souvenirHtml(souvenir));
+  files['souvenir.md'] = strToU8(souvenirMarkdown(souvenir));
+  files['souvenir.json'] = strToU8(JSON.stringify(souvenir,null,2));
+  files['chart.svg'] = strToU8(natalChartSvg(data.chart));
+  files['calculations.json'] = strToU8(JSON.stringify({schema:'resonance-calculations-v1',birth:data.chart.birth,chart:data.chart,context:data.context,additional:data.additional},null,2));
   const behaviorText = behavioralArchiveText(data);
   if (behaviorText) files['readings/behavioral-profile.txt'] = strToU8(behaviorText);
   const avatar = data.additional?.livingAvatar?.value;

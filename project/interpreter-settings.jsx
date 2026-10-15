@@ -20,7 +20,7 @@ function InterpreterSettings({ onConnected }) {
       if (!alive.current || generation !== connectionSeq.current) return;
       setModels(choices);
       const selected = choices.some(m => m.id === model) ? model : choices[0].id;
-      setModel(selected); window.OpenRouter.configure(key, selected); setKey('');
+      setModel(selected); window.OpenRouter.configure(key, selected); if (window.Interpreter) window.Interpreter.select('OpenRouter'); setKey('');
       setStatus('Configured · ' + selected + ' · authentication is checked when generating'); if (onConnected) onConnected();
     } catch (e) { if (alive.current && generation === connectionSeq.current) setStatus(e.message); }
     finally { if (alive.current && generation === connectionSeq.current) setBusy(false); }
@@ -33,6 +33,7 @@ function InterpreterSettings({ onConnected }) {
     <button type="button" className="hdr-pill" onClick={() => { connectionSeq.current++; window.OpenRouter.disconnect(); setKey(''); setBusy(false); setStatus('Disconnected'); }}>Disconnect</button>
     <p role="status">{status}</p>
     <p>Only enabling the AI checkbox sends your chart and reading context to OpenRouter and its selected provider. Your local reading is always available.</p>
+    {window.Mistral && <window.MistralSettings />}
   </details>;
 }
 Object.assign(window, { InterpreterSettings });

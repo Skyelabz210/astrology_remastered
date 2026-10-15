@@ -15,8 +15,8 @@ test('first onboarding run creates a living avatar that evolves through goals an
   await page.getByLabel('What are you working toward?',{exact:true}).fill('Finish my design project');
   await page.getByLabel('How do you learn best?',{exact:true}).fill('Concrete examples and small experiments');
   await page.getByRole('button',{name:'Save my goals and preferences',exact:true}).click();
-  await page.getByLabel('Entry type',{exact:true}).selectOption('reading-feedback');
-  await page.getByLabel('How did the reading fit?',{exact:true}).selectOption('does-not-fit');
+  await page.getByRole('combobox',{name:'Entry type',exact:true}).selectOption('reading-feedback');
+  await page.getByRole('combobox',{name:'How did the reading fit?',exact:true}).selectOption('does-not-fit');
   await page.getByLabel('What happened? Include an example or a counterexample.',{exact:true}).fill('I found a counterexample: I slowed down before deciding.');
   await page.getByRole('button',{name:'Save check-in',exact:true}).click();
   await expect(page.locator('.living-xp strong')).toHaveText('10 XP');
@@ -44,7 +44,7 @@ test('changing a birth record creates a separate avatar without another user’s
   await page.getByLabel('What happened? Include an example or a counterexample.',{exact:true}).fill('First person private observation');
   await page.getByRole('button',{name:'Save check-in',exact:true}).click();
   await page.getByRole('button',{name:'Explore techniques',exact:true}).click();
-  await page.getByRole('button',{name:'Birth entry',exact:true}).click();
+  await page.getByRole('button',{name:'Your birth details',exact:true}).click();
   await page.getByLabel('Birth calendar',{exact:true}).fill('1993-06-10');
   await page.getByRole('button',{name:/Cast the spread/i}).click();
   await page.getByRole('button',{name:'Continue your avatar',exact:true}).click();

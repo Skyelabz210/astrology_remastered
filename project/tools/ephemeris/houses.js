@@ -864,6 +864,23 @@ export function ascMcFromDate(date, latDeg, lngDeg) {
   return ascMc(jdUt1, ttFromUtc(jdUt1), latDeg, lngDeg);
 }
 
+// Western intersection of the prime vertical and ecliptic. The local north
+// vector is orthogonal to the prime-vertical plane; solve its dot product
+// with an ecliptic unit vector, then select the western antipode. At a
+// zenith/nadir degeneracy the east/west choice is undefined and withheld.
+export function vertexFromDate(date, latDeg, lngDeg) {
+  if(!Number.isFinite(date.getTime()) || !Number.isFinite(latDeg) || Math.abs(latDeg)>=90 || !Number.isFinite(lngDeg) || Math.abs(lngDeg)>180)return null;
+  const jd=date.getTime()/86400000+2440587.5,tt=ttFromUtc(jd);
+  const theta=(gastDeg(jd,tt)+lngDeg)*Math.PI/180,phi=latDeg*Math.PI/180,eps=meanObliquityDeg(tt)*Math.PI/180;
+  const a=Math.sin(phi)*Math.cos(theta),b=Math.cos(phi)*Math.sin(eps)-Math.sin(phi)*Math.sin(theta)*Math.cos(eps);
+  if(Math.hypot(a,b)<1e-12)return null;
+  let lambda=Math.atan2(a,b);
+  const east=-Math.sin(theta)*Math.cos(lambda)+Math.cos(theta)*Math.sin(lambda)*Math.cos(eps);
+  if(Math.abs(east)<1e-12)return null;
+  if(east>0)lambda+=Math.PI;
+  return ((lambda*180/Math.PI)%360+360)%360;
+}
+
 // Dispatch table for the 8 quadrant house systems this module computes with
 // a real (jdUt1, jdTt, latDeg, lngDeg) solver, keyed exactly as
 // POLAR_FALLBACK_POLICY and project/validate.js's SYSTEM_LABELS already key
@@ -923,6 +940,7 @@ if (typeof window !== "undefined") {
   window.Houses = {
     ascMc,
     ascMcFromDate,
+    vertexFromDate,
     placidusCusps,
     kochCusps,
     regiomontanusCusps,
