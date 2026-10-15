@@ -113,6 +113,15 @@ export function chartEvidenceForBody(chart, body, context = chart?.readingContex
     return { body: a.other, cardIdx: a.cardIdx, aspect: a.aspect, orbText: a.orbText, phase: a.phase, separationArcsec, lanes,
       text: `${body} links to ${a.other} through a natal ${a.aspect.toLowerCase()}, orb ${a.orbText}, ${a.phase}.` };
   });
+  const arc = context?.evidence?.solarArc;
+  const directionData = arc?.status === 'ready' && arc.value?.status === 'ready' ? arc.value : null;
+  const sameDirectionOwner = directionData?.input?.birth && chart.birth
+    && JSON.stringify([new Date(directionData.input.birth.dateISO).toISOString(), directionData.input.birth.lat, directionData.input.birth.lng])
+      === JSON.stringify([new Date(chart.birth.dateISO).toISOString(), chart.birth.lat, chart.birth.lng]);
+  const directionPoint = !chart.timeUnknown && sameDirectionOwner ? directionData.planets.find(p => p.name === body) : null;
+  const directions = directionPoint ? { method: directionData.method, at: directionData.input.targetAt, arcArcsec: directionData.arcArcsec,
+    point: directionPoint, contacts: directionData.contacts.filter(c => c.natalBody === body),
+    text: `The ${directionData.method === 'true' ? 'true progressed-Sun' : 'Naibod'} solar-arc construction advances this natal point by ${dms(Number(directionData.arcArcsec))} at ${directionData.input.targetAt}. It supplies a separate reflection layer; it is neither natal placement nor today's sky. Compare its contacts in Solar-arc directions with your dated observations; a mismatch is useful feedback.` } : null;
   const living = context?.evidence?.livingProfile?.value;
   const expectedOwner = chart.birth && JSON.stringify([new Date(chart.birth.dateISO).toISOString(), chart.birth.lat, chart.birth.lng]);
   const reported = living?.ownerKey === expectedOwner ? living.domains?.find(d => d.body === body) : null;
@@ -127,9 +136,9 @@ export function chartEvidenceForBody(chart, body, context = chart?.readingContex
     feedback.text += ' Your reports personalize the reflection; they do not change the astronomical facts.';
     if (feedback.goal) falsifier.text += ` Relate this exercise to your stated goal: ${feedback.goal}.`;
   }
-  return { body, anchor, conditions, aspects, tension, trajectory, falsifier, resonance, facts, feedback,
+  return { body, anchor, conditions, aspects, tension, trajectory, falsifier, resonance, facts, feedback, directions,
     text: [facts.join(' '), 'Interpretive tension: ' + tension.interpretation, 'Transit trajectory: ' + trajectory.text, 'Check against experience: ' + falsifier.text,
-      resonance.length ? 'Connected placements: ' + resonance.map(r => r.text).join(' ') : 'No natal aspect links were supplied.', feedback?.text || ''].filter(Boolean).join('\n') };
+      resonance.length ? 'Connected placements: ' + resonance.map(r => r.text).join(' ') : 'No natal aspect links were supplied.', directions?.text || '', feedback?.text || ''].filter(Boolean).join('\n') };
 }
 
 export function behavioralProfile(chart, context = chart?.readingContext) {

@@ -46,7 +46,9 @@ function BehavioralProfilePage({ settings, chapters = [], onBack, setTweak }) {
     setBusy(true); setStatus('Writing your behavioral profile…');
     try {
       if (!window.agentAvailable()) throw new Error('Connect OpenRouter in interpreter settings first.');
-      const aiContext = settings.shareBehavioralDataWithAI === true ? context : { ...context, evidence: Object.fromEntries(Object.entries(context.evidence).filter(([name]) => name !== 'livingProfile')) };
+      // The prose validator currently owns natal/transit claims. Constructed
+      // directions remain inspectable locally until that contract is extended.
+      const aiContext = { ...context, evidence: Object.fromEntries(Object.entries(context.evidence).filter(([name]) => name !== 'solarArc' && (name !== 'livingProfile' || settings.shareBehavioralDataWithAI === true))) };
       const aiProfile = window.BehavioralProfile.behavioralProfile(chart, aiContext);
       const prompt = window.buildChartPrompt(chart, context.jd) + '\nTASK: Write a behavioral profile, organized into motivation, emotional needs, communication, relationships, and response to conflict. For each domain include its supplied anchor, interpretive tension, located transit trajectory or explicit unavailability, observation/counterexample, and linked placements. Cite natal degrees, houses when known, aspect orbs and phase exactly as supplied. Label natal and transiting contacts separately. Never turn a numerical or symbolic relation into a measured behavioral trait. Use possibilities and practical self-observation prompts, never diagnoses, measured personality claims, or certain predictions. Preserve unknown-time limitations. Do not invent placements or aspects.\nLocal starting profile:\n' + aiProfile.text + '\nStructured chart evidence:\n' + JSON.stringify(aiProfile.sections) + (settings.shareBehavioralDataWithAI === true && window.LivingProfile ? '\nUser-reported goals and observations (use as reports, never inferred diagnoses):\n' + JSON.stringify(window.compactLivingSummary(window.LivingProfile.summarizeProfile(window.LivingProfile.loadProfile(chart.birth)),10)) : '');
       const text = await window.completeVerified(prompt, answer => window.validateNatalGrounding(answer, chart, 3), behavioralChartImage(chart));
@@ -65,6 +67,7 @@ function BehavioralProfilePage({ settings, chapters = [], onBack, setTweak }) {
       <details><summary>Computed natal evidence · {s.aspects.length} contacts</summary><ul>{s.facts.slice(1).map((fact,i) => <li key={i}>{fact}</li>)}</ul></details>
       <h3>Interpretive tension</h3><p>{s.tension.text}</p>
       <h3>Transit trajectory</h3><p>{s.trajectory.text}</p><small>{s.trajectory.scope}</small>
+      {s.directions && <div><h3>Solar-arc reflection</h3><p>{s.directions.text}</p><p>{s.directions.contacts.length} directed-to-natal contacts within 1° involve this domain. The separate solar-arc table identifies each body and orb.</p></div>}
       <h3>Check against experience</h3><p>{s.falsifier.hypothesis}</p><p>{s.falsifier.protocol}</p><p>{s.falsifier.counterexample}</p>
       {s.feedback && <div className="behavior-feedback"><h3>Your evolving experience</h3><p>{s.feedback.text}</p></div>}
       <h3>Connected placements</h3>{s.resonance.length ? <ul>{s.resonance.map(r => <li key={r.body}>{local.sections.some(section => section.body === r.body) ? <a href={`#behavior-${r.body}`}>{r.body}</a> : r.body} · {r.aspect}, orb {r.orbText}, {r.phase}</li>)}</ul> : <p>No natal aspect links were supplied.</p>}

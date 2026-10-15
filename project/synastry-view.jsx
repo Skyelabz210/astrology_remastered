@@ -41,7 +41,10 @@ function SynastryView({ chartA, chartB, chapters = [], settings, setTweak, onBac
   const capturedContext = $synUseMemo(() => {
     const c = personal.context;
     const input = { ...c.input, kind: 'synastry', partnerBirth: { ...chartB.birth } };
-    const evidence = { ...c.evidence, synastry: { status: 'ready', value: rawSyn } };
+    let composite;
+    try { const value = window.VariantCalculations.compositeChart(chartA, chartB); composite = { status: value.status, value }; }
+    catch (error) { composite = { status: 'unavailable', value: { status: 'unavailable', message: error.message } }; }
+    const evidence = { ...c.evidence, synastry: { status: 'ready', value: rawSyn }, composite };
     return { ...c, input, evidence, cacheFingerprint: window.ReadingRuns.evidenceFingerprint([c.at, input, evidence]) };
   }, [personal.context, rawSyn, chartB]);
   // A selected date is exact input, even within the current 30-day bucket.
@@ -189,6 +192,7 @@ function SynastryView({ chartA, chartB, chapters = [], settings, setTweak, onBac
         ) : <div className="syn-hdr-spacer"></div>}
       </header>
 
+      <window.CompositePanel value={context.evidence.composite.value} />
       <div className="syn-top">
         {/* compatibility dial */}
         <div className="syn-dial-card">

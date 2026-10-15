@@ -43,6 +43,8 @@ Each listed target is present in an actual user-facing component. Several relate
 
 Additional directory destinations are natal placements/houses, sect, chart shape, element and modality balance, patterns/stelliums/joys, transit perfections, behavioral profile, and synastry. Four new destinations—Jyotisha, Mayan calendars, Celestial souvenir and Chart consultant—open the integrated behavioral page and bring the catalogue to 33 entries. They are exercised by the evolution browser suite; the independent two-action matrix remains the 20-technique set above. Navigation utilities are not counted as techniques.
 
+Release v1.2.0 adds four further destinations (37 total): Exact register inspector, Solar-arc directions, Planetary stations and Composite relationship chart. The first three open their real sections in the behavioral page; composite opens relationship results when both birth records exist and otherwise requires partner entry. `browser-tests/variant-integration.spec.mjs` verifies these actual surfaces, focus, calculations, ownership and retention independently of the original 20-technique matrix. Calculation conventions and withheld outputs are documented in [VARIANT_INTEGRATION.md](VARIANT_INTEGRATION.md).
+
 Synastry has a separate prerequisite: both birth records must be entered. Its directory item opens results when a partner is already entered; otherwise it opens the second-birth form. Reaching that form in two activations is not a claim that computed synastry exists before the second birth is provided. The browser matrix prepares a real second record before using synastry results as a start screen.
 
 ## Before the directory

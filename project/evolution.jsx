@@ -105,6 +105,7 @@ function EvolutionPanel({chart,context,settings}) {
     {['html','md','json'].map(format=><button type="button" key={format} onClick={()=>download(format)}>Download souvenir {format.toUpperCase()}</button>)}
     <button type="button" disabled={!pack||busy||!settings.agentOn||!interpreter.available} onClick={()=>generate('souvenir')}>Add AI keepsake interpretation</button>
     {renderReading(keepsake)}
+    <window.VariantLab chart={chart} context={context} pack={pack} />
     <h2>Chart consultant</h2><form onSubmit={e=>{e.preventDefault();generate('consultant');}}><label>Ask your chart consultant<textarea maxLength={600} value={question} onChange={e=>setQuestion(e.target.value)} placeholder="How might these aspects relate to the decision I am reflecting on?" /></label><button type="submit" disabled={!pack||busy||!settings.agentOn||!interpreter.available||!question.trim()}>Ask with source traces</button></form>
     <p>Uses the selected provider and AI permission below. Goals and journal notes are included only when you enable their separate sharing checkbox.</p>
     {!pack && <p>{packError || 'Preparing admitted chart sources…'}</p>}{renderReading(answer)}<p role="status">{message}</p>

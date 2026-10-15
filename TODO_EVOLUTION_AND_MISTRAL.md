@@ -3,7 +3,7 @@
 **Target Release:** Astrology Remastered v2.0 (Resonance Unified)  
 **Primary Integration Focus:** Mistral AI Intelligence Layer, Resonance Reading Theatre, Exact Substrate Modernization, Life Chapters, and Souvenir Artifact Generation.
 
-**Implementation:** The v1.1.0 avatar integration and roadmap delivery are mapped, with source files and remaining limits, in [EVOLUTION_IMPLEMENTATION.md](project/docs/EVOLUTION_IMPLEMENTATION.md). OpenRouter remains the default free-model route; Mistral is an explicit alternative. Three geometry/depth views are adapted from the located Prime Resonance repository; a pixel-identical screen port and Celestial Registry integration remain open.
+**Implementation:** The avatar integration and roadmap delivery are mapped, with source files and remaining limits, in [EVOLUTION_IMPLEMENTATION.md](project/docs/EVOLUTION_IMPLEMENTATION.md). The v1.2.0 [variant integration](project/docs/VARIANT_INTEGRATION.md) adds Celestial Registry's residue inspector and corrected Prime Resonance composite, solar-arc and station techniques alongside the three geometry/depth views. OpenRouter remains the default free-model route; Mistral is an explicit alternative. A pixel-identical full-screen theatre port remains open.
 
 ---
 

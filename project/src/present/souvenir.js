@@ -10,7 +10,7 @@ export function buildSouvenir(chart, context = null, avatar = null, generated = 
     birth: { dateISO: chart.birth.dateISO, lat: chart.birth.lat, lng: chart.birth.lng, placeLabel: chart.birth.placeLabel || '' },
     at: context?.at || chart.birth.dateISO,
     dedication: `For ${chart.birth.subjectName || 'you'}: a record of the sky, the choices you describe, and the person you continue to become.`,
-    sections: local.sections.map(s=>({ title:s.title, anchor:s.anchor.text, text:s.tension.text, observation:s.falsifier.text, trajectory:s.trajectory.text })),
+    sections: local.sections.map(s=>({ title:s.title, anchor:s.anchor.text, text:s.tension.text, observation:s.falsifier.text, trajectory:[s.trajectory.text,s.directions?.text].filter(Boolean).join(' ') })),
     chapters: (context?.input?.chapters || []).map(ch=>({ place:ch.placeKey || ch.placeLabel || '', from:ch.startISO || '', until:ch.endISO || '', approximate:ch.approximate === true })),
     reports: avatar ? { preferences: { ...avatar.preferences }, observations: (avatar.history || []).slice(-20).map(r=>({at:r.at,domain:r.domain,note:r.note,agreement:r.agreement,rating:r.rating})) } : null,
     generated: generated ? { title:generated.title, sections:generated.sections.map(s=>({title:s.title,text:s.text,citations:[...s.citations]})) } : null,

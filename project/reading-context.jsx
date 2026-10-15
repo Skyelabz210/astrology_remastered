@@ -49,6 +49,10 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
   const transits = evaluate('transits', () => window.currentTransits(chart, jd));
   const persona = evaluate('traditional', () => window.PersonaModel.personaForChart(chart, new Date(at), window.Astronomy));
   const residence = evaluate('residence', () => window.chapterAware(chart, chapters, jd));
+  evaluate('solarArc', () => {
+    if (!window.VariantCalculations || window.EPHEMERIS_MODE === 'SYNTHETIC') throw new Error('Real solar-arc ephemeris unavailable');
+    return window.VariantCalculations.solarArcDirections(chart, jd, window.Astronomy);
+  });
   evaluate('behavioralTrajectories', () => {
     if (!window.BehavioralProfile || typeof window.BehavioralProfile.behavioralTrajectories !== 'function') throw new Error('Behavioral trajectory calculation unavailable');
     return window.BehavioralProfile.behavioralTrajectories(chart, jd,
@@ -68,6 +72,7 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
     return window.EnhancedReading.natalEclipseText(window.Astronomy, chart, eclipseOrb);
   });
   const personalLines = [];
+  if (evidence.solarArc?.status === 'ready') personalLines.push(`The true solar-arc direction advances the natal longitudes by ${Number(evidence.solarArc.value.arcArcsec) / 3600} degrees at this reading's instant. This symbolic direction is separate from today's transits; the behavioral page exposes its directed-to-natal contacts.`);
   if (residence && residence.active) personalLines.push(`Your residence at this reading's instant is ${residence.active.place.label}. Return charts use the residence on each return date.`);
   if (residence && residence.dropped) personalLines.push(`${residence.dropped} residence ${residence.dropped === 1 ? 'entry was' : 'entries were'} excluded because the location or date interval was invalid. Correct those entries to include them in location-based calculations.`);
   if (persona) {
@@ -96,7 +101,7 @@ function buildPersonalReadingContext(chart, jd, chapters = [], settings = {}) {
     houseSystemActual: chart.houseSystemActual, settings: { orbScale: settings.orbScale ?? 1, eclipseOrb,
       sect: settings.sect || 'auto', shareBehavioralDataWithAI: settings.shareBehavioralDataWithAI === true }, ephemeris: window.Astronomy && window.EPHEMERIS_MODE !== 'SYNTHETIC' ? 'Astronomy Engine 2.1.19' : 'synthetic demo',
     interpreter: settings.agentOn === true && (window.Interpreter || window.OpenRouter)?.available() ? { provider: window.Interpreter?.provider() || 'OpenRouter', model: (window.Interpreter || window.OpenRouter).model() } : null,
-    modelRevision: 'personal-reading-v2', release: window.APP_RELEASE || null };
+    modelRevision: 'personal-reading-v3', release: window.APP_RELEASE || null };
   const owner = window.ReadingRuns ? window.ReadingRuns.profileKey(chart.birth) : JSON.stringify(chart.birth);
   const cacheFingerprint = window.ReadingRuns ? window.ReadingRuns.evidenceFingerprint([at, input, evidence]) : JSON.stringify([at, input, evidence]);
   return { jd, at, profileKey: owner, input, evidence, limitations, cacheFingerprint,
