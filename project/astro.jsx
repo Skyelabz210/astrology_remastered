@@ -31,6 +31,25 @@
 // synthetic mean-motion model) to use for it — plus the ZODIAC/PLANET_*
 // data tables and computeNatal(), the top-level orchestrator that wires
 // ephemeris output through AstroCore's interpretation functions.
+//
+// ── P31: THE EXACT RING IS THE SYSTEM OF RECORD ────────────────────────
+// astronomy-engine is a SENSOR. Every float degree it (or houses.js, or the
+// mean-element node formulas) produces crosses ONE boundary —
+// ExactRing.wrapDegToArcsec() from src/present/exact-ring.js — and becomes an
+// exact integer arcsecond s ∈ [0, 1295999] in Z_1296000 (= 2^7·3^4·5^3, the
+// same ring src/core/ring.js proves and produce-ledger.mjs certifies). From
+// that point on, ALL downstream astrology runs as exact integer arithmetic:
+// speeds are signed integer arcsec/day deltas of quantized ±6h samples
+// (retrograde ⟺ speed < 0, structurally), sign/degree/minute/second come from
+// integer quotient/remainder, Hermetic Lots are (a+x−y) mod 1296000, house
+// placement compares integer arcs against quantized cusps, aspects match the
+// integer harmonic lattice (sextile = 216000″, square = 324000″, …) with
+// integer arcsecond orbs, and every body carries its Safe-Basis residue
+// vector {mod 2,3,5,7,11,13,17,19}. No float participates after quantization.
+// Float legacy fields (lon, degInSign, speed in °/day, orb in °) remain on the
+// chart purely as display conveniences derived FROM the integers; the
+// authoritative values are the *Arcsec/*BigInt fields. window.EXACT_RING_MODE
+// advertises which engine computed the chart.
 
 const ZODIAC = [
   { name: "Aries",       glyph: "♈", element: "Fire",  modality: "Cardinal", ruler: "Mars",    latin: "Aries"      },
@@ -88,14 +107,52 @@ function computeLots(asc, sun, moon, isDay) { return AstroCore.computeLots(asc, 
 
 // Full Hellenistic lots — Fortune, Spirit, Eros, Necessity, Courage,
 // Victory, Nemesis. Many compose on the first two.
-// AstroCore.computeAllLots returns each lot's `sign` index but not a sign
-// name (astro-core.js has no ZODIAC data table); attach `signName` here
-// from this file's own ZODIAC so callers see the exact same shape as before.
+// P31: computed HERE in exact Z_1296000 integer arcseconds — every lot is
+// (asc + x − y) mod 1,296,000 with BigInt operands from the locked ring
+// positions, never float `% 360` on unrounded sums. The legacy AstroCore
+// float implementation remains for its direct unit tests; the LIVE chart
+// path uses this exact one. `lon` stays a float display convenience derived
+// FROM the integer; `arcsecBigInt`/`arcsec` are authoritative.
+const LOT_FORMULAS = [
+  { name: "Fortune",   day: ["Moon", "Sun"],        night: ["Sun", "Moon"],
+    formulaDay: "Asc + Moon − Sun",     formulaNight: "Asc + Sun − Moon" },
+  { name: "Spirit",    day: ["Sun", "Moon"],        night: ["Moon", "Sun"],
+    formulaDay: "Asc + Sun − Moon",     formulaNight: "Asc + Moon − Sun" },
+  { name: "Eros",      day: ["Venus", "Spirit"],    night: ["Spirit", "Venus"],
+    formulaDay: "Asc + Venus − Spirit", formulaNight: "Asc + Spirit − Venus" },
+  { name: "Necessity", day: ["Fortune", "Mercury"], night: ["Mercury", "Fortune"],
+    formulaDay: "Asc + Fortune − Mercury", formulaNight: "Asc + Mercury − Fortune" },
+  { name: "Courage",   day: ["Fortune", "Mars"],    night: ["Mars", "Fortune"],
+    formulaDay: "Asc + Fortune − Mars", formulaNight: "Asc + Mars − Fortune" },
+  { name: "Victory",   day: ["Jupiter", "Spirit"],  night: ["Spirit", "Jupiter"],
+    formulaDay: "Asc + Jupiter − Spirit", formulaNight: "Asc + Spirit − Jupiter" },
+  { name: "Nemesis",   day: ["Fortune", "Saturn"],  night: ["Saturn", "Fortune"],
+    formulaDay: "Asc + Fortune − Saturn", formulaNight: "Asc + Saturn − Fortune" },
+];
 function computeAllLots(asc, planets, isDay) {
-  return AstroCore.computeAllLots(asc, planets, isDay).map(l => ({
-    ...l,
-    signName: ZODIAC[l.sign].name,
-  }));
+  const sAsc = typeof asc === "bigint" ? asc : toArcsec(asc);
+  const sOf = new Map(planets.map(p => [p.name,
+    p.arcsecBigInt !== undefined ? p.arcsecBigInt : toArcsec(p.lon)]));
+  const lotS = new Map();
+  const out = [];
+  for (const f of LOT_FORMULAS) {
+    const [xName, yName] = isDay ? f.day : f.night;
+    const sx = lotS.has(xName) ? lotS.get(xName) : sOf.get(xName);
+    const sy = lotS.has(yName) ? lotS.get(yName) : sOf.get(yName);
+    if (sx === undefined || sy === undefined) continue; // parity with legacy find() throw avoided
+    const s = lotArcsec(sAsc, sx, sy);
+    lotS.set(f.name, s);
+    out.push({
+      name: f.name,
+      arcsecBigInt: s,
+      arcsec: Number(s),
+      lon: arcsecToDeg(s),
+      sign: Number(s / SIGN_ARC_B),
+      signName: ZODIAC[Number(s / SIGN_ARC_B)].name,
+      formula: isDay ? f.formulaDay : f.formulaNight,
+    });
+  }
+  return out;
 }
 
 // Pattern detection — Grand Trine, T-Square, Grand Cross, Yod, Stellium.
@@ -165,6 +222,9 @@ const PLANET_ORDER = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","
 // a badge regardless of which path any individual planet ends up using.
 if (typeof window !== "undefined") {
   window.EPHEMERIS_MODE = window.Astronomy ? "REAL" : "SYNTHETIC";
+  // P31: the exact ring is the system of record whenever ExactRing loaded —
+  // every chart's downstream arithmetic runs in Z_1296000 integer arcseconds.
+  window.EXACT_RING_MODE = (window.ExactRing && typeof window.ExactRing.wrapDegToArcsec === "function") ? "EXACT_RING" : "LEGACY_FLOAT";
   // Which ASC/MC path is live. "REAL" = houses.js ascMc(); "APPROX" =
   // this file's approximate GMST/fixed-obliquity closed form.
   Object.defineProperty(window, "ANGLES_MODE", {
@@ -411,6 +471,133 @@ function houseForLongEqual(lon, ascDeg) { return AstroCore.houseForLongEqual(lon
 // CRT residues — pure integer arithmetic on arcseconds
 function residues(arcsec) { return AstroCore.residues(arcsec); }
 
+const ARCSEC_PER_DEG = 3600;
+function roundHalfAwayFromZero(x) {
+  return x >= 0 ? Math.floor(x + 0.5) : Math.ceil(x - 0.5);
+}
+
+// ── P31 exact-ring helpers (system of record: Z_1296000 BigInt arcseconds) ──
+// The sensor boundary. ONE function converts float degrees to the ring. The
+// canonical quantizer is ExactRing.wrapDegToArcsec (src/present/exact-ring.js,
+// published as window.ExactRing by a <script type="module"> tag that runs
+// before this text/babel script on every page). When that module is absent
+// (a minimal harness that never loaded it), the IDENTICAL rounding convention
+// runs inline below, so positions can never diverge between environments —
+// only the extended residue-lane extras degrade. window.EXACT_RING_MODE and
+// each chart's `exactRingMode` field advertise which engine ran.
+const EXACT_RING_AVAILABLE = () => typeof window !== "undefined" && window.ExactRing
+  && typeof window.ExactRing.wrapDegToArcsec === "function";
+function degToRingArcsec(deg) {
+  let s = roundHalfAwayFromZero(deg * ARCSEC_PER_DEG) % 1296000;
+  if (s < 0) s += 1296000;
+  return BigInt(s);
+}
+function toArcsec(deg) {
+  return EXACT_RING_AVAILABLE() ? window.ExactRing.wrapDegToArcsec(deg) : degToRingArcsec(deg);
+}
+const RING_B = 1296000n;
+const SIGN_ARC_B = 108000n;
+// Float legacy fields are DERIVED FROM the locked integer — display
+// conveniences can never disagree with the system of record.
+function arcsecToDeg(s) { return Number(s) / 3600; }
+function signedArcB(sa, sb) {
+  let d = (sa - sb) % RING_B;
+  if (d > 648000n) d -= RING_B;
+  else if (d <= -648000n) d += RING_B;
+  if (d === -648000n) d = 648000n;
+  return d;
+}
+// Exact ±6h central difference in arcsec/day from quantized sensor samples.
+function planetSpeedArcsec(name, jd) {
+  const sMinus = toArcsec(planetLongitude(name, jd - 0.25));
+  const sPlus  = toArcsec(planetLongitude(name, jd + 0.25));
+  return signedArcB(sPlus, sMinus) * 2n;
+}
+// Quantize a full 12-cusp float array into ring integers once per chart.
+function quantizeCusps(cuspsFloat) {
+  if (!cuspsFloat) return null;
+  return cuspsFloat.map(toArcsec);
+}
+// Integer-arcsecond nearest-aspect lookup. The canonical lattice lives in
+// ExactRing (src/present/exact-ring.js); the identical integer table is
+// mirrored below so a harness without the module still computes EXACT ring
+// aspects — never float degrees. window.EXACT_RING_MODE discloses which
+// engine ran; both paths are integer arcseconds.
+const RING_LATTICE = [
+  { name: "Conjunction",    angle: 0,       target: 0n,      orbArcsec: 28800n, family: "cardinal" },
+  { name: "Opposition",     angle: 180,     target: 648000n, orbArcsec: 28800n, family: "cardinal" },
+  { name: "Trine",          angle: 120,     target: 432000n, orbArcsec: 25200n, family: "classical" },
+  { name: "Square",         angle: 90,      target: 324000n, orbArcsec: 25200n, family: "classical" },
+  { name: "Sextile",        angle: 60,      target: 216000n, orbArcsec: 18000n, family: "classical" },
+  { name: "Quincunx",       angle: 150,     target: 540000n, orbArcsec: 10800n, family: "minor" },
+  { name: "Semisquare",     angle: 45,      target: 162000n, orbArcsec: 7200n,  family: "minor" },
+  { name: "Semisextile",    angle: 30,      target: 108000n, orbArcsec: 7200n,  family: "minor" },
+  { name: "Sesquiquadrate", angle: 135,     target: 486000n, orbArcsec: 7200n,  family: "minor" },
+  { name: "Novile",         angle: 40,      target: 144000n, orbArcsec: 5400n,  family: "novile" },
+  { name: "Decile",         angle: 36,      target: 129600n, orbArcsec: 4320n,  family: "decile" },
+  { name: "Tridecile",      angle: 108,     target: 388800n, orbArcsec: 4320n,  family: "decile" },
+  { name: "Quintile",       angle: 72,      target: 259200n, orbArcsec: 7200n,  family: "quintile" },
+  { name: "BiQuintile",     angle: 144,     target: 518400n, orbArcsec: 7200n,  family: "quintile" },
+  // Off-ring harmonics (7/11/13 do not divide 1,296,000) locked to their
+  // NEAREST integer lattice points; the defect belongs to the division, not
+  // the comparison arithmetic. See src/core/ring.js closure theory.
+  { name: "Septile",        angle: 360 / 7,  target: 185143n, orbArcsec: 5400n, family: "septile" },
+  { name: "Undecile",       angle: 360 / 11, target: 118909n, orbArcsec: 4320n, family: "undecile" },
+  { name: "Tredecile",      angle: 360 / 13, target: 100154n, orbArcsec: 4320n, family: "tredecile" },
+];
+function aspectFromRing(sa, sb, orbScale) {
+  if (EXACT_RING_AVAILABLE()) return window.ExactRing.nearestAspectRing(sa, sb, orbScale);
+  const d = arcDistanceB(sa, sb);
+  let best = null;
+  for (const a of RING_LATTICE) {
+    const sep = d >= a.target ? d - a.target : a.target - d;
+    const orb = BigInt(roundHalfAwayFromZero(Number(a.orbArcsec) * orbScale));
+    if (sep <= orb && (best === null || sep < best.sepArcsec)) {
+      best = { name: a.name, angle: a.angle, family: a.family, target: a.target,
+               orbArcsec: orb, sepArcsec: sep, exact: sep === 0n };
+    }
+  }
+  return best;
+}
+function arcDistanceB(sa, sb) {
+  const d = ((sa - sb) % RING_B + RING_B) % RING_B;
+  return d <= 648000n ? d : RING_B - d;
+}
+// Applying/separating from exact relative velocity and integer error.
+function phaseFromRing(sFast, sSlow, vFast, vSlow, target) {
+  if (EXACT_RING_AVAILABLE()) return window.ExactRing.phaseExact(sFast, sSlow, vFast, vSlow, target);
+  const rel = vFast - vSlow;
+  if (rel === 0n) return "static";
+  const sep = arcDistanceB(sFast, sSlow);
+  const err = sep >= target ? sep - target : target - sep;
+  if (err === 0n) return "exact";
+  return (sep > target ? rel > 0n : rel < 0n) ? "separating" : "applying";
+}
+// House placement dispatch, all-integer once cusps are quantized.
+function makeHouseDispatcher(houseCuspsArc, houseSystemActual, ascSignIdx, sAsc) {
+  return (s) => {
+    if (houseCuspsArc) {
+      if (EXACT_RING_AVAILABLE()) return window.ExactRing.houseForCuspsExact(s, houseCuspsArc);
+      return AstroCore.houseForCusps(arcsecToDeg(s), houseCuspsArc.map(arcsecToDeg));
+    }
+    if (houseSystemActual === "whole") {
+      if (EXACT_RING_AVAILABLE()) return window.ExactRing.houseWholeSign(s, sAsc);
+      return houseForSign(Number(s / SIGN_ARC_B), ascSignIdx);
+    }
+    if (EXACT_RING_AVAILABLE()) return window.ExactRing.houseEqual(s, sAsc);
+    return houseForLongEqual(arcsecToDeg(s), arcsecToDeg(sAsc));
+  };
+}
+// Safe-Basis 8-lane residue vector (BigInt), or the legacy 6-lane Number map.
+function laneResiduesOf(s) {
+  if (EXACT_RING_AVAILABLE()) return window.ExactRing.laneResidues(s);
+  return residues(Number(s));
+}
+// Exact modular Hermetic Lot: (asc + x − y) mod 1,296,000.
+function lotArcsec(sAsc, sx, sy) {
+  return ((sAsc + sx - sy) % RING_B + RING_B) % RING_B;
+}
+
 // Speed (deg/day) for each modeled body.
 //
 // Real-ephemeris path: a central-difference speed computed from
@@ -481,12 +668,20 @@ function computeNatal(birth) {
   const date = new Date(birth.dateISO);
   const jd = dateToJD(date);
   const solvedAngles = realAngles(date, birth.lat, birth.lng);
-  const asc = solvedAngles ? solvedAngles.ascDeg : approxAscendantDeg(date, birth.lat, birth.lng);
-  const mc  = midheavenDeg(date, birth.lng);
-  const desc = mod360(asc + 180);
-  const ic   = mod360(mc  + 180);
-  const ascSignIdx = Math.floor(asc / 30);
-  const mcSignIdx  = Math.floor(mc  / 30);
+  const ascFloat = solvedAngles ? solvedAngles.ascDeg : approxAscendantDeg(date, birth.lat, birth.lng);
+  const mcFloat  = midheavenDeg(date, birth.lng);
+  // ── P31 SENSOR BOUNDARY: angles lock into the ring immediately after the
+  // horizon solver; every downstream angle operation is exact integer math.
+  const sAsc = toArcsec(ascFloat);
+  const sMc  = toArcsec(mcFloat);
+  const sDesc = (sAsc + 648000n) % RING_B;
+  const sIc   = (sMc  + 648000n) % RING_B;
+  const asc = arcsecToDeg(sAsc);   // legacy float display, derived FROM the integer
+  const mc  = arcsecToDeg(sMc);
+  const desc = arcsecToDeg(sDesc);
+  const ic   = arcsecToDeg(sIc);
+  const ascSignIdx = Number(sAsc / SIGN_ARC_B);
+  const mcSignIdx  = Number(sMc  / SIGN_ARC_B);
   // Sect follows the physical solar hemisphere. At polar latitude the
   // eastern Ascendant alone does not identify which ecliptic half is above.
   let solarAltitude = null;
@@ -520,19 +715,17 @@ function computeNatal(birth) {
     houseCusps = quadrantCuspsFor(birth.houseSystem, date, birth.lat, birth.lng);
     if (!houseCusps) houseSystemActual = "whole"; // POLAR_FALLBACK_POLICY / offline fallback
   }
-  // Single dispatcher for all 3 house-placement call sites below, so the
+  // Single dispatcher for all house-placement call sites, so the
   // quadrant/whole/equal choice is made once per chart, not per point.
-  const houseOf = (lon, sign) => {
-    if (houseCusps) return AstroCore.houseForCusps(lon, houseCusps);
-    return houseSystemActual === "whole"
-      ? houseForSign(sign, ascSignIdx)
-      : houseForLongEqual(lon, asc);
-  };
+  // P31: cusps are quantized into the ring ONCE here; placement is exact
+  // integer arc arithmetic thereafter (see makeHouseDispatcher).
+  const houseCuspsArc = quantizeCusps(houseCusps);
+  const houseOf = makeHouseDispatcher(houseCuspsArc, houseSystemActual, ascSignIdx, sAsc);
 
   // The Ascendant's own shadow lane — the chart-specific term inside every
   // card's resonance, returned on the chart so the reading can NAME it
-  // instead of only feeling it as glow.
-  const ascR11 = (Math.round(asc * 3600) % 1296000) % 11;
+  // instead of only feeling it as glow. Exact: from the locked ring integer.
+  const ascR11 = Number(sAsc % 11n);
 
   const positionWarnings = [];
   if (!solvedAngles) positionWarnings.push("Ascendant uses the closed-form fallback with approximate sidereal time and fixed J2000 obliquity; the house solver did not supply this chart's angle.");
@@ -541,22 +734,32 @@ function computeNatal(birth) {
   if (window.Astronomy) positionWarnings.push("North/South Node use mean lunar nodes; Lilith uses mean lunar apogee. These are approximate elements, not true/osculating positions.");
   if (birth.includeSyntheticBodies) positionWarnings.push("Chiron uses a synthetic demo position; no Chiron ephemeris is installed.");
   const planets = PLANET_ORDER.filter(p => p !== "Chiron" || !window.Astronomy || birth.includeSyntheticBodies).map(p => {
-    const lon  = planetLongitude(p, jd);
-    const sign = Math.floor(lon / 30);
-    const arcsec = Math.round(lon * 3600) % 1296000;
-    const degInSign = lon - sign * 30;
+    // ── P31: the sensor float crosses the boundary HERE and is locked. The
+    // ring integer `s` is the system of record; every field below that has an
+    // exact form (sign, degInSign, arcsec, speed, retrograde, house, residues)
+    // is computed from it with integer arithmetic. `lon`/float `speed` remain
+    // as derived display conveniences only.
+    const s = toArcsec(planetLongitude(p, jd));
+    const lon = arcsecToDeg(s);
+    const sign = Number(s / SIGN_ARC_B);
+    const arcsec = Number(s);
+    const speedArcsec = planetSpeedArcsec(p, jd);          // exact arcsec/day
+    const retrograde = speedArcsec < 0n;                    // structurally tied to speed
+    const degInSign = Number(s % SIGN_ARC_B) / 3600;        // exact quotient path
     return {
       name: p,
       glyph: PLANET_GLYPH[p],
       lon,
+      arcsecBigInt: s,           // authoritative ring position
+      speedArcsecBigInt: speedArcsec, // authoritative signed motion
       sign,
       degInSign,
       arcsec,
-      speed: planetSpeed(p, jd),
-      retrograde: isRetrograde(p, jd),
-      house: houseOf(lon, sign),
+      speed: Number(speedArcsec) / 3600, // °/day, derived FROM the integer
+      retrograde,
+      house: houseOf(s),
       dignity: dignityFor(p, sign),
-      residues: residues(arcsec),
+      residues: laneResiduesOf(s),   // Safe-Basis lanes, exact when ExactRing loaded
       declination: window.Astronomy && REAL_EPHEMERIS_BODIES.has(p)
         ? window.Astronomy.EquatorFromVector(window.Astronomy.RotateVector(
           window.Astronomy.Rotation_EQJ_EQD(window.Astronomy.MakeTime(date)),
@@ -567,21 +770,24 @@ function computeNatal(birth) {
     };
   });
 
-  // South node is opposite the North
+  // South node is opposite the North — exact: +648000″ in the ring.
   const nn = planets.find(p => p.name === "NorthNode");
   if (nn) {
-    const snLon = mod360(nn.lon + 180);
-    const snSign = Math.floor(snLon / 30);
+    const snS = (nn.arcsecBigInt + 648000n) % RING_B;
+    const snLon = arcsecToDeg(snS);
+    const snSign = Number(snS / SIGN_ARC_B);
     planets.push({
       name: "SouthNode",
       glyph: PLANET_GLYPH.SouthNode,
       lon: snLon,
+      arcsecBigInt: snS,
+      speedArcsecBigInt: nn.speedArcsecBigInt,
       sign: snSign,
-      degInSign: snLon - snSign * 30,
-      arcsec: Math.round(snLon * 3600) % 1296000,
+      degInSign: Number(snS % SIGN_ARC_B) / 3600,
+      arcsec: Number(snS),
       speed: nn.speed,
       retrograde: true,
-      house: houseOf(snLon, snSign),
+      house: houseOf(snS),
       // dignityFor("SouthNode", snSign) is what this line calls now. It
       // used to call dignityFor("Sun", snSign), which is a real defect, not
       // a documented approximation: the Sun's DOMICILE/EXALT rows made the
@@ -598,7 +804,7 @@ function computeNatal(birth) {
       // already flows through the same generic, already-correct call above
       // (`dignity: dignityFor(p, sign)`).
       dignity: dignityFor("SouthNode", snSign),
-      residues: residues(Math.round(snLon * 3600) % 1296000),
+      residues: laneResiduesOf(snS),
       declination: planetDeclination(snLon), // nodes lie on the ecliptic: β ≡ 0
       criticalDegree: criticalKind(snSign, snLon - snSign * 30),
     });
@@ -611,7 +817,7 @@ function computeNatal(birth) {
     const ruler   = planets.find(p => p.name === sign.ruler);
     const principal = tenants[0] ?? ruler;
     const dignity   = dignityFor(principal.name, principal.sign);
-    const house     = houseOf(idx * 30 + 15, idx);
+    const house     = houseOf(BigInt(idx * 30 + 15) * 3600n); // mid-sign, exact ring point
 
     // Full Ptolemaic dignity table — triplicity, term, face
     const actualSign = ZODIAC[principal.sign];
@@ -631,24 +837,28 @@ function computeNatal(birth) {
       (dignity.kind === "detriment"  ? -5 : 0) +
       (dignity.kind === "fall"       ? -4 : 0);
 
-    // Aspect from this card's principal to the Sun, used to drive its glow
+    // Aspect from this card's principal to the Sun — exact ring comparison
+    // (integer separation vs integer lattice targets), glow phase from exact
+    // integer velocities.
     const sun = planets.find(p => p.name === "Sun");
-    const delta = mod360(principal.lon - sun.lon);
-    const aspect = principal.name === "Sun" ? null : nearestAspect(delta, birth.orbScale ?? 1);
-    if (aspect) aspect.phase = applyingPhase(principal.lon, sun.lon, principal.speed, sun.speed, aspect.angle);
+    const aspect = principal.name === "Sun" ? null : aspectFromRing(principal.arcsecBigInt, sun.arcsecBigInt, birth.orbScale ?? 1);
+    if (aspect) aspect.phase = phaseFromRing(
+      principal.arcsecBigInt, sun.arcsecBigInt,
+      principal.speedArcsecBigInt, sun.speedArcsecBigInt, aspect.target);
 
     // Resonance: a 0..1 scalar that drives glow vibrance.
     // Blends Ptolemaic dignity total, tenancy count, aspect tightness, and the
     // card's shadow-lane (mod 11) residue distance from the chart's Asc residue.
-    const cardArcsec = (idx * 30 + 15) * 3600;
-    const cardR11 = Math.floor(cardArcsec) % 11;
+    // Presentation weighting only — it never feeds back into positions.
+    const cardS = BigInt(idx * 30 + 15) * 3600n;
+    const cardR11 = Number(cardS % 11n);
     const laneDist = Math.min(
       Math.abs(ascR11 - cardR11),
       11 - Math.abs(ascR11 - cardR11)
     ) / 5.5; // 0..1
     const dignityNorm = (ptolemaicBonus + 5) / 20;       // 0..1 (range ~-5..+15)
     const tenancyNorm = Math.min(tenants.length / 3, 1);
-    const aspectNorm  = aspect ? 1 - (aspect.sep / aspect.orb) : 0;
+    const aspectNorm  = aspect ? 1 - (Number(aspect.sepArcsec) / Number(aspect.orbArcsec)) : 0;
     const angularBoost = [1, 4, 7, 10].includes(house) ? 0.15 : 0;
     const resonance = Math.max(0, Math.min(1,
       0.30 * dignityNorm +
@@ -660,7 +870,7 @@ function computeNatal(birth) {
 
     // Hue offset for iridescent shimmer — derived from the principal's
     // arcsec residue mod 360 so each card has a *unique* shimmer signature.
-    const hueShift = (Math.floor(principal.arcsec) % 360);
+    const hueShift = Number(principal.arcsecBigInt % 360n);
 
     return {
       ...sign,
@@ -680,7 +890,7 @@ function computeNatal(birth) {
       resonance,
       hueShift,
       laneR11: cardR11,
-      laneR13: Math.floor(cardArcsec) % 13,
+      laneR13: Number(cardS % 13n),
     };
   });
 
@@ -694,7 +904,9 @@ function computeNatal(birth) {
     phase.illuminationApproximate = false;
   }
   const shape = chartShape(planets.filter(p => REAL_EPHEMERIS_BODIES.has(p.name)));
-  const lots  = computeAllLots(asc, planets, isDayChart);
+  // P31: Lots computed on the LOCKED ring integers — (Asc + X − Y) mod
+  // 1,296,000 in BigInt, not float % 360 on unrounded sums.
+  const lots  = computeAllLots(sAsc, planets, isDayChart);
 
   // ───── Full aspect grid (every visible pair, applying/separating) ─────
   const visibleAspectBodies = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","Chiron","NorthNode"];
@@ -703,37 +915,46 @@ function computeNatal(birth) {
     for (let j = i + 1; j < planets.length; j++) {
       const A = planets[i], B = planets[j];
       if (!visibleAspectBodies.includes(A.name) || !visibleAspectBodies.includes(B.name)) continue;
-      const delta = mod360(A.lon - B.lon);
-      const asp = nearestAspect(delta, birth.orbScale ?? 1);
+      // ── P31: exact ring aspect — integer shortest arc vs integer harmonic
+      // lattice targets (sextile 216000″, square 324000″, trine 432000″,
+      // opposition 648000″, …). Orbs are INTEGER ARCSECONDS, not float °.
+      const asp = aspectFromRing(A.arcsecBigInt, B.arcsecBigInt, birth.orbScale ?? 1);
       if (!asp) continue;
-      // Faster planet first
-      const fast = Math.abs(A.speed) >= Math.abs(B.speed) ? A : B;
+      // Faster planet first — exact integer velocity magnitudes
+      const fast = (A.speedArcsecBigInt < 0n ? -A.speedArcsecBigInt : A.speedArcsecBigInt)
+                 >= (B.speedArcsecBigInt < 0n ? -B.speedArcsecBigInt : B.speedArcsecBigInt) ? A : B;
       const slow = fast === A ? B : A;
-      const phaseLabel = applyingPhase(fast.lon, slow.lon, fast.speed, slow.speed, asp.angle);
+      const phaseLabel = phaseFromRing(fast.arcsecBigInt, slow.arcsecBigInt, fast.speedArcsecBigInt, slow.speedArcsecBigInt, asp.target);
       aspectGrid.push({
         a: A.name, b: B.name, aGlyph: A.glyph, bGlyph: B.glyph,
         aspect: asp.name, angle: asp.angle, family: asp.family,
-        orb: asp.sep, maxOrb: asp.orb,
+        orb: Number(asp.sepArcsec) / 3600,   // legacy float ° display, derived FROM the integer
+        maxOrb: Number(asp.orbArcsec) / 3600,
+        orbArcsec: asp.sepArcsec,            // authoritative integer orb (arcsec)
+        targetArcsec: asp.target,            // exact harmonic lattice target
         phase: phaseLabel,
-        tightness: 1 - (asp.sep / asp.orb),
+        tightness: 1 - (Number(asp.sepArcsec) / Number(asp.orbArcsec)),
       });
     }
   }
   // Sort tightest first
   aspectGrid.sort((a, b) => a.orb - b.orb);
 
-  // ───── Antiscia (1° orb) ─────
+  // ───── Antiscia (1° orb) — P31: exact ring arithmetic. The antiscion axis
+  // is a ring reflection ((90° − λ) mod 360 → ±324000″ integer operation); the
+  // contact test compares integer circular arcs against 3600″. Orbs reported
+  // in arcseconds; float ° derived for display only.
   const antisciaContacts = [];
+  const antiS = (s) => (((324000n - s) % RING_B) + RING_B) % RING_B;
+  const contraS = (s) => (antiS(s) + 648000n) % RING_B;
   for (let i = 0; i < planets.length; i++) {
     for (let j = i + 1; j < planets.length; j++) {
       const A = planets[i], B = planets[j];
       if (!visibleAspectBodies.includes(A.name) || !visibleAspectBodies.includes(B.name)) continue;
-      const antiA = antiscion(A.lon);
-      const contraA = contraAntiscion(A.lon);
-      const d1 = Math.min(Math.abs(antiA - B.lon), 360 - Math.abs(antiA - B.lon));
-      const d2 = Math.min(Math.abs(contraA - B.lon), 360 - Math.abs(contraA - B.lon));
-      if (d1 < 1.0) antisciaContacts.push({ a: A.name, b: B.name, kind: "antiscion", orb: d1 });
-      if (d2 < 1.0) antisciaContacts.push({ a: A.name, b: B.name, kind: "contra-antiscion", orb: d2 });
+      const d1 = Number(arcDistanceB(antiS(A.arcsecBigInt), B.arcsecBigInt));
+      const d2 = Number(arcDistanceB(contraS(A.arcsecBigInt), B.arcsecBigInt));
+      if (d1 < 3600) antisciaContacts.push({ a: A.name, b: B.name, kind: "antiscion", orb: d1 / 3600, orbArcsec: d1 });
+      if (d2 < 3600) antisciaContacts.push({ a: A.name, b: B.name, kind: "contra-antiscion", orb: d2 / 3600, orbArcsec: d2 });
     }
   }
 
@@ -811,6 +1032,14 @@ function computeNatal(birth) {
     mc,
     desc,
     ic,
+    // ── P31 authoritative ring values (exact integer arcseconds; the floats
+    // above are display conveniences derived from these) ──
+    ascArcsecBigInt: sAsc,
+    mcArcsecBigInt: sMc,
+    descArcsecBigInt: sDesc,
+    icArcsecBigInt: sIc,
+    houseCuspsArcsec: houseCuspsArc,   // quantized cusps or null (whole/equal)
+    exactRingMode: EXACT_RING_AVAILABLE() ? "EXACT_RING" : "LEGACY_FLOAT",
     vertex: birth.timeUnknown || !window.Houses?.vertexFromDate ? null : window.Houses.vertexFromDate(date,birth.lat,birth.lng),
     ascSignIdx,
     mcSignIdx,
