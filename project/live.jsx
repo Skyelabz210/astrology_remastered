@@ -299,8 +299,8 @@ function LiveStatePanel({ chart, chapters = [] }) {
             </svg>
           </div>
           <div className="cl-worldline-readout">
-            <div className="cl-worldline-stat"><span>proper elapsed time τ</span><strong>{(worldline ? worldline.properSeconds / 86400 : 0).toFixed(9)} d</strong></div>
-            <div className="cl-worldline-stat"><span>coordinate elapsed time t</span><strong>{(worldline ? worldline.coordinateSeconds / 86400 : 0).toFixed(9)} d</strong></div>
+            <div className="cl-worldline-stat"><span>proper elapsed time τ</span><strong>{worldline ? (worldline.properSeconds / 86400).toFixed(9) + " d" : "—"}</strong></div>
+            <div className="cl-worldline-stat"><span>coordinate elapsed time t</span><strong>{worldline ? (worldline.coordinateSeconds / 86400).toFixed(9) + " d" : "—"}</strong></div>
             <div className="cl-worldline-stat"><span>coordinate − proper time</span><strong>{worldline ? (worldline.lagSeconds * 1e6).toFixed(3) + " μs" : "—"}</strong></div>
             <div className="cl-worldline-stat"><span>proper-time rate dτ/dt</span><strong>{worldline ? worldline.properRate.toFixed(12) : "—"}</strong></div>
           </div>
@@ -309,10 +309,21 @@ function LiveStatePanel({ chart, chapters = [] }) {
           <>
             <div className="cl-worldline-columns">
               <div>
+                <h5>CTM · cylindrical phase</h5>
+                <div className="cl-worldline-equation">Pₙ = (P₀ + nΔ) mod M</div>
+                <div className="cl-rows">
+                  <div className="cl-row"><span className="l">master phase P</span><span className="v">{data.ctm.tco.P.toLocaleString()}</span></div>
+                  <div className="cl-row"><span className="l">period M</span><span className="v">{data.ctm.tco.M.toLocaleString()} days</span></div>
+                  <div className="cl-row"><span className="l">cyclic angle θ</span><span className="v">{data.ctm.tco.thetaDeg.toFixed(4)}°</span></div>
+                  <div className="cl-row"><span className="l">birth-relative syndrome</span><span className="v">{data.ctm.syndromeDeg.toFixed(4)}°</span></div>
+                </div>
+              </div>
+              <div>
                 <h5>CRAM · signed carry (day ticks)</h5>
                 <div className="cl-worldline-equation">N = {worldline.cram.N.toLocaleString()} = 36K + r</div>
                 <div className="cl-rows">
                   <div className="cl-row"><span className="l">shell modulus M</span><span className="v">36</span></div>
+                  <div className="cl-row"><span className="l">anchor modulus A</span><span className="v">37</span></div>
                   <div className="cl-row"><span className="l">residue r = N mod 36</span><span className="v">{worldline.cram.residue}</span></div>
                   <div className="cl-row"><span className="l">winding K = floor(N / 36)</span><span className="v">{worldline.cram.winding}</span></div>
                   <div className="cl-row"><span className="l">signed anchor v₃₇ = (r − K) mod 37</span><span className="v">↓ {worldline.cram.signedAnchor}</span></div>
