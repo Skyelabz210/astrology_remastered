@@ -1,5 +1,5 @@
 // test/present/worldline.test.js — natal worldline / CRAM / GR model boundaries.
-import { buildNatalWorldline } from "../../src/astro/worldline.js";
+import { buildNatalWorldline, buildQmnfCoordinates } from "../../src/astro/worldline.js";
 
 const BIRTH = "2000-01-01T00:00:00Z";
 const place = { latitudeDeg: 35.1408, longitudeDeg: -79.0058 };
@@ -14,6 +14,21 @@ export function run() {
     ...place,
     ...extra,
   });
+
+  const qmnf = buildQmnfCoordinates(123456789n);
+  t("QMNF safe basis multiplies to the 30,030-state modulus",
+    qmnf.modulus === "30030" && qmnf.basis.join(",") === "2,3,5,7,11,13");
+  t("CRT residue coordinates stay within their prime fields",
+    qmnf.crt.every((entry) => BigInt(entry.residue) < BigInt(entry.prime)) &&
+    qmnf.residue === String(((123456789n % 30030n) + 30030n) % 30030n));
+  t("M+1 anchor eliminates winding modulo 30,031",
+    qmnf.eliminationVerified && qmnf.eliminatedWinding === qmnf.winding);
+  t("quadratic reciprocity gives antisymmetric prime-pair signatures",
+    qmnf.reciprocity.length === 3 &&
+    qmnf.reciprocity.every((pair) => pair.symbolPQ === -pair.symbolQP));
+  t("observer quotient retains residue and exact winding lift",
+    qmnf.observerQuotient.exactLift &&
+    qmnf.observerQuotient.fiberCoordinate === qmnf.winding);
 
   const birth = atDays(0);
   t("birth instant starts at N=0, r=0, K=0, v37=0",
@@ -73,7 +88,7 @@ export function run() {
     String(polar.relativity.localTangentialSpeedMS));
 
   t("worldline result keeps chart coordinates and model assumptions explicit",
-    shell.schema === "NATAL_WORLDLINE_V1" &&
+    shell.schema === "NATAL_WORLDLINE_V2" &&
     shell.input.altitudeSource === "assumed sea level" &&
     shell.interval.timeScale.includes("leap seconds omitted") &&
     shell.relativity.model.includes("Schwarzschild"),
