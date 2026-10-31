@@ -38,6 +38,32 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  natal-worldline:
+    name: natal-worldline regression
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: project
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Run this focused suite in isolation too: the broad test runner can
+      # stop on an unrelated suite before it reaches test/present/worldline.
+      - run: |
+          node --input-type=module -e '
+            import("./test/present/worldline.test.js").then(({ run }) => {
+              const rows = run();
+              for (const row of rows) {
+                console.log((row.ok ? "ok " : "FAIL ") + row.name + (row.detail ? " — " + row.detail : ""));
+              }
+              const failed = rows.filter((row) => !row.ok);
+              console.log((rows.length - failed.length) + "/" + rows.length + " worldline checks");
+              if (failed.length) process.exit(1);
+            }).catch((error) => { console.error(error); process.exit(1); });
+          '
+
   claims:
     name: claims
     runs-on: ubuntu-latest
