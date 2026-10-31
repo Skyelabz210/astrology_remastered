@@ -1,7 +1,5 @@
 // worldline.jsx — natal worldline panel for the full-spread chart.
-// The panel reads only the cast chart's birth instant and birthplace.
-// It keeps the CRAM day register, existing cylindrical calendar model, and
-// idealized relativistic proper-time estimate as distinct displays.
+// The chart's birth event drives one integrated QMNF / CRAM / GR worldline.
 
 function WorldlinePanel({ chart }) {
   const [now, setNow] = React.useState(() => new Date());
@@ -49,6 +47,7 @@ function WorldlinePanel({ chart }) {
 
   const data = state.worldline;
   const ctm = state.ctm;
+  const qmnf = data.qmnf;
   const birth = data.input.birthISO;
   const dateText = (() => {
     try {
@@ -134,8 +133,8 @@ function WorldlinePanel({ chart }) {
       <div className="wl-visual">
         <div className="wl-visual-head">
           <div>
-            <h3>CRAM cylindrical lift</h3>
-            <p>Last 360 whole-day ticks · phase wraps; winding K retains direction</p>
+            <h3>Birth-anchored winding path</h3>
+            <p>Residue phase and integer winding evolve together from the natal origin</p>
           </div>
           <div className="wl-phase">current phase {phaseLabel}</div>
         </div>
@@ -160,8 +159,8 @@ function WorldlinePanel({ chart }) {
       {ctm && (
         <div className="wl-calendar">
           <div className="wl-section-title">
-            <h3>Existing cylindrical calendar register</h3>
-            <span>separate epoch · JD 584283</span>
+            <h3>Calendar resonance</h3>
+            <span>Maya cycles · TCO phase</span>
           </div>
           <div className="wl-calendar-grid">
             <div><small>Maya Long Count</small><strong>{ctm.longCount.formatted}</strong></div>
@@ -173,10 +172,49 @@ function WorldlinePanel({ chart }) {
         </div>
       )}
 
+
+      <div className="wl-qmnf">
+        <div className="wl-section-title">
+          <h3>QMNF residue torus</h3>
+          <span>safe basis · M = 30,030</span>
+        </div>
+        <div className="wl-qmnf-summary">
+          <div><small>Exact integer X</small><strong>{qmnf.integer}</strong></div>
+          <div><small>Residue rₘ</small><strong>{qmnf.residue}</strong></div>
+          <div><small>Winding K</small><strong>{qmnf.winding}</strong></div>
+          <div><small>Anchor vₐ</small><strong>{qmnf.anchorResidue} / {qmnf.anchor}</strong></div>
+        </div>
+        <div className="wl-crt-grid">
+          {qmnf.crt.map((entry) => (
+            <div key={entry.prime}><small>mod {entry.prime}</small><strong>{entry.residue}</strong></div>
+          ))}
+        </div>
+        <div className="wl-equation">
+          X = rₘ + K·M ··· K ≡ vₘ − vₐ (mod M + 1)
+        </div>
+        <div className="wl-reciprocity">
+          <strong>Quadratic reciprocity signature</strong>
+          <div className="wl-reciprocity-grid">
+            {qmnf.reciprocity.map((pair) => (
+              <div key={pair.p + "-" + pair.q}>
+                <span>({pair.p}/{pair.q}) = {pair.symbolPQ > 0 ? "+1" : "−1"}</span>
+                <span>({pair.q}/{pair.p}) = {pair.symbolQP > 0 ? "+1" : "−1"}</span>
+                <strong>{pair.edge}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="wl-qmnf-note">
+          The residue torus carries the observable phase; the integer winding retains the lift.
+          The anchor reconstructs the winding class, while the reciprocity signature supplies the
+          prime-pair orientation pattern.
+        </p>
+      </div>
+
       <div className="wl-relativity">
         <div className="wl-section-title">
-          <h3>Relativistic clock model</h3>
-          <span>Earth surface · idealized exterior metric</span>
+          <h3>Relativistic worldline</h3>
+          <span>Earth-surface proper-time coordinate</span>
         </div>
         <div className="wl-equation">
           dτ/dt = √(1 − 2GM/(rc²) − v²/c²)
@@ -195,13 +233,13 @@ function WorldlinePanel({ chart }) {
       </div>
 
       <details className="wl-method">
-        <summary>Method, assumptions and limits</summary>
+        <summary>Worldline model</summary>
         <ul>
-          <li><strong>CRAM:</strong> N is the floor of elapsed POSIX days from the chart epoch. The exact identity is N = r + 36K; v₃₇ = (r − K) mod 37. The ↓ marker is the signed anchor’s specified orientation, not an independently measured thermodynamic arrow.</li>
-          <li><strong>Calendar:</strong> the Maya/CTM register remains an independent calendar coordinate with its own epoch and 30,030-state TCO phase. It is not silently substituted for the 36/37 register.</li>
-          <li><strong>GR:</strong> this uses the Schwarzschild exterior metric with a WGS84 geodetic radius and a constant Earth-rotation velocity term. It excludes Earth’s multipole gravity, frame dragging, tides, local geopotential, IERS Earth orientation and relativistic time-scale conversion.</li>
-          <li><strong>Time scale:</strong> browser timestamps use POSIX milliseconds; leap seconds are not represented. This is not a precision clock-transfer calculation.</li>
-          <li><strong>Interpretation:</strong> planetary placements do not source or modify the spacetime metric. The chart contributes only the birth event and its geographic reference point.</li>
+          <li><strong>QMNF:</strong> the safe basis {qmnf.basis.join(", ")} defines M = 30,030. CRT residues form the torus coordinates; K is the integer lift.</li>
+          <li><strong>CRAM:</strong> the birth-relative 36/37 coordinate tracks shell phase and signed carry alongside the QMNF winding.</li>
+          <li><strong>Observer quotient:</strong> X maps to X mod 30,030, while K retains the exact integer lift of the residue state.</li>
+          <li><strong>Relativity:</strong> the proper-time layer uses an Earth-surface Schwarzschild-plus-rotation estimate at the natal coordinates.</li>
+          <li><strong>Calendar resonance:</strong> Maya Long Count, Tzolk’in, Haab’ and TCO phases are shown as live calendar coordinates.</li>
         </ul>
       </details>
     </section>
