@@ -90,6 +90,16 @@ function LiveStatePanel({ chart, chapters = [] }) {
     };
   }, [target.getTime(), chart, chapters]);
 
+  // Three independent clocks are kept side-by-side: the app's CTM phase,
+  // the CRAM signed-carry coordinate, and proper time on an Earth-surface
+  // worldline under the explicitly bounded Schwarzschild approximation.
+  const worldline = React.useMemo(() => {
+    const calculate = window.Worldline && window.Worldline.calculateWorldline;
+    return typeof calculate === "function"
+      ? calculate(chart.jd, data.jdT, chart.birth.lat, chart.birth.lng)
+      : null;
+  }, [chart, data.jdT]);
+
   const chapterContext = React.useMemo(
     () => (typeof window.chapterAware === "function" ? window.chapterAware(chart, chapters, data.jdT) : null),
     [chart, chapters, data.jdT]
@@ -258,6 +268,73 @@ function LiveStatePanel({ chart, chapters = [] }) {
           <h4>Helix · z vs θ</h4>
           <HelixViz syndrome={data.ctm.syndromeDeg} />
         </div>
+      </div>
+
+      <div className="cl-card cl-card-wide cl-worldline">
+        <h4>Worldline · cyclic time, signed carry, and general relativity</h4>
+        <p className="cl-note">
+          The chart's birth event anchors a timelike observer worldline at the birth latitude and longitude,
+          held at the mean Earth radius and co-rotating with Earth. The CTM phase remains the cyclic calendar
+          coordinate; CRAM adds its discrete signed-carry coordinate; the metric below estimates the observer's
+          proper time. These are coupled readouts of the same selected interval, not one equation or one physical theory.
+        </p>
+        <div className="cl-worldline-grid">
+          <div className="cl-worldline-diagram" role="img" aria-label="Schematic worldline from birth event to selected target event; spatial displacement is enlarged for visibility">
+            <svg viewBox="0 0 520 188" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <marker id="cl-wl-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+                  <path d="M0 0 L6 3 L0 6" fill="none" stroke="currentColor" strokeWidth="1"/>
+                </marker>
+              </defs>
+              <path d="M62 150 H476 M62 150 V18" fill="none" stroke="currentColor" opacity=".35"/>
+              <path d="M62 150 L430 30" fill="none" stroke="currentColor" opacity=".2" strokeDasharray="4 5"/>
+              <path d="M62 150 C170 116 300 74 430 30" fill="none" stroke="#a9f6d7" strokeWidth="2.5" markerEnd="url(#cl-wl-arrow)"/>
+              <circle cx="62" cy="150" r="4" fill="currentColor"/>
+              <circle cx="430" cy="30" r="5" fill="#a9f6d7"/>
+              <text x="62" y="169" fill="currentColor" fontSize="10">birth event</text>
+              <text x="430" y="18" fill="currentColor" fontSize="10" textAnchor="middle">target event</text>
+              <text x="476" y="166" fill="currentColor" fontSize="10" textAnchor="end">coordinate time →</text>
+              <text x="12" y="16" fill="currentColor" fontSize="10">spatial displacement</text>
+              <text x="260" y="184" fill="currentColor" fontSize="9" textAnchor="middle" opacity=".7">schematic only · spatial displacement enlarged for visibility</text>
+            </svg>
+          </div>
+          <div className="cl-worldline-readout">
+            <div className="cl-worldline-stat"><span>proper elapsed time τ</span><strong>{(worldline ? worldline.properSeconds / 86400 : 0).toFixed(9)} d</strong></div>
+            <div className="cl-worldline-stat"><span>coordinate elapsed time t</span><strong>{(worldline ? worldline.coordinateSeconds / 86400 : 0).toFixed(9)} d</strong></div>
+            <div className="cl-worldline-stat"><span>coordinate − proper time</span><strong>{worldline ? (worldline.lagSeconds * 1e6).toFixed(3) + " μs" : "—"}</strong></div>
+            <div className="cl-worldline-stat"><span>proper-time rate dτ/dt</span><strong>{worldline ? worldline.properRate.toFixed(12) : "—"}</strong></div>
+          </div>
+        </div>
+        {worldline && (
+          <>
+            <div className="cl-worldline-columns">
+              <div>
+                <h5>CRAM · signed carry (day ticks)</h5>
+                <div className="cl-worldline-equation">N = {worldline.cram.N.toLocaleString()} = 36K + r</div>
+                <div className="cl-rows">
+                  <div className="cl-row"><span className="l">shell modulus M</span><span className="v">36</span></div>
+                  <div className="cl-row"><span className="l">residue r = N mod 36</span><span className="v">{worldline.cram.residue}</span></div>
+                  <div className="cl-row"><span className="l">winding K = floor(N / 36)</span><span className="v">{worldline.cram.winding}</span></div>
+                  <div className="cl-row"><span className="l">signed anchor v₃₇ = (r − K) mod 37</span><span className="v">↓ {worldline.cram.signedAnchor}</span></div>
+                </div>
+              </div>
+              <div>
+                <h5>GR · Earth-surface metric</h5>
+                <div className="cl-worldline-equation">dτ/dt = √(1 − rₛ/R − v²/c²)</div>
+                <div className="cl-rows">
+                  <div className="cl-row"><span className="l">latitude / longitude</span><span className="v">{worldline.latitudeDeg.toFixed(4)}° / {worldline.longitudeDeg.toFixed(4)}°</span></div>
+                  <div className="cl-row"><span className="l">surface speed from rotation</span><span className="v">{worldline.tangentialSpeedMps.toFixed(3)} m/s</span></div>
+                  <div className="cl-row"><span className="l">Schwarzschild radius rₛ</span><span className="v">{worldline.schwarzschildRadiusM.toFixed(4)} m</span></div>
+                  <div className="cl-row"><span className="l">worldline coordinates</span><span className="v">r = R⊕, θ fixed, φ = φ₀ + Ωt</span></div>
+                </div>
+              </div>
+            </div>
+            <p className="cl-note cl-worldline-caveat">
+              Model boundary: spherical Earth, mean radius, altitude 0 m, Earth-only Schwarzschild gravity plus the local rotational kinematic term. Solar-system gravity, geoid/altitude, frame dragging, tides, and N-body integration are omitted. This surface observer is accelerated (not a free-fall geodesic). The chart's date/time uncertainty carries through unchanged.
+              {chart.timeUnknown && " Birth time is unknown; the app's assumed birth instant is therefore only a reference event, not an exact proper-time origin."}
+            </p>
+          </>
+        )}
       </div>
 
       <div className="cl-card cl-card-wide">
