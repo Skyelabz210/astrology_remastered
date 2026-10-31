@@ -320,17 +320,17 @@ function LiveStatePanel({ chart, chapters = [] }) {
               </div>
               <div>
                 <h5>GR · Earth-surface metric</h5>
-                <div className="cl-worldline-equation">dτ/dt = √(1 − rₛ/R − v²/c²)</div>
+                <div className="cl-worldline-equation">dτ/dt = √(1 − rₛ/R) √(1 − v_local²/c²)</div>
                 <div className="cl-rows">
                   <div className="cl-row"><span className="l">latitude / longitude</span><span className="v">{worldline.latitudeDeg.toFixed(4)}° / {worldline.longitudeDeg.toFixed(4)}°</span></div>
-                  <div className="cl-row"><span className="l">surface speed from rotation</span><span className="v">{worldline.tangentialSpeedMps.toFixed(3)} m/s</span></div>
+                  <div className="cl-row"><span className="l">local rotational speed</span><span className="v">{worldline.tangentialSpeedMps.toFixed(3)} m/s</span></div>
                   <div className="cl-row"><span className="l">Schwarzschild radius rₛ</span><span className="v">{worldline.schwarzschildRadiusM.toFixed(4)} m</span></div>
                   <div className="cl-row"><span className="l">worldline coordinates</span><span className="v">r = R⊕, θ fixed, φ = φ₀ + Ωt</span></div>
                 </div>
               </div>
             </div>
             <p className="cl-note cl-worldline-caveat">
-              Model boundary: spherical Earth, mean radius, altitude 0 m, Earth-only Schwarzschild gravity plus the local rotational kinematic term. Solar-system gravity, geoid/altitude, frame dragging, tides, and N-body integration are omitted. This surface observer is accelerated (not a free-fall geodesic). The chart's date/time uncertainty carries through unchanged.
+              Model boundary: Julian-day time is a UT-like proxy for Schwarzschild coordinate time; spherical Earth, mean radius, altitude 0 m, Earth-only Schwarzschild gravity plus the local rotational kinematic term. Solar-system gravity, geoid/altitude, frame dragging, tides, and N-body integration are omitted. This surface observer is accelerated (not a free-fall geodesic). The chart's date/time uncertainty carries through unchanged.
               {chart.timeUnknown && " Birth time is unknown; the app's assumed birth instant is therefore only a reference event, not an exact proper-time origin."}
             </p>
           </>
