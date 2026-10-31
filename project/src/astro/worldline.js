@@ -139,7 +139,6 @@ export function buildNatalWorldline({
   // Rotation phase is shown relative to the natal meridian. A full inertial
   // Earth-orientation reconstruction would require UT1/GMST and IERS data.
   const rotationAngleRad = (
-    longitude * Math.PI / 180 +
     WORLDLINE_CONSTANTS.earthAngularVelocityRadS * coordinateSeconds
   ) % (2 * Math.PI);
   const relativePositionM = {
