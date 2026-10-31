@@ -3050,3 +3050,23 @@ body::before {
 .variant-lab summary { cursor: pointer; }
 .register-equation { font-family: ui-monospace, monospace; }
 .composite-panel { margin-inline: 1rem; min-width: 0; }
+
+
+/* Coupled CTM / CRAM / GR worldline readout. */
+.cl-worldline { margin-top: 18px; }
+.cl-worldline-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(240px, .8fr); gap: 20px; align-items: center; }
+.cl-worldline-diagram { min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px; color: var(--ink-dim); background: #ffffff04; }
+.cl-worldline-diagram svg { display: block; width: 100%; height: auto; }
+.cl-worldline-readout { display: grid; gap: 8px; }
+.cl-worldline-stat { display: flex; justify-content: space-between; gap: 12px; padding: 9px 10px; border-bottom: 1px solid var(--line); font-size: 11px; }
+.cl-worldline-stat span { color: var(--ink-dim); }
+.cl-worldline-stat strong { font-family: var(--mono); text-align: right; font-weight: 500; overflow-wrap: anywhere; }
+.cl-worldline-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+.cl-worldline-columns > div { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 6px; }
+.cl-worldline-columns h5 { margin: 0 0 10px; font-size: 12px; color: var(--ink); }
+.cl-worldline-equation { margin: 8px 0 12px; font-family: var(--mono); font-size: 12px; color: var(--ink); overflow-wrap: anywhere; }
+.cl-worldline-caveat { margin-top: 16px; }
+@media (max-width: 760px) {
+  .cl-worldline-grid, .cl-worldline-columns { grid-template-columns: minmax(0, 1fr); }
+  .cl-worldline-stat { align-items: flex-start; flex-wrap: wrap; }
+}
