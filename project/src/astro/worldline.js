@@ -19,9 +19,10 @@ export function positiveMod(value, modulus) {
  * Evaluate a chart subject's idealized Earth-surface worldline between
  * the natal event and a selected target event.
  *
- * Julian days are the chart engine's UT-like coordinate. Latitude/longitude
- * are geographic birth-place coordinates. The observer remains at that
- * surface location, co-rotating with Earth.
+ * Julian days are the chart engine's UT-like coordinate, used as a proxy
+ * for Schwarzschild coordinate time (not a calibrated GR coordinate-time
+ * realization). Latitude/longitude are geographic birth-place coordinates.
+ * The observer remains at that surface location, co-rotating with Earth.
  */
 export function calculateWorldline(birthJd, targetJd, latitudeDeg, longitudeDeg = 0) {
   for (const [name, value] of Object.entries({ birthJd, targetJd, latitudeDeg, longitudeDeg })) {
@@ -36,14 +37,18 @@ export function calculateWorldline(birthJd, targetJd, latitudeDeg, longitudeDeg 
   const longitudeRad = positiveMod(longitudeDeg, 360) * Math.PI / 180;
   const radiusM = C.earthRadiusM;
   const angularVelocity = C.earthRotationRadS;
-  const tangentialSpeedMps = angularVelocity * radiusM * Math.cos(latitudeRad);
+  const coordinateTangentialSpeedMps = angularVelocity * radiusM * Math.cos(latitudeRad);
   const schwarzschildRadiusM = 2 * C.G * C.earthMassKg / (C.cMps * C.cMps);
+  const staticLapseSquared = 1 - schwarzschildRadiusM / radiusM;
+  const staticLapse = Math.sqrt(staticLapseSquared);
+  // Speed measured by a local static observer; coordinate speed is
+  // divided by the Schwarzschild lapse before applying the SR factor.
+  const tangentialSpeedMps = coordinateTangentialSpeedMps / staticLapse;
 
-  // Schwarzschild g_tt plus the azimuthal g_phiphi term for
-  // phi(t) = phi_0 + Omega_Earth * t at fixed r and latitude.
+  // Schwarzschild metric along phi(t) = phi_0 + Omega_Earth*t at fixed
+  // radius and latitude: dτ/dt = sqrt(1-rs/R) * sqrt(1-v_local²/c²).
   const metricRateSquared =
-    1 - schwarzschildRadiusM / radiusM -
-    (tangentialSpeedMps * tangentialSpeedMps) / (C.cMps * C.cMps);
+    staticLapseSquared * (1 - (tangentialSpeedMps * tangentialSpeedMps) / (C.cMps * C.cMps));
   if (!(metricRateSquared > 0)) throw new RangeError("Worldline is not timelike under this model");
 
   const properRate = Math.sqrt(metricRateSquared);
@@ -76,6 +81,8 @@ export function calculateWorldline(birthJd, targetJd, latitudeDeg, longitudeDeg 
     longitudeAtTargetRad,
     angularVelocityRadS: angularVelocity,
     tangentialSpeedMps,
+    coordinateTangentialSpeedMps,
+    staticLapse,
     coordinates: {
       rM: radiusM,
       thetaRad: Math.PI / 2 - latitudeRad,
