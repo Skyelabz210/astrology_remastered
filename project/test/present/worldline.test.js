@@ -20,6 +20,10 @@ export function run() {
     birth.cram.N === "0" && birth.cram.r === "0" && birth.cram.K === "0" && birth.cram.vA === "0",
     JSON.stringify(birth.cram));
 
+  t("worldline rotation trace is zeroed at the natal-meridian origin",
+    birth.geometry.rotationAngleRad === 0,
+    String(birth.geometry.rotationAngleRad));
+
   const shell = atDays(36);
   t("first completed shell increments K and signs anchor downward",
     shell.cram.N === "36" && shell.cram.r === "0" && shell.cram.K === "1" && shell.cram.vA === "36",
