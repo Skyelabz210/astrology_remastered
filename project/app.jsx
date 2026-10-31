@@ -505,7 +505,7 @@ function Spread({ settings, setTweak, t, dstNote, onBack, chapters }) {
       <Header chart={chart} settings={settings} setTweak={setTweak} onBack={onBack} />
 
       {/* Birth-anchored cyclic and relativistic time registers. */}
-      {typeof window !== "undefined" && window.WorldlinePanel && <WorldlinePanel chart={chart} />}
+      {typeof window !== "undefined" && window.WorldlinePanel && <window.WorldlinePanel chart={chart} />}
 
       <Synthesis reading={chartReading} settings={settings} />
 
