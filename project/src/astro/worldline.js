@@ -1,17 +1,8 @@
 // src/astro/worldline.js
 //
-// NATAL_WORLDLINE_V1
-//
-// Three registers are deliberately kept separate:
-//   1. Chart epoch/place: an astronomical event and its geodetic coordinates.
-//   2. CRAM cycle: exact integer day index N -> (r, K), with M=36 and A=37.
-//   3. GR clock: an idealized proper-time rate for an Earth-fixed observer.
-//
-// The CRAM register is a chosen coordinate on the chart's history. It is not
-// a physical 36-day period and does not alter the relativistic metric.
-//
-// BigInt is retained through the CRAM decomposition. Floating point enters
-// only at the astronomical timestamp / geodesy / GR presentation boundary.
+// NATAL_WORLDLINE_V2 — integrated QMNF / CRAM / GR chart-time engine.
+// Exact integer coordinates stay in BigInt; floating-point arithmetic is
+// confined to timestamp, geodesy, and relativistic presentation calculations.
 
 import { identity } from "../core/arrow.js";
 import { mod } from "../core/residues.js";
@@ -26,7 +17,85 @@ export const WORLDLINE_CONSTANTS = Object.freeze({
   speedOfLightMS: 299792458,
   secondsPerDay: 86400,
   millisecondsPerDay: 86400000,
+  safeBasis: Object.freeze([2n, 3n, 5n, 7n, 11n, 13n]),
+  safeModulus: 30030n,
 });
+
+
+function modPow(base, exponent, modulus) {
+  let b = mod(base, modulus);
+  let e = exponent;
+  let result = 1n;
+  while (e > 0n) {
+    if (e & 1n) result = (result * b) % modulus;
+    b = (b * b) % modulus;
+    e >>= 1n;
+  }
+  return result;
+}
+
+function legendreSymbol(value, prime) {
+  const a = mod(value, prime);
+  if (a === 0n) return 0;
+  return modPow(a, (prime - 1n) / 2n, prime) === 1n ? 1 : -1;
+}
+
+/**
+ * Map one exact integer onto the QMNF residue torus and its integer lift.
+ * The quotient coordinate is the residue modulo 30030; the lift is K.
+ * The M+1 anchor gives K = v_M - v_A (mod M+1).
+ */
+export function buildQmnfCoordinates(value) {
+  const X = typeof value === "bigint" ? value : BigInt(value);
+  const basis = WORLDLINE_CONSTANTS.safeBasis;
+  const M = WORLDLINE_CONSTANTS.safeModulus;
+  const A = M + 1n;
+  const residue = mod(X, M);
+  const winding = floorDiv(X, M);
+  const anchorResidue = mod(X, A);
+  const eliminatedWinding = mod(residue - anchorResidue, A);
+  const crt = basis.map((prime) => ({
+    prime: prime.toString(),
+    residue: mod(X, prime).toString(),
+  }));
+  const oddPrimes = basis.filter((prime) => prime % 4n === 3n);
+  const reciprocity = [];
+  for (let i = 0; i < oddPrimes.length; i++) {
+    for (let j = i + 1; j < oddPrimes.length; j++) {
+      const p = oddPrimes[i];
+      const q = oddPrimes[j];
+      const pq = legendreSymbol(p, q);
+      const qp = legendreSymbol(q, p);
+      reciprocity.push({
+        p: p.toString(),
+        q: q.toString(),
+        symbolPQ: pq,
+        symbolQP: qp,
+        edge: pq === -1 ? p.toString() + "→" + q.toString()
+          : qp === -1 ? q.toString() + "→" + p.toString() : null,
+      });
+    }
+  }
+  return {
+    integer: X.toString(),
+    modulus: M.toString(),
+    residue: residue.toString(),
+    winding: winding.toString(),
+    reconstruction: residue.toString() + " + " + winding.toString() + " × " + M.toString(),
+    anchor: A.toString(),
+    anchorResidue: anchorResidue.toString(),
+    eliminatedWinding: eliminatedWinding.toString(),
+    eliminationVerified: mod(winding - eliminatedWinding, A) === 0n,
+    basis: basis.map(String),
+    crt,
+    reciprocity,
+    observerQuotient: {
+      map: "X ↦ X mod 30030",
+      fiberCoordinate: winding.toString(),
+      exactLift: true,
+    },
+  };
+}
 
 function parseInstant(value, name) {
   if (typeof value !== "string" ||
@@ -111,6 +180,7 @@ export function buildNatalWorldline({
   const anchor = WORLDLINE_CONSTANTS.anchor;
   const { r, K } = identity(elapsedDays, shell);
   const signedAnchor = mod(r - K, anchor);
+  const qmnf = buildQmnfCoordinates(elapsedDays);
   const elapsedMsNumber = Number(elapsedMilliseconds);
   const coordinateSeconds = elapsedMsNumber / 1000;
   const coordinateDays = elapsedMsNumber / WORLDLINE_CONSTANTS.millisecondsPerDay;
@@ -148,7 +218,7 @@ export function buildNatalWorldline({
   };
 
   return {
-    schema: "NATAL_WORLDLINE_V1",
+    schema: "NATAL_WORLDLINE_V2",
     frame: "Earth-fixed observer at the natal chart location",
     input: {
       birthISO: birth.iso,
@@ -166,6 +236,7 @@ export function buildNatalWorldline({
       elapsedJulianYears: coordinateSeconds / (365.25 * 86400),
       timeScale: "POSIX milliseconds interpreted as UTC; leap seconds omitted",
     },
+    qmnf,
     cram: {
       N: elapsedDays.toString(),
       M: shell.toString(),
@@ -208,5 +279,5 @@ export function buildNatalWorldline({
 }
 
 if (typeof window !== "undefined") {
-  window.WorldlineCore = { buildNatalWorldline, WORLDLINE_CONSTANTS };
+  window.WorldlineCore = { buildNatalWorldline, buildQmnfCoordinates, WORLDLINE_CONSTANTS };
 }
