@@ -68,18 +68,13 @@
 import { RING, closes, stepArcsec } from "../core/ring.js";
 import { B8 } from "../core/basis.js";
 
-const SIGN_ARCSEC = 108000n;         // 30°
 const DEG_ARCSEC = 3600n;            // 1°
 const MIN_ARCSEC = 60n;              // 1′
 const CIRC_HALF = 648000n;           // 180°
 
 export const RING_ARCSEC = 1296000;
-// SIGN_ARC is the BigInt ring unit (30° in arcseconds). It MUST be BigInt:
-// decompose/houseWholeSign/houseEqual divide BigInt ring points by it, and
-// JS throws "Cannot mix BigInt and other types" the moment a bigint meets a
-// number. This module was unreachable from every page (no HTML loaded it),
-// so the latent crash never executed — test/present/exact-ring.test.js now
-// exercises every exported function and keeps it honest.
+// BigInt ring positions must be divided by a BigInt sign width. Keeping
+// this constant typed prevents Number/BigInt mixing in houses and decompose.
 export const SIGN_ARC = 108000n;
 
 /**
