@@ -113,7 +113,7 @@ export function run() {
   t('unknown time suppresses per-card natal lane interpretation', !sb.narrativeForCard(unknown.cards[0], unknown).includes('eleventh lane'));
   t('unknown time export does not assert sect', !sb.buildReadingMarkdown({ ...unknown, readingContext: unknownContext }, unknown.cards).includes('**Sect**'));
   const run = { version: 1, id: 'run-a', profileKey: context.profileKey, at: context.at,
-    input: context.input, evidence: context.evidence, reading: narrative.text };
+    input: context.input, evidence: { ...context.evidence, natal: context.natal }, reading: narrative.text };
   t('run persists the inputs and evidence alongside the reading', ReadingRuns.saveRun(storage, run)
     && ReadingRuns.loadRuns(storage, context.profileKey)[0].reading === narrative.text);
   t('profile identities separate users with the same birth instant', ReadingRuns.profileKey(birth) !== ReadingRuns.profileKey({ ...birth, subjectName: 'Jordan' }));
@@ -131,7 +131,7 @@ export function run() {
   const foreignRun = { ...run, profileKey: ReadingRuns.profileKey(foreignBirth), input: { ...run.input, birth: foreignBirth } };
   const malformed = { ...run, input: {} };
   const forged = { ...foreignRun, profileKey: run.profileKey };
-  storage.setItem(ReadingRuns.RUNS_KEY, JSON.stringify([malformed, forged, run]));
+  storage.setItem(ReadingRuns.RUNS_KEY, ReadingRuns.snapshotJSON([malformed, forged, run]));
   t('bad and forged records are skipped without dropping valid history', ReadingRuns.loadRuns(storage, run.profileKey).length === 1);
   t('saving a run requires its actual birth record and matching owner', !ReadingRuns.saveRun(storage, malformed) && !ReadingRuns.saveRun(storage, forged));
   const invalidBirth = { ...birth, lat: 100 };

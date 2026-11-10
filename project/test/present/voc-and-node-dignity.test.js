@@ -111,10 +111,10 @@ export async function run() {
     const moonAspects = chart.aspectGrid.filter((a) => (a.a === "Moon" || a.b === "Moon") && MAJOR.includes(a.aspect));
     const hasApplying = moonAspects.some((a) => a.phase === "applying");
     t("fixture chart: Moon's major aspects are recorded with a phase",
-      moonAspects.length > 0, JSON.stringify(moonAspects));
+      moonAspects.length > 0, JSON.stringify(moonAspects, (_key, value) => typeof value === "bigint" ? String(value) : value));
     t("fixture chart: isVoc matches 'no applying major aspect', not 'no aspect at all'",
       chart.voidOfCourse.isVoc === !hasApplying,
-      `isVoc=${chart.voidOfCourse.isVoc} hasApplying=${hasApplying} moonAspects=${JSON.stringify(moonAspects)}`);
+      `isVoc=${chart.voidOfCourse.isVoc} hasApplying=${hasApplying} moonAspects=${JSON.stringify(moonAspects, (_key, value) => typeof value === "bigint" ? String(value) : value)}`);
   }
 
   // Broader sweep: for every probe chart, isVoc must be the exact logical

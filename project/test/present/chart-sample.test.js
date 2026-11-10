@@ -221,9 +221,16 @@ export async function run() {
         Math.abs(g.tightness - (1 - g.orb / g.maxOrb)) < 1e-9, `${id}: ${g.a}-${g.b}`);
       const A = chart.planets.find((p) => p.name === g.a);
       const B = chart.planets.find((p) => p.name === g.b);
+      // Septiles/undeciles/tredeciles target the nearest integer lattice
+      // point, not their unrepresentable ideal float angle. Independently
+      // re-derive both the target and orb from the chart's exact positions.
+      const delta = (A.arcsecBigInt - B.arcsecBigInt + 1296000n) % 1296000n;
+      const separation = delta <= 648000n ? delta : 1296000n - delta;
+      const target = BigInt(Math.round(g.angle * 3600));
+      const orb = separation >= target ? separation - target : target - separation;
       check("aspect separation re-derives from the two longitudes",
-        Math.abs(circDiff(A.lon - B.lon, g.angle) - g.orb) < 1e-6 ||
-        Math.abs(circDiff(B.lon - A.lon, g.angle) - g.orb) < 1e-6, `${id}: ${g.a}-${g.b}`);
+        g.targetArcsec === target && g.orbArcsec === orb && g.orb === Number(orb) / 3600,
+        `${id}: ${g.a}-${g.b}`);
       check("aspect grid is sorted tightest first", g.orb >= lastOrb - 1e-9, `${id}: ${g.a}-${g.b}`);
       lastOrb = g.orb;
     }

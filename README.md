@@ -21,7 +21,7 @@ stations. [The variant review](project/docs/VARIANT_INTEGRATION.md) records sour
 revisions, corrected formulas, conventions and remaining gaps.
 
 ```
-7767/7767 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
+7873/7873 assertions · full ecliptic sweep 1,296,000 points, 0 mismatches · 21/21 core modules float-free
 ```
 
 The test banner records automated checks, not proof of every mathematical or interpretive claim in this repository.

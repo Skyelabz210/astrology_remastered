@@ -6,13 +6,14 @@ import { readFileSync } from "node:fs";
 import * as AstroCore from "../../src/present/astro-core.js";
 import * as ExactRing from "../../src/present/exact-ring.js";
 import * as Houses from "../../tools/ephemeris/houses.js";
+import * as ReadingRuns from "../../src/astro/reading-runs.js";
 
 function loadChart(canonical) {
   const sandbox = { AstroCore, Houses };
   if (canonical) sandbox.ExactRing = ExactRing;
   sandbox.window = sandbox;
   vm.createContext(sandbox);
-  for (const file of ["vendor/astronomy.browser.min.js", "astro.jsx", "readings.jsx", "agent.jsx"]) {
+  for (const file of ["vendor/astronomy.browser.min.js", "astro.jsx", "time.jsx", "synastry.jsx", "readings.jsx", "agent.jsx"]) {
     const source = readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
     vm.runInContext(source, sandbox, { filename: file });
   }
@@ -61,6 +62,42 @@ export function run() {
       const unknown = sandbox.computeNatal({ ...birth, timeUnknown: true });
       return unknown.cards.every(card => sandbox.rigorousFor(card, unknown)
         .find(row => row.label === "house").value.includes("birth time unknown"));
+    });
+    const backing = new Map();
+    const storage = { getItem: key => backing.get(key) || null, setItem: (key, value) => backing.set(key, value) };
+    const run = { version: 1, id: "exact-chart", profileKey: ReadingRuns.profileKey(chart.birth),
+      at: "2026-10-02T12:00:00.000Z", input: { birth: chart.birth },
+      evidence: { natal: chart, exact: { large: 9007199254740993n, negative: -9007199254740993n } },
+      reading: "Local chart reading" };
+    check(`${mode}: full natal evidence persists with lossless integer strings`, () => {
+      if (!ReadingRuns.saveRun(storage, run)) return false;
+      const saved = ReadingRuns.loadRuns(storage)[0];
+      return saved.evidence.exact.large === "9007199254740993"
+        && saved.evidence.exact.negative === "-9007199254740993"
+        && saved.evidence.natal.planets.every((p, i) =>
+          p.arcsecBigInt === String(chart.planets[i].arcsecBigInt));
+    });
+    check(`${mode}: evidence hashing agrees before and after JSON persistence`, () =>
+      ReadingRuns.evidenceFingerprint(run) === ReadingRuns.evidenceFingerprint(ReadingRuns.loadRuns(storage)[0]));
+    check(`${mode}: attached exact evidence preserves its owner and integer precision`, () =>
+      ReadingRuns.attachEvidence(storage, run.id, "exactUpdate", { position: 9007199254740993n }, run.profileKey)
+      && ReadingRuns.loadRuns(storage, run.profileKey)[0].evidence.exactUpdate.position === "9007199254740993");
+    check(`${mode}: persistence leaves the authoritative chart BigInts untouched`, () =>
+      typeof chart.planets[0].arcsecBigInt === "bigint" && typeof run.evidence.exact.large === "bigint");
+    check(`${mode}: synastry evidence containing both full charts can be hashed and saved`, () => {
+      const partner = sandbox.computeNatal({ ...birth, dateISO: "1980-10-21T21:31:00Z", subjectName: "Partner" });
+      const relationship = { ...run, id: "relationship", input: { birth: chart.birth, partnerBirth: partner.birth, kind: "synastry" },
+        evidence: { synastry: sandbox.computeSynastry(chart, partner) } };
+      return ReadingRuns.evidenceFingerprint(relationship).length === 32
+        && ReadingRuns.saveRun(storage, relationship)
+        && ReadingRuns.loadRuns(storage)[0].input.partnerBirth.subjectName === "Partner";
+    });
+    check(`${mode}: HCRM's legacy quantizer cannot overwrite the natal chart quantizer`, () => {
+      vm.runInContext(readFileSync(new URL("../../hcrm.jsx", import.meta.url), "utf8"), sandbox);
+      const recast = sandbox.computeNatal(birth);
+      return typeof sandbox.toArcsec(1) === "number"
+        && recast.ascArcsecBigInt === chart.ascArcsecBigInt
+        && recast.planets.every((p, i) => p.arcsecBigInt === chart.planets[i].arcsecBigInt);
     });
     check(`${mode}: raw canonical lane API remains BigInt`, () =>
       Object.values(ExactRing.laneResidues(1234567n)).every(value => typeof value === "bigint"));

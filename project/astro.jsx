@@ -130,9 +130,9 @@ const LOT_FORMULAS = [
     formulaDay: "Asc + Fortune − Saturn", formulaNight: "Asc + Saturn − Fortune" },
 ];
 function computeAllLots(asc, planets, isDay) {
-  const sAsc = typeof asc === "bigint" ? asc : toArcsec(asc);
+  const sAsc = typeof asc === "bigint" ? asc : natalArcsec(asc);
   const sOf = new Map(planets.map(p => [p.name,
-    p.arcsecBigInt !== undefined ? p.arcsecBigInt : toArcsec(p.lon)]));
+    p.arcsecBigInt !== undefined ? p.arcsecBigInt : natalArcsec(p.lon)]));
   const lotS = new Map();
   const out = [];
   for (const f of LOT_FORMULAS) {
@@ -492,7 +492,9 @@ function degToRingArcsec(deg) {
   if (s < 0) s += 1296000;
   return BigInt(s);
 }
-function toArcsec(deg) {
+// Keep this chart quantizer distinct from hcrm.jsx's Number-valued toArcsec.
+// Both classic scripts share the window namespace on the console pages.
+function natalArcsec(deg) {
   return EXACT_RING_AVAILABLE() ? window.ExactRing.wrapDegToArcsec(deg) : degToRingArcsec(deg);
 }
 const RING_B = 1296000n;
@@ -509,14 +511,14 @@ function signedArcB(sa, sb) {
 }
 // Exact ±6h central difference in arcsec/day from quantized sensor samples.
 function planetSpeedArcsec(name, jd) {
-  const sMinus = toArcsec(planetLongitude(name, jd - 0.25));
-  const sPlus  = toArcsec(planetLongitude(name, jd + 0.25));
+  const sMinus = natalArcsec(planetLongitude(name, jd - 0.25));
+  const sPlus  = natalArcsec(planetLongitude(name, jd + 0.25));
   return signedArcB(sPlus, sMinus) * 2n;
 }
 // Quantize a full 12-cusp float array into ring integers once per chart.
 function quantizeCusps(cuspsFloat) {
   if (!cuspsFloat) return null;
-  return cuspsFloat.map(toArcsec);
+  return cuspsFloat.map(natalArcsec);
 }
 // Integer-arcsecond nearest-aspect lookup. The canonical lattice lives in
 // ExactRing (src/present/exact-ring.js); the identical integer table is
@@ -542,8 +544,8 @@ const RING_LATTICE = [
   // NEAREST integer lattice points; the defect belongs to the division, not
   // the comparison arithmetic. See src/core/ring.js closure theory.
   { name: "Septile",        angle: 360 / 7,  target: 185143n, orbArcsec: 5400n, family: "septile" },
-  { name: "Undecile",       angle: 360 / 11, target: 118909n, orbArcsec: 4320n, family: "undecile" },
-  { name: "Tredecile",      angle: 360 / 13, target: 100154n, orbArcsec: 4320n, family: "tredecile" },
+  { name: "Undecile",       angle: 360 / 11, target: 117818n, orbArcsec: 4320n, family: "undecile" },
+  { name: "Tredecile",      angle: 360 / 13, target: 99692n, orbArcsec: 4320n, family: "tredecile" },
 ];
 function aspectFromRing(sa, sb, orbScale) {
   if (EXACT_RING_AVAILABLE()) return window.ExactRing.nearestAspectRing(sa, sb, orbScale);
@@ -677,8 +679,8 @@ function computeNatal(birth) {
   const mcFloat  = midheavenDeg(date, birth.lng);
   // ── P31 SENSOR BOUNDARY: angles lock into the ring immediately after the
   // horizon solver; every downstream angle operation is exact integer math.
-  const sAsc = toArcsec(ascFloat);
-  const sMc  = toArcsec(mcFloat);
+  const sAsc = natalArcsec(ascFloat);
+  const sMc  = natalArcsec(mcFloat);
   const sDesc = (sAsc + 648000n) % RING_B;
   const sIc   = (sMc  + 648000n) % RING_B;
   const asc = arcsecToDeg(sAsc);   // legacy float display, derived FROM the integer
@@ -744,7 +746,7 @@ function computeNatal(birth) {
     // exact form (sign, degInSign, arcsec, speed, retrograde, house, residues)
     // is computed from it with integer arithmetic. `lon`/float `speed` remain
     // as derived display conveniences only.
-    const s = toArcsec(planetLongitude(p, jd));
+    const s = natalArcsec(planetLongitude(p, jd));
     const lon = arcsecToDeg(s);
     const sign = Number(s / SIGN_ARC_B);
     const arcsec = Number(s);
@@ -1103,7 +1105,7 @@ function computeNatal(birth) {
 Object.assign(window, {
   ZODIAC, PLANET_GLYPH, PLANET_ORDER,
   computeNatal, dignityFor, nearestAspect, dateToJD, ascendantDeg, midheavenDeg,
-  planetLongitude, residues, mod360,
+  planetLongitude, isRetrograde, residues, mod360,
   termRuler, faceRuler, lunarPhase, chartShape, computeLots, computeAllLots,
   antiscion, contraAntiscion, planetDeclination, planetSpeed,
   applyingPhase, criticalKind, detectPatterns,

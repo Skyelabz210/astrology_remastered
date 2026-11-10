@@ -163,8 +163,8 @@ export const ASPECT_LATTICE = Object.freeze([
   { name: "BiQuintile",     angle: 144,  target: 518400n, orbArcsec: 7200n,  family: "quintile" },
   // 360/7° = 185142.857…″ → nearest integer lattice point 185143″ (defect disclosed by closure check)
   { name: "Septile",        angle: 360 / 7,  target: 185143n, orbArcsec: 5400n, family: "septile" },
-  { name: "Undecile",       angle: 360 / 11, target: 118909n, orbArcsec: 4320n, family: "undecile" },
-  { name: "Tredecile",      angle: 360 / 13, target: 100154n, orbArcsec: 4320n, family: "tredecile" },
+  { name: "Undecile",       angle: 360 / 11, target: 117818n, orbArcsec: 4320n, family: "undecile" },
+  { name: "Tredecile",      angle: 360 / 13, target: 99692n, orbArcsec: 4320n, family: "tredecile" },
 ]);
 
 /**

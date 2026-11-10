@@ -104,8 +104,11 @@ export async function run() {
 
     // 2. The value that actually reaches the chart — not just the helper.
     const chart = computeNatal({ dateISO, lat, lng, houseSystem: "whole", sect: "auto" });
-    t(`${label} · computeNatal ascendant == ascMc`,
-      Math.abs(circDiffDeg(chart.asc, ref.ascDeg)) < IDENTITY_TOL_DEG,
+    // The solver stays unquantized above; the chart locks its result to the
+    // nearest arcsecond. Assert that exact contract, not a wider tolerance.
+    const ascArcsec = BigInt(Math.round(ref.ascDeg * 3600) % 1296000);
+    t(`${label} · computeNatal ascendant equals the quantized solver`,
+      chart.ascArcsecBigInt === ascArcsec && chart.asc === Number(ascArcsec) / 3600,
       `chart.asc=${chart.asc.toFixed(6)}`);
 
     // 3. The rising sign — the thing a reader sees — follows the solver.
@@ -115,7 +118,8 @@ export async function run() {
 
     // 4. Descendant/IC stay opposite their angles.
     t(`${label} · descendant == ASC + 180`,
-      Math.abs(circDiffDeg(chart.desc, ref.ascDeg + 180)) < 1e-9);
+      chart.descArcsecBigInt === (ascArcsec + 648000n) % 1296000n
+      && Math.abs(circDiffDeg(chart.desc, chart.asc + 180)) < 1e-9);
   }
 
   // 5. The corrected fallback must select the same horizon branch.
@@ -174,8 +178,9 @@ export async function run() {
     // The MC does not depend on latitude, so it must remain exact even where
     // the Ascendant cannot be computed. This is the half worth keeping.
     const mcRef = housesModule.ascMcFromDate(polarDate, 0, lng).mcDeg;
-    t(`${label} · Midheaven stays exact`,
-      Math.abs(circDiffDeg(chart.mc, mcRef)) < IDENTITY_TOL_DEG,
+    t(`${label} · Midheaven equals the quantized solver`,
+      chart.mcArcsecBigInt === BigInt(Math.round(mcRef * 3600) % 1296000)
+      && chart.mc === Number(chart.mcArcsecBigInt) / 3600,
       `mc=${chart.mc.toFixed(6)} ref=${mcRef.toFixed(6)}`);
 
     // Planetary positions are latitude-independent and must be unaffected.

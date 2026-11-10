@@ -25,7 +25,7 @@ const currentLat = Number(arg("current-lat", 29.4241));
 const currentLng = Number(arg("current-lng", -98.4936));
 
 // ── browser globals the classic scripts expect ────────────────────────
-globalThis.window = globalThis;
+const window = globalThis.window = globalThis;
 // astronomy-engine is an ES module in node_modules; the vendored browser
 // build is a minified IIFE that only assigns window.Astronomy (no exports).
 window.Astronomy = await import(pathToFileURL(path.join(projectDir, "node_modules", "astronomy-engine", "esm", "astronomy.js")).href)
@@ -119,7 +119,6 @@ console.log("Chart shape:", chart.shape);
 
 // ── relocated local ASC/MC for current residence (San Antonio, TX) ────
 {
-  const jd = chart.jd;
   const rel = api.ascendantDeg(new Date(dateISO), currentLat, currentLng);
   const relMc = api.midheavenDeg(new Date(dateISO), currentLng);
   console.log("\n=== RELOCATED CHART (local ASC/MC at current residence) ===");

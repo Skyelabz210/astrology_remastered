@@ -78,6 +78,10 @@ export async function run() {
   check("at least one astro.jsx page found to audit", audited > 0);
 
   // ── 2. Boundary math: round first, then reduce modulo 1,296,000 ───
+  check("every harmonic target is the nearest arcsecond to its advertised angle",
+        ASPECT_LATTICE.every(a => a.target === BigInt(Math.round(a.angle * 3600))));
+  check("undecile target rounds one eleventh of the integer ring", ASPECT_LATTICE.find(a => a.name === "Undecile").target === (1296000n + 5n) / 11n);
+  check("tredecile target rounds one thirteenth of the integer ring", ASPECT_LATTICE.find(a => a.name === "Tredecile").target === (1296000n + 6n) / 13n);
   check("ring constants have the correct values/types",
         RING_ARCSEC === 1296000 && SIGN_ARC === 108000n);
   check("wrapDegToArcsec(0) = 0n", wrapDegToArcsec(0) === 0n);
