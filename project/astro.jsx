@@ -588,9 +588,14 @@ function makeHouseDispatcher(houseCuspsArc, houseSystemActual, ascSignIdx, sAsc)
     return houseForLongEqual(arcsecToDeg(s), arcsecToDeg(sAsc));
   };
 }
-// Safe-Basis 8-lane residue vector (BigInt), or the legacy 6-lane Number map.
+// Presentation boundary: the canonical API retains its BigInt lane vector,
+// while chart consumers (JSX, readings, prompts) receive Number-valued lanes
+// just like the fallback. Each Safe-Basis residue is at most 18, so this
+// conversion is lossless and does not alter the authoritative ring position.
 function laneResiduesOf(s) {
-  if (EXACT_RING_AVAILABLE()) return window.ExactRing.laneResidues(s);
+  if (EXACT_RING_AVAILABLE()) return Object.fromEntries(
+    Object.entries(window.ExactRing.laneResidues(s)).map(([lane, value]) => [lane, Number(value)])
+  );
   return residues(Number(s));
 }
 // Exact modular Hermetic Lot: (asc + x − y) mod 1,296,000.
@@ -842,9 +847,15 @@ function computeNatal(birth) {
     // integer velocities.
     const sun = planets.find(p => p.name === "Sun");
     const aspect = principal.name === "Sun" ? null : aspectFromRing(principal.arcsecBigInt, sun.arcsecBigInt, birth.orbScale ?? 1);
-    if (aspect) aspect.phase = phaseFromRing(
-      principal.arcsecBigInt, sun.arcsecBigInt,
-      principal.speedArcsecBigInt, sun.speedArcsecBigInt, aspect.target);
+    if (aspect) {
+      // Legacy card/reading fields are display degrees derived from the
+      // locked integer result, never separate floating-point calculations.
+      aspect.sep = arcsecToDeg(aspect.sepArcsec);
+      aspect.orb = arcsecToDeg(aspect.orbArcsec);
+      aspect.phase = phaseFromRing(
+        principal.arcsecBigInt, sun.arcsecBigInt,
+        principal.speedArcsecBigInt, sun.speedArcsecBigInt, aspect.target);
+    }
 
     // Resonance: a 0..1 scalar that drives glow vibrance.
     // Blends Ptolemaic dignity total, tenancy count, aspect tightness, and the
