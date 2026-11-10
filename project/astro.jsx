@@ -568,12 +568,21 @@ function arcDistanceB(sa, sb) {
 // Applying/separating from exact relative velocity and integer error.
 function phaseFromRing(sFast, sSlow, vFast, vSlow, target) {
   if (EXACT_RING_AVAILABLE()) return window.ExactRing.phaseExact(sFast, sSlow, vFast, vSlow, target);
+  // Differentiate the shortest separation, not the raw longitude difference.
+  // Either body order and either orientation around the ring give the same phase.
+  let delta = ((sFast - sSlow) % RING_B + RING_B) % RING_B;
+  if (delta > 648000n) delta -= RING_B;
+  const sep = delta < 0n ? -delta : delta;
+  const error = sep - target;
+  if (error === 0n) return "exact";
   const rel = vFast - vSlow;
   if (rel === 0n) return "static";
-  const sep = arcDistanceB(sFast, sSlow);
-  const err = sep >= target ? sep - target : target - sep;
-  if (err === 0n) return "exact";
-  return (sep > target ? rel > 0n : rel < 0n) ? "separating" : "applying";
+  const magnitude = rel < 0n ? -rel : rel;
+  // At conjunction/opposition the unsigned arc has a cusp. Use its forward
+  // one-sided rate: it opens from zero and closes from a half-circle.
+  const separationRate = sep === 0n ? magnitude
+    : sep === 648000n ? -magnitude : delta < 0n ? -rel : rel;
+  return error * separationRate < 0n ? "applying" : "separating";
 }
 // House placement dispatch, all-integer once cusps are quantized.
 function makeHouseDispatcher(houseCuspsArc, houseSystemActual, ascSignIdx, sAsc) {
@@ -609,11 +618,11 @@ function lotArcsec(sAsc, sx, sy) {
 //
 // Real-ephemeris path: a central-difference speed computed from
 // window.Astronomy (realPlanetSpeedDegPerDay() above) whenever this body has
-// one (REAL_EPHEMERIS_BODIES) and a jd was supplied. isRetrograde() above
-// derives retrograde = speed < 0 from this exact same call, so the speed
-// number and the retrograde flag can never disagree for a given (planet, jd)
-// — this FIXES the historical bug where the synthetic constant rate below
-// was always positive regardless of isRetrograde()'s separate heuristic.
+// one (REAL_BODIES) and a jd was supplied. isRetrograde() above
+// derives retrograde = speed < 0 from this exact same call, so the two can never
+// disagree (this is the fix for the historical bug where the synthetic
+// planetSpeed below was a constant positive mean rate independent of this
+// heuristic flag).
 //
 // Synthetic path (jd omitted, body has no real-ephemeris mapping, or the
 // real computation itself throws): the original constant mean rate derived
@@ -706,8 +715,8 @@ function computeNatal(birth) {
   // Whole/Equal even though 8 more systems were sitting fully computed and
   // tested one function call away. See docs/COMPLETION_AUDIT.md §4.
   //
-  // POLAR_FALLBACK_POLICY's own declared fallback for every "hard" quadrant
-  // system is "WholeSign" — honored here exactly, not re-decided. A missing
+  // POLAR_FALLBACK_POLICY's own declared fallback for every "hard" system is
+  // "WholeSign" — honored here exactly, not re-decided. A missing
   // window.Houses module (offline/failed load) degrades the same way, for
   // the same reason astro.jsx's own ASC/MC fallback exists: a page missing
   // a script tag should render an approximate chart, not a blank one.

@@ -199,15 +199,21 @@ export function nearestAspectRing(sa, sb, orbScale = 1) {
  * @param {bigint} target - aspect lattice target
  */
 export function phaseExact(sFast, sSlow, vFast, vSlow, target) {
+  // Differentiate the shortest separation, not the raw longitude difference.
+  // Either body order and either orientation around the ring give the same phase.
+  let delta = ((sFast - sSlow) % RING + RING) % RING;
+  if (delta > 648000n) delta -= RING;
+  const sep = delta < 0n ? -delta : delta;
+  const error = sep - target;
+  if (error === 0n) return "exact";
   const rel = vFast - vSlow;
   if (rel === 0n) return "static";
-  const sep = arcDistance(sFast, sSlow);
-  const err = sep >= target ? sep - target : target - sep; // ≥ 0
-  if (err === 0n) return "exact";
-  // Moving apart when the current separation exceeds the target and the
-  // (unsigned) separation derivative is positive; symmetric below target.
-  const opening = sep > target ? rel > 0n : rel < 0n;
-  return opening ? "separating" : "applying";
+  const magnitude = rel < 0n ? -rel : rel;
+  // At conjunction/opposition the unsigned arc has a cusp. Use its forward
+  // one-sided rate: it opens from zero and closes from a half-circle.
+  const separationRate = sep === 0n ? magnitude
+    : sep === 648000n ? -magnitude : delta < 0n ? -rel : rel;
+  return error * separationRate < 0n ? "applying" : "separating";
 }
 
 // ── House placement in the ring ───────────────────────────────────────
