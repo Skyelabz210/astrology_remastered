@@ -68,18 +68,13 @@
 import { RING, closes, stepArcsec } from "../core/ring.js";
 import { B8 } from "../core/basis.js";
 
-const SIGN_ARCSEC = 108000n;         // 30°
 const DEG_ARCSEC = 3600n;            // 1°
 const MIN_ARCSEC = 60n;              // 1′
 const CIRC_HALF = 648000n;           // 180°
 
 export const RING_ARCSEC = 1296000;
-// SIGN_ARC is the BigInt ring unit (30° in arcseconds). It MUST be BigInt:
-// decompose/houseWholeSign/houseEqual divide BigInt ring points by it, and
-// JS throws "Cannot mix BigInt and other types" the moment a bigint meets a
-// number. This module was unreachable from every page (no HTML loaded it),
-// so the latent crash never executed — test/present/exact-ring.test.js now
-// exercises every exported function and keeps it honest.
+// BigInt ring positions must be divided by a BigInt sign width. Keeping
+// this constant typed prevents Number/BigInt mixing in houses and decompose.
 export const SIGN_ARC = 108000n;
 
 /**
@@ -168,8 +163,8 @@ export const ASPECT_LATTICE = Object.freeze([
   { name: "BiQuintile",     angle: 144,  target: 518400n, orbArcsec: 7200n,  family: "quintile" },
   // 360/7° = 185142.857…″ → nearest integer lattice point 185143″ (defect disclosed by closure check)
   { name: "Septile",        angle: 360 / 7,  target: 185143n, orbArcsec: 5400n, family: "septile" },
-  { name: "Undecile",       angle: 360 / 11, target: 118909n, orbArcsec: 4320n, family: "undecile" },
-  { name: "Tredecile",      angle: 360 / 13, target: 100154n, orbArcsec: 4320n, family: "tredecile" },
+  { name: "Undecile",       angle: 360 / 11, target: 117818n, orbArcsec: 4320n, family: "undecile" },
+  { name: "Tredecile",      angle: 360 / 13, target: 99692n, orbArcsec: 4320n, family: "tredecile" },
 ]);
 
 /**
@@ -204,15 +199,21 @@ export function nearestAspectRing(sa, sb, orbScale = 1) {
  * @param {bigint} target - aspect lattice target
  */
 export function phaseExact(sFast, sSlow, vFast, vSlow, target) {
+  // Differentiate the shortest separation, not the raw longitude difference.
+  // Either body order and either orientation around the ring give the same phase.
+  let delta = ((sFast - sSlow) % RING + RING) % RING;
+  if (delta > 648000n) delta -= RING;
+  const sep = delta < 0n ? -delta : delta;
+  const error = sep - target;
+  if (error === 0n) return "exact";
   const rel = vFast - vSlow;
   if (rel === 0n) return "static";
-  const sep = arcDistance(sFast, sSlow);
-  const err = sep >= target ? sep - target : target - sep; // ≥ 0
-  if (err === 0n) return "exact";
-  // Moving apart when the current separation exceeds the target and the
-  // (unsigned) separation derivative is positive; symmetric below target.
-  const opening = sep > target ? rel > 0n : rel < 0n;
-  return opening ? "separating" : "applying";
+  const magnitude = rel < 0n ? -rel : rel;
+  // At conjunction/opposition the unsigned arc has a cusp. Use its forward
+  // one-sided rate: it opens from zero and closes from a half-circle.
+  const separationRate = sep === 0n ? magnitude
+    : sep === 648000n ? -magnitude : delta < 0n ? -rel : rel;
+  return error * separationRate < 0n ? "applying" : "separating";
 }
 
 // ── House placement in the ring ───────────────────────────────────────

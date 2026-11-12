@@ -130,9 +130,9 @@ const LOT_FORMULAS = [
     formulaDay: "Asc + Fortune − Saturn", formulaNight: "Asc + Saturn − Fortune" },
 ];
 function computeAllLots(asc, planets, isDay) {
-  const sAsc = typeof asc === "bigint" ? asc : toArcsec(asc);
+  const sAsc = typeof asc === "bigint" ? asc : natalArcsec(asc);
   const sOf = new Map(planets.map(p => [p.name,
-    p.arcsecBigInt !== undefined ? p.arcsecBigInt : toArcsec(p.lon)]));
+    p.arcsecBigInt !== undefined ? p.arcsecBigInt : natalArcsec(p.lon)]));
   const lotS = new Map();
   const out = [];
   for (const f of LOT_FORMULAS) {
@@ -492,7 +492,9 @@ function degToRingArcsec(deg) {
   if (s < 0) s += 1296000;
   return BigInt(s);
 }
-function toArcsec(deg) {
+// Keep this chart quantizer distinct from hcrm.jsx's Number-valued toArcsec.
+// Both classic scripts share the window namespace on the console pages.
+function natalArcsec(deg) {
   return EXACT_RING_AVAILABLE() ? window.ExactRing.wrapDegToArcsec(deg) : degToRingArcsec(deg);
 }
 const RING_B = 1296000n;
@@ -509,14 +511,14 @@ function signedArcB(sa, sb) {
 }
 // Exact ±6h central difference in arcsec/day from quantized sensor samples.
 function planetSpeedArcsec(name, jd) {
-  const sMinus = toArcsec(planetLongitude(name, jd - 0.25));
-  const sPlus  = toArcsec(planetLongitude(name, jd + 0.25));
+  const sMinus = natalArcsec(planetLongitude(name, jd - 0.25));
+  const sPlus  = natalArcsec(planetLongitude(name, jd + 0.25));
   return signedArcB(sPlus, sMinus) * 2n;
 }
 // Quantize a full 12-cusp float array into ring integers once per chart.
 function quantizeCusps(cuspsFloat) {
   if (!cuspsFloat) return null;
-  return cuspsFloat.map(toArcsec);
+  return cuspsFloat.map(natalArcsec);
 }
 // Integer-arcsecond nearest-aspect lookup. The canonical lattice lives in
 // ExactRing (src/present/exact-ring.js); the identical integer table is
@@ -542,8 +544,8 @@ const RING_LATTICE = [
   // NEAREST integer lattice points; the defect belongs to the division, not
   // the comparison arithmetic. See src/core/ring.js closure theory.
   { name: "Septile",        angle: 360 / 7,  target: 185143n, orbArcsec: 5400n, family: "septile" },
-  { name: "Undecile",       angle: 360 / 11, target: 118909n, orbArcsec: 4320n, family: "undecile" },
-  { name: "Tredecile",      angle: 360 / 13, target: 100154n, orbArcsec: 4320n, family: "tredecile" },
+  { name: "Undecile",       angle: 360 / 11, target: 117818n, orbArcsec: 4320n, family: "undecile" },
+  { name: "Tredecile",      angle: 360 / 13, target: 99692n, orbArcsec: 4320n, family: "tredecile" },
 ];
 function aspectFromRing(sa, sb, orbScale) {
   if (EXACT_RING_AVAILABLE()) return window.ExactRing.nearestAspectRing(sa, sb, orbScale);
@@ -566,12 +568,21 @@ function arcDistanceB(sa, sb) {
 // Applying/separating from exact relative velocity and integer error.
 function phaseFromRing(sFast, sSlow, vFast, vSlow, target) {
   if (EXACT_RING_AVAILABLE()) return window.ExactRing.phaseExact(sFast, sSlow, vFast, vSlow, target);
+  // Differentiate the shortest separation, not the raw longitude difference.
+  // Either body order and either orientation around the ring give the same phase.
+  let delta = ((sFast - sSlow) % RING_B + RING_B) % RING_B;
+  if (delta > 648000n) delta -= RING_B;
+  const sep = delta < 0n ? -delta : delta;
+  const error = sep - target;
+  if (error === 0n) return "exact";
   const rel = vFast - vSlow;
   if (rel === 0n) return "static";
-  const sep = arcDistanceB(sFast, sSlow);
-  const err = sep >= target ? sep - target : target - sep;
-  if (err === 0n) return "exact";
-  return (sep > target ? rel > 0n : rel < 0n) ? "separating" : "applying";
+  const magnitude = rel < 0n ? -rel : rel;
+  // At conjunction/opposition the unsigned arc has a cusp. Use its forward
+  // one-sided rate: it opens from zero and closes from a half-circle.
+  const separationRate = sep === 0n ? magnitude
+    : sep === 648000n ? -magnitude : delta < 0n ? -rel : rel;
+  return error * separationRate < 0n ? "applying" : "separating";
 }
 // House placement dispatch, all-integer once cusps are quantized.
 function makeHouseDispatcher(houseCuspsArc, houseSystemActual, ascSignIdx, sAsc) {
@@ -588,9 +599,14 @@ function makeHouseDispatcher(houseCuspsArc, houseSystemActual, ascSignIdx, sAsc)
     return houseForLongEqual(arcsecToDeg(s), arcsecToDeg(sAsc));
   };
 }
-// Safe-Basis 8-lane residue vector (BigInt), or the legacy 6-lane Number map.
+// Presentation boundary: the canonical API retains its BigInt lane vector,
+// while chart consumers (JSX, readings, prompts) receive Number-valued lanes
+// just like the fallback. Each Safe-Basis residue is at most 18, so this
+// conversion is lossless and does not alter the authoritative ring position.
 function laneResiduesOf(s) {
-  if (EXACT_RING_AVAILABLE()) return window.ExactRing.laneResidues(s);
+  if (EXACT_RING_AVAILABLE()) return Object.fromEntries(
+    Object.entries(window.ExactRing.laneResidues(s)).map(([lane, value]) => [lane, Number(value)])
+  );
   return residues(Number(s));
 }
 // Exact modular Hermetic Lot: (asc + x − y) mod 1,296,000.
@@ -602,11 +618,11 @@ function lotArcsec(sAsc, sx, sy) {
 //
 // Real-ephemeris path: a central-difference speed computed from
 // window.Astronomy (realPlanetSpeedDegPerDay() above) whenever this body has
-// one (REAL_EPHEMERIS_BODIES) and a jd was supplied. isRetrograde() above
-// derives retrograde = speed < 0 from this exact same call, so the speed
-// number and the retrograde flag can never disagree for a given (planet, jd)
-// — this FIXES the historical bug where the synthetic constant rate below
-// was always positive regardless of isRetrograde()'s separate heuristic.
+// one (REAL_BODIES) and a jd was supplied. isRetrograde() above
+// derives retrograde = speed < 0 from this exact same call, so the two can never
+// disagree (this is the fix for the historical bug where the synthetic
+// planetSpeed below was a constant positive mean rate independent of this
+// heuristic flag).
 //
 // Synthetic path (jd omitted, body has no real-ephemeris mapping, or the
 // real computation itself throws): the original constant mean rate derived
@@ -672,8 +688,8 @@ function computeNatal(birth) {
   const mcFloat  = midheavenDeg(date, birth.lng);
   // ── P31 SENSOR BOUNDARY: angles lock into the ring immediately after the
   // horizon solver; every downstream angle operation is exact integer math.
-  const sAsc = toArcsec(ascFloat);
-  const sMc  = toArcsec(mcFloat);
+  const sAsc = natalArcsec(ascFloat);
+  const sMc  = natalArcsec(mcFloat);
   const sDesc = (sAsc + 648000n) % RING_B;
   const sIc   = (sMc  + 648000n) % RING_B;
   const asc = arcsecToDeg(sAsc);   // legacy float display, derived FROM the integer
@@ -699,8 +715,8 @@ function computeNatal(birth) {
   // Whole/Equal even though 8 more systems were sitting fully computed and
   // tested one function call away. See docs/COMPLETION_AUDIT.md §4.
   //
-  // POLAR_FALLBACK_POLICY's own declared fallback for every "hard" quadrant
-  // system is "WholeSign" — honored here exactly, not re-decided. A missing
+  // POLAR_FALLBACK_POLICY's own declared fallback for every "hard" system is
+  // "WholeSign" — honored here exactly, not re-decided. A missing
   // window.Houses module (offline/failed load) degrades the same way, for
   // the same reason astro.jsx's own ASC/MC fallback exists: a page missing
   // a script tag should render an approximate chart, not a blank one.
@@ -739,7 +755,7 @@ function computeNatal(birth) {
     // exact form (sign, degInSign, arcsec, speed, retrograde, house, residues)
     // is computed from it with integer arithmetic. `lon`/float `speed` remain
     // as derived display conveniences only.
-    const s = toArcsec(planetLongitude(p, jd));
+    const s = natalArcsec(planetLongitude(p, jd));
     const lon = arcsecToDeg(s);
     const sign = Number(s / SIGN_ARC_B);
     const arcsec = Number(s);
@@ -842,9 +858,15 @@ function computeNatal(birth) {
     // integer velocities.
     const sun = planets.find(p => p.name === "Sun");
     const aspect = principal.name === "Sun" ? null : aspectFromRing(principal.arcsecBigInt, sun.arcsecBigInt, birth.orbScale ?? 1);
-    if (aspect) aspect.phase = phaseFromRing(
-      principal.arcsecBigInt, sun.arcsecBigInt,
-      principal.speedArcsecBigInt, sun.speedArcsecBigInt, aspect.target);
+    if (aspect) {
+      // Legacy card/reading fields are display degrees derived from the
+      // locked integer result, never separate floating-point calculations.
+      aspect.sep = arcsecToDeg(aspect.sepArcsec);
+      aspect.orb = arcsecToDeg(aspect.orbArcsec);
+      aspect.phase = phaseFromRing(
+        principal.arcsecBigInt, sun.arcsecBigInt,
+        principal.speedArcsecBigInt, sun.speedArcsecBigInt, aspect.target);
+    }
 
     // Resonance: a 0..1 scalar that drives glow vibrance.
     // Blends Ptolemaic dignity total, tenancy count, aspect tightness, and the
@@ -1092,7 +1114,7 @@ function computeNatal(birth) {
 Object.assign(window, {
   ZODIAC, PLANET_GLYPH, PLANET_ORDER,
   computeNatal, dignityFor, nearestAspect, dateToJD, ascendantDeg, midheavenDeg,
-  planetLongitude, residues, mod360,
+  planetLongitude, isRetrograde, residues, mod360,
   termRuler, faceRuler, lunarPhase, chartShape, computeLots, computeAllLots,
   antiscion, contraAntiscion, planetDeclination, planetSpeed,
   applyingPhase, criticalKind, detectPatterns,

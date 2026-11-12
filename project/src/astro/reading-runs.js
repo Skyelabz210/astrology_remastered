@@ -2,10 +2,15 @@
 // and evidence; a later run supplements history rather than changing birth data.
 export const RUNS_KEY = 'resonance.reading-runs.v1';
 export const RUNS_MAX = 50;
+// JSON snapshots use decimal strings for exact integers, matching private ZIP
+// exports. Do not coerce to Number or mutate the live BigInt chart objects.
+export function snapshotJSON(value) {
+  return JSON.stringify(value, (_key, item) => typeof item === 'bigint' ? String(item) : item);
+}
 // Compact deterministic cache identifier, not an authentication certificate.
 // FNV-1a 128 over UTF-16 bytes keeps repeated input snapshots out of cache keys.
 export function evidenceFingerprint(value) {
-  const text = JSON.stringify(value);
+  const text = snapshotJSON(value);
   let hash = 0x6c62272e07bb014262b821756295c58dn;
   const prime = 0x1000000000000000000013bn, mask = (1n << 128n) - 1n;
   for (let i = 0; i < text.length; i++) {
@@ -41,7 +46,7 @@ export function loadRuns(storage, owner = null) {
 export function saveRun(storage, run) {
   try {
     storage = storage || globalThis.localStorage;
-    const clean = JSON.parse(JSON.stringify(run));
+    const clean = JSON.parse(snapshotJSON(run));
     if (!validRun(clean)) return false;
     const rows = loadRuns(storage).filter(r => r.id !== clean.id || r.profileKey !== clean.profileKey);
     storage.setItem(RUNS_KEY, JSON.stringify([clean, ...rows].slice(0, RUNS_MAX)));

@@ -1,24 +1,9 @@
-// test/present/exact-ring.test.js — the P31 sensor boundary, wired and proven.
+// P31 canonical exact-ring integration regression gate.
 //
-// src/present/exact-ring.js declares itself "the SYSTEM OF RECORD for every
-// chart computation" and astro.jsx's comment (line ~482) claims it is
-// "published as window.ExactRing by a <script type=\"module\"> tag that runs
-// before this text/babel script on every page". That claim was FALSE: no HTML
-// page loaded the module, so window.ExactRing was undefined at runtime and
-// every chart silently ran the inline LEGACY_FLOAT-tagged fallback instead of
-// the advertised canonical quantizer. This suite is the regression gate:
-//
-//   1. wiring  — every page that loads astro.jsx must load exact-ring.js as a
-//      `type="module"` script BEFORE the astro.jsx text/babel tag (module
-//      scripts execute before DOMContentLoaded, which is when Babel-standalone
-//      runs the classic scripts — same ordering guarantee core-shim.js relies
-//      on).
-//   2. math    — the exported ring arithmetic itself, run directly under Node
-//      (the module is dual-environment by design).
-//   3. parity  — astro.jsx's degToRingArcsec fallback must agree with
-//      wrapDegToArcsec bit-for-bit; if they ever diverge, the two live paths
-//      split the app's idea of a position and the header's "positions can
-//      never diverge between environments" claim becomes false again.
+// Audits every HTML entrypoint that loads astro.jsx, validates the BigInt
+// arithmetic and boundary rounding, and compares the canonical implementation
+// against the fallback function bodies extracted from the shipped astro.jsx.
+// Browser smoke tests separately verify that modules actually initialize.
 
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -42,7 +27,6 @@ function extractFn(src, name) {
   const start = src.indexOf(`function ${name}(`);
   if (start < 0) throw new Error(`astro.jsx: function ${name}() not found`);
   let depth = 0, i = src.indexOf("{", start);
-  const open = i;
   for (; i < src.length; i++) {
     if (src[i] === "{") depth++;
     else if (src[i] === "}") { depth--; if (depth === 0) break; }
@@ -55,35 +39,61 @@ const degToRingArcsec = new Function(
   extractFn(ASTRO_SRC, "degToRingArcsec") + "; return degToRingArcsec;"
 )(BigInt, roundHalfAwayFromZero, 3600);
 
+// Extract the shipped fallback lattice and arithmetic, not a test-only copy.
+const latticeStart = ASTRO_SRC.indexOf("const RING_LATTICE = [");
+const latticeEnd = ASTRO_SRC.indexOf("\n];", latticeStart);
+if (latticeStart < 0 || latticeEnd < 0) {
+  throw new Error("astro.jsx: RING_LATTICE not found");
+}
+const fallback = new Function("roundHalfAwayFromZero", `
+  const RING_B = 1296000n;
+  const EXACT_RING_AVAILABLE = () => false;
+  ${ASTRO_SRC.slice(latticeStart, latticeEnd + 3)}
+  ${extractFn(ASTRO_SRC, "arcDistanceB")}
+  ${extractFn(ASTRO_SRC, "aspectFromRing")}
+  ${extractFn(ASTRO_SRC, "phaseFromRing")}
+  return { aspectFromRing, phaseFromRing };
+`)(roundHalfAwayFromZero);
+
 export async function run() {
   const rows = [];
   const check = (name, ok, detail = "") => rows.push({ name, ok: !!ok, detail });
 
-  // ── 1. Wiring: pages that load astro.jsx must load exact-ring.js first ──
+  // ── 1. Wiring: the canonical module must precede every chart core ──
   const htmlFiles = readdirSync(ROOT).filter((f) => f.endsWith(".html"));
+  let audited = 0;
   for (const f of htmlFiles) {
     const src = read(f);
-    if (!/src=["']astro\.jsx["']/.test(src)) continue; // page doesn't mount the chart core
-    const hasTag = /src=["'][^"']*exact-ring\.js["']/.test(src);
-    const idxRing = src.search(/<script[^>]*src=["'][^"']*exact-ring\.js["']/);
-    const idxAstro = src.search(/<script[^>]*src=["']astro\.jsx["']/);
-    check(
-      `${f}: exact-ring.js wired before astro.jsx`,
-      hasTag && idxRing >= 0 && idxRing < idxAstro,
-      hasTag ? (idxRing < idxAstro ? "" : "tag present but AFTER astro.jsx")
-             : "no <script> tag for src/present/exact-ring.js on this page"
-    );
+    const tags = [...src.matchAll(/<script\b[^>]*>/gi)];
+    const astro = tags.find((m) => /\bsrc=["']astro\.jsx["']/i.test(m[0]));
+    if (!astro) continue;
+    audited++;
+    const ring = tags.filter((m) => /\bsrc=["']src\/present\/exact-ring\.js["']/i.test(m[0]));
+    const valid = ring.length === 1
+      && /\btype=["']module["']/i.test(ring[0][0])
+      && ring[0].index < astro.index;
+    check(`${f}: canonical ES module precedes astro.jsx`, valid,
+      valid ? "" : "missing, duplicated, wrong type, or after astro.jsx");
   }
-  check("at least one astro.jsx page found to audit", htmlFiles.length > 0);
+  check("at least one astro.jsx page found to audit", audited > 0);
 
-  // ── 2. Boundary math: wrapDegToArcsec ─────────────────────────────
+  // ── 2. Boundary math: round first, then reduce modulo 1,296,000 ───
+  check("every harmonic target is the nearest arcsecond to its advertised angle",
+        ASPECT_LATTICE.every(a => a.target === BigInt(Math.round(a.angle * 3600))));
+  check("undecile target rounds one eleventh of the integer ring", ASPECT_LATTICE.find(a => a.name === "Undecile").target === (1296000n + 5n) / 11n);
+  check("tredecile target rounds one thirteenth of the integer ring", ASPECT_LATTICE.find(a => a.name === "Tredecile").target === (1296000n + 6n) / 13n);
+  check("ring constants have the correct values/types",
+        RING_ARCSEC === 1296000 && SIGN_ARC === 108000n);
   check("wrapDegToArcsec(0) = 0n", wrapDegToArcsec(0) === 0n);
   check("wrapDegToArcsec(360) wraps to 0n", wrapDegToArcsec(360) === 0n);
-  check("wrapDegToArcsec(-0.0001) wraps forward", wrapDegToArcsec(-0.0001) === 1295999n);
-  check("wrapDegToArcsec(10.0000042) = 36000n (half-up at the .499…″ edge)",
+  check("wrapDegToArcsec(-0.0001) rounds to zero", wrapDegToArcsec(-0.0001) === 0n);
+  check("wrapDegToArcsec(-0.0002) rounds to last arcsecond", wrapDegToArcsec(-0.0002) === 1295999n);
+  check("wrapDegToArcsec(10.0000042) = 36000n",
         wrapDegToArcsec(10.0000042) === 36000n);
-  check("wrapDegToArcsec(359.9999997) = 1295999n (last point on the ring)",
-        wrapDegToArcsec(359.9999997) === 1295999n);
+  check("wrapDegToArcsec(359.9999997) wraps to zero",
+        wrapDegToArcsec(359.9999997) === 0n);
+  check("wrapDegToArcsec(359.9998) is last arcsecond",
+        wrapDegToArcsec(359.9998) === 1295999n);
   check("wrapDegToArcsec rejects NaN", (() => { try { wrapDegToArcsec(NaN); return false; } catch { return true; } })());
   check("wrapDegToArcsec output ∈ [0, RING) over 4000 sampled degrees", (() => {
     for (let k = -2000; k < 2000; k++) {
@@ -99,6 +109,37 @@ export async function run() {
     for (let k = -3500; k < 3500; k++) {
       const deg = k * 0.101;
       if (wrapDegToArcsec(deg) !== degToRingArcsec(deg)) return false;
+    }
+    return true;
+  })());
+
+  // Compare the canonical implementation to the actual legacy fallback
+  // implementation, including aspect metadata and relative-motion phases.
+  check("astro.jsx aspectFromRing parity (deterministic ring samples)", (() => {
+    const fields = ["name", "angle", "family", "target", "orbArcsec", "sepArcsec", "exact"];
+    for (let a = 0n; a < 1296000n; a += 1811n) {
+      const b = (a * 37n + 913n) % 1296000n;
+      for (const scale of [0.5, 1, 1.5, 10]) {
+        const canonical = nearestAspectRing(a, b, scale);
+        const legacy = fallback.aspectFromRing(a, b, scale);
+        if (canonical === null || legacy === null) {
+          if (canonical !== legacy) return false;
+        } else if (!fields.every((field) => canonical[field] === legacy[field])) {
+          return false;
+        }
+      }
+    }
+    return true;
+  })());
+  check("astro.jsx phaseFromRing parity (all aspect targets)", (() => {
+    for (const { target } of ASPECT_LATTICE) {
+      for (let a = 0n; a < 1296000n; a += 51731n) {
+        const b = (a * 17n + 373n) % 1296000n;
+        for (const velocity of [-5n, 0n, 5n]) {
+          if (phaseExact(a, b, velocity, 0n, target)
+              !== fallback.phaseFromRing(a, b, velocity, 0n, target)) return false;
+        }
+      }
     }
     return true;
   })());
@@ -159,7 +200,11 @@ export async function run() {
         phaseExact(100n, 0n, -5n, 0n, 648000n) === "separating");
   check("phaseExact: applying below target with positive relative velocity",
         phaseExact(100n, 0n, 5n, 0n, 648000n) === "applying");
-  check("phaseExact: separating above target", phaseExact(650000n, 0n, 5n, 0n, 648000n) === "separating");
+  // A sextile is reachable above target: 220000″ > 216000″ (60°).
+  check("phaseExact: separating above sextile target",
+        phaseExact(220000n, 0n, 5n, 0n, 216000n) === "separating");
+  check("phaseExact: applying above sextile target",
+        phaseExact(220000n, 0n, -5n, 0n, 216000n) === "applying");
   check("phaseExact: static on zero relative velocity", phaseExact(100n, 0n, 7n, 7n, 648000n) === "static");
 
   // Houses.
